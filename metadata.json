@@ -1,0 +1,8 @@
+{
+  "name": "K-Cinema 大师：影视工业化流程",
+  "description": "一款专业的高端应用程序，旨在教学并引导用户了解韩国影视制作行业的严苛标准，涵盖从剧本开发到全球发行的全流程。",
+  "requestFramePermissions": [
+    "camera",
+    "microphone"
+  ]
+}
