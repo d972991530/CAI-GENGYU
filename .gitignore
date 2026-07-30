@@ -22,3 +22,8 @@ dist-ssr
 *.njsproj
 *.sln
 *.sw?
+
+# script2manga skill runtime artifacts
+.claude/skills/script2manga/output/
+__pycache__/
+*.pyc
