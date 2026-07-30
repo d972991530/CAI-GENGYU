@@ -63,6 +63,91 @@ export async function generateStoryboardDescription(prompt: string, mode: 'creat
 }
 
 /**
+ * 漫画分镜格
+ */
+export interface ComicPanel {
+  panelNumber: number;
+  sceneDescription: string;
+  caption?: string;
+  dialogue?: { character: string; line: string }[];
+}
+
+/**
+ * 剧本拆解为漫画分镜格 - 结构化输出场景描述与对白
+ */
+export async function breakdownScriptToComicPanels(script: string, panelCount: number = 6): Promise<ComicPanel[]> {
+  const ai = getAI();
+  const response = await ai.models.generateContent({
+    model: 'gemini-3-pro-preview',
+    contents: `你是一名资深漫画编剧兼分镜师。请将以下剧本改编为约 ${panelCount} 格漫画分镜。
+    要求：
+    1. 挑选最具戏剧张力和视觉表现力的关键时刻，保持叙事连贯。
+    2. 每一格给出足够具体的画面描述（人物、动作、表情、场景、构图），以便画师直接绘制。
+    3. 提取角色对白（如有），保持精炼、口语化，适合放入漫画对话气泡。
+    4. 如某格没有对白，可仅提供旁白/场景说明性的 caption。
+
+    剧本内容：${script}`,
+    config: {
+      temperature: 0.7,
+      thinkingConfig: { thinkingBudget: 0 },
+      responseMimeType: 'application/json',
+      responseSchema: {
+        type: Type.ARRAY,
+        items: {
+          type: Type.OBJECT,
+          properties: {
+            panelNumber: { type: Type.INTEGER },
+            sceneDescription: { type: Type.STRING },
+            caption: { type: Type.STRING },
+            dialogue: {
+              type: Type.ARRAY,
+              items: {
+                type: Type.OBJECT,
+                properties: {
+                  character: { type: Type.STRING },
+                  line: { type: Type.STRING }
+                },
+                required: ['character', 'line']
+              }
+            }
+          },
+          required: ['panelNumber', 'sceneDescription']
+        }
+      }
+    }
+  });
+  return JSON.parse(response.text);
+}
+
+/**
+ * 单格漫画图像生成 - 手绘风格
+ */
+export async function generateComicPanelImage(panel: ComicPanel, style: string = '日式漫画 (Manga B&W)'): Promise<string | null> {
+  const ai = getAI();
+  const dialogueText = panel.dialogue?.length
+    ? panel.dialogue.map(d => `${d.character}: "${d.line}"`).join('; ')
+    : '';
+
+  const prompt = `Hand-drawn comic book panel illustration, ${style}.
+    Traditional hand-drawn look: visible ink/pencil linework, crosshatching or screentone shading, textured paper background, imperfect organic lines. Absolutely NOT smooth vector or 3D render.
+    Scene: ${panel.sceneDescription}.
+    ${dialogueText ? `Include hand-lettered speech bubbles with the exact text: ${dialogueText}.` : ''}
+    ${panel.caption ? `Include a narration caption box with text: "${panel.caption}".` : ''}
+    Strong panel border, dynamic comic composition.`;
+
+  const response = await ai.models.generateContent({
+    model: 'gemini-2.5-flash-image',
+    contents: { parts: [{ text: prompt }] },
+    config: {
+      imageConfig: { aspectRatio: "4:3" }
+    }
+  });
+
+  const part = response.candidates?.[0].content.parts.find(p => p.inlineData);
+  return part ? `data:image/png;base64,${part.inlineData.data}` : null;
+}
+
+/**
  * 关键帧生成 - 支持细化控制参数
  */
 export async function generateKeyframeImage(prompt: string, style: string = 'Cinematic') {
