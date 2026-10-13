@@ -1,0 +1,56 @@
+name: Build 蛊变 (Windows + Android)
+
+on:
+  push:
+    paths:
+      - 'gubian-game/**'
+      - '.github/workflows/build-game.yml'
+  workflow_dispatch:
+
+defaults:
+  run:
+    working-directory: gubian-game
+
+jobs:
+  windows:
+    runs-on: windows-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+          cache-dependency-path: gubian-game/package-lock.json
+      - run: npm ci
+      - run: npm run dist:win
+      - uses: actions/upload-artifact@v4
+        with:
+          name: GuBian-Windows
+          path: |
+            gubian-game/release/*.exe
+          if-no-files-found: error
+
+  android:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+          cache-dependency-path: gubian-game/package-lock.json
+      - uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: 21
+      - run: npm ci
+      - run: npm run android:init
+      - name: Gradle assembleDebug
+        working-directory: gubian-game/android
+        run: ./gradlew assembleDebug --no-daemon
+      - run: cp android/app/build/outputs/apk/debug/app-debug.apk GuBian-Android.apk
+      - uses: actions/upload-artifact@v4
+        with:
+          name: GuBian-Android
+          path: gubian-game/GuBian-Android.apk
+          if-no-files-found: error

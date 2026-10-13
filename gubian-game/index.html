@@ -1,0 +1,118 @@
+<!doctype html>
+<html lang="zh-CN">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover" />
+    <meta name="theme-color" content="#000000" />
+    <title>蛊变：长江启示录</title>
+  </head>
+  <body>
+    <canvas id="game"></canvas>
+
+    <div id="hud">
+      <div id="objective"></div>
+      <div id="vitals">
+        <div class="hp"><div id="hp-fill"></div></div>
+        <span id="hp-text">良好</span>
+        <span id="herbs">草药 ×1</span>
+      </div>
+      <div id="ammo"></div>
+      <div id="abilities"></div>
+      <div id="crosshair"><i></i><i></i><i></i><i></i></div>
+      <div id="hitmarker"></div>
+      <div id="prompt"></div>
+      <div id="hint"></div>
+      <div id="boss"><span></span><div class="bar"><div id="boss-fill"></div></div></div>
+      <div id="subtitle"></div>
+    </div>
+
+    <div id="scan-tint"></div>
+    <div id="frost"></div>
+    <div id="vignette"></div>
+    <div id="letterbox"><div></div><div></div></div>
+    <div id="fade"></div>
+    <div id="caption"></div>
+    <div id="document"></div>
+
+    <div id="menu" class="screen on">
+      <div class="title">
+        <h1>蛊变</h1>
+        <h2>长江启示录</h2>
+        <p class="chapter">第一章 · 云梦号</p>
+      </div>
+      <div class="buttons">
+        <button data-act="start">开始游戏</button>
+        <button data-act="settings">设置</button>
+        <button data-act="controls">操作说明</button>
+      </div>
+      <p class="foot">含血腥与惊悚内容，建议 16 岁以上玩家游玩 · 佩戴耳机体验更佳</p>
+    </div>
+
+    <div id="pause" class="screen">
+      <h3>暂停</h3>
+      <div class="buttons">
+        <button data-act="resume">继续</button>
+        <button data-act="settings">设置</button>
+        <button data-act="checkpoint">从检查点重来</button>
+        <button data-act="quit">返回主菜单</button>
+      </div>
+    </div>
+
+    <div id="dead" class="screen">
+      <h3 class="red">你死了</h3>
+      <div class="buttons">
+        <button data-act="checkpoint">从检查点继续</button>
+        <button data-act="quit">返回主菜单</button>
+      </div>
+    </div>
+
+    <div id="ended" class="screen">
+      <h3>第一章　云梦号　完</h3>
+      <div id="stats"></div>
+      <p class="next">下一章：回溯 · 七二一（开发中）<br><small>三个月前，巫山深处——老周与陈砚</small></p>
+      <div class="buttons"><button data-act="quit">返回主菜单</button></div>
+    </div>
+
+    <div id="settings" class="screen">
+      <h3>设置</h3>
+      <label>画质
+        <select id="s-quality">
+          <option value="low">低（中低端手机）</option>
+          <option value="mid">中</option>
+          <option value="high">高（含实时阴影）</option>
+        </select>
+      </label>
+      <label>视角灵敏度 <input id="s-sens" type="range" min="0.3" max="2.5" step="0.1" /></label>
+      <label>音量 <input id="s-vol" type="range" min="0" max="1" step="0.05" /></label>
+      <label class="row">辅助瞄准 <input id="s-assist" type="checkbox" /></label>
+      <p class="note">画质阴影与光源数量在重启游戏后生效。</p>
+      <div class="buttons"><button data-act="back">返回</button></div>
+    </div>
+
+    <div id="controls" class="screen">
+      <h3>操作说明</h3>
+      <div class="cols">
+        <div>
+          <h4>电脑（Windows）</h4>
+          <p>WASD 移动 · Shift 奔跑 · 鼠标 视角</p>
+          <p>左键 射击 · 右键 瞄准 · R 换弹</p>
+          <p>E 互动 · Q 勘察镜 · F 手电强光</p>
+          <p>G 小满的铜铃 · H 使用草药</p>
+          <p>Esc 暂停 · F11 全屏</p>
+        </div>
+        <div>
+          <h4>手机（安卓）</h4>
+          <p>左半屏拖动：虚拟摇杆（推到底奔跑）</p>
+          <p>右半屏滑动：转动视角</p>
+          <p>按住「开火」射击，同时可拖动瞄准</p>
+          <p>「瞄准」切换越肩瞄准</p>
+          <p>其余技能按钮在解锁后出现</p>
+        </div>
+      </div>
+      <div class="buttons"><button data-act="back">返回</button></div>
+    </div>
+
+    <div id="loading">加载中……</div>
+    <script type="module" src="/src/main.ts"></script>
+  </body>
+</html>
