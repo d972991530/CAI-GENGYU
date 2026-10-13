@@ -54,3 +54,32 @@ jobs:
           name: GuBian-Android
           path: gubian-game/GuBian-Android.apk
           if-no-files-found: error
+
+  release:
+    needs: [windows, android]
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+    defaults:
+      run:
+        working-directory: .
+    steps:
+      - uses: actions/download-artifact@v4
+        with:
+          path: out
+          merge-multiple: true
+      - name: Publish GitHub Release
+        uses: softprops/action-gh-release@v2
+        with:
+          tag_name: game-build-${{ github.run_number }}
+          name: 蛊变：长江启示录 第一章 · 构建 ${{ github.run_number }}
+          target_commitish: ${{ github.sha }}
+          make_latest: true
+          body: |
+            《蛊变：长江启示录》第一章「云梦号」
+
+            - 安卓：下载 `GuBian-Android.apk`，在手机上安装（需允许“安装未知来源应用”）
+            - Windows：`GuBian Setup *.exe` 为安装版，`GuBian-Portable-*.exe` 为免安装版
+          files: |
+            out/*.apk
+            out/*.exe
