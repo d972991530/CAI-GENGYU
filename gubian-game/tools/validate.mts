@@ -16,7 +16,7 @@ for (const f of files) {
   const mod = await import(pathToFileURL(join(dataDir, f)).href);
   const data = Object.values(mod)[0] as any;
   let script = '';
-  try { script = readFileSync(join(here, `../src/chapters/ch${data.id}.ts`), 'utf8'); } catch { script = '*'; }
+  try { script = readFileSync(join(here, `../src/chapters/${data.side ?? `ch${data.id}`}.ts`), 'utf8'); } catch { script = '*'; }
   const errs: string[] = [];
   const warn: string[] = [];
   const W = Math.max(...data.map.map((r: string) => r.length));

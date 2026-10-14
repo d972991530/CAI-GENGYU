@@ -9,7 +9,7 @@ const PLANE = (() => {
   return g;
 })();
 
-const HEIGHTS: Record<string, number> = { lin: 1.8, zhou: 1.78, su: 1.68, man: 1.25, chen: 1.75, apo: 1.5, xu: 1.8, zhong: 1.72 };
+const HEIGHTS: Record<string, number> = { lin: 1.8, zhou: 1.78, su: 1.68, man: 1.25, chen: 1.75, apo: 1.5, xu: 1.8, zhong: 1.72, tang: 1.8, civ1: 1.15, civ2: 1.15 };
 
 // 剧情同伴 / NPC：立绘公告板，跟随玩家，不参与伤害
 export class Npc {

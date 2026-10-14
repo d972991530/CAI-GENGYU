@@ -7,15 +7,20 @@ const SPRITES = [
   'coffin_hang', 'tank_body',
   // 用户资产包（独立单体）
   'infected', 'miner', 'nuo_mask', 'bride2', 'scare_nuo',
+  // 联动《侠客行1971》
+  'tang', 'noh_gun', 'noh_gun_w1', 'noh_gun_w2', 'noh_gun_hit', 'noh_blade', 'noh_blade_w', 'noh_blade_atk', 'noh_dead',
+  'tsuchigumo', 'tsuchigumo_w', 'tsuchigumo_atk', 'tsuchigumo_dead', 'civ1', 'civ2',
 ];
 const TEX = [
   'frost_door', 'tank_wall', 'ship_wall', 'frost_shelf', 'wood_panel', 'carpet', 'wet_tile', 'hold_wall',
   'sluice_wall', 'factory_wall', 'banquet_wall', 'village_wall',
   'm_ch1', 'm_ch2', 'm_ch3', 'm_ch4', 'm_ch5', 'm_ch6', 'm_ch7', 'm_ch8', 'm_coffin', 'm_terminal',
+  'x_brick', 'x_plaster', 'x_stone', 'x_wood', 'x_iron', 'x_roof', 'x_cloth', 'x_concrete', 'x_shutter', 'x_window', 'x_door', 'x_poster', 'x_memorial',
 ];
-const HUD = ['h_pistol_b', 'h_bell_b', 'w_mg', 'w_cryo', 'w_pistol2', 'w_cryo2'];
-const PROPS = ['ammo', 'bell', 'medkit', 'serum'];
-export const PORTRAITS = ['lin', 'su', 'zhou', 'chen', 'man', 'apo', 'xu', 'zhong'];
+const HUD = ['h_pistol_b', 'h_bell_b', 'w_mg', 'w_cryo', 'w_pistol2', 'w_cryo2',
+  'wt_pistol_r', 'wt_pistol_l', 'wt_shotgun', 'wt_sword', 'wt_sg1', 'wt_sg2', 'wt_sw0', 'wt_sw1', 'wt_sw2'];
+const PROPS = ['ammo', 'bell', 'medkit', 'serum', 'x_medkit', 'x_ammo', 'x_shells'];
+export const PORTRAITS = ['lin', 'su', 'zhou', 'chen', 'man', 'apo', 'xu', 'zhong', 'tang'];
 
 export interface SpriteInfo {
   name: string;

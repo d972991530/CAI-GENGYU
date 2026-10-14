@@ -23,7 +23,7 @@ export interface Shot {
 }
 
 const SPEAKER_PORTRAIT: Record<string, string> = {
-  林骁: 'lin', 苏晚: 'su', 陈砚: 'chen', 老周: 'zhou', 小满: 'man', 阿婆: 'apo', 许怀远: 'xu', 钟曼: 'zhong',
+  林骁: 'lin', 苏晚: 'su', 陈砚: 'chen', 老周: 'zhou', 小满: 'man', 阿婆: 'apo', 许怀远: 'xu', 钟曼: 'zhong', 唐武男: 'tang',
 };
 
 function imgUrl(id: string) {

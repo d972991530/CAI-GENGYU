@@ -30,6 +30,9 @@ export interface Kind {
   passive?: boolean;
   charge?: boolean;
   score: number;
+  human?: boolean; // 人类敌人：铜铃无效
+  revive?: number; // 倒地若干秒后爬起，除非被爆头 / 赤霄斩首
+  anim?: { walk?: string[]; attack?: string; hurt?: string; dead?: string };
 }
 
 export const KINDS: Record<string, Kind> = {
@@ -46,6 +49,12 @@ export const KINDS: Record<string, Kind> = {
   steelbone: { name: '钢骨', sprites: ['steelbone'], h: 2.9, hp: 1500, speed: 2.2, dmg: 30, reach: 2.6, windup: 0.9, cd: 1.6, headFrac: 0.12, headMult: 1, armor: 0.1, weak: [[0.3, 0.42, 0.6, 0.72]], weakMult: 2.5, bright: 1.25, radius: 1.0, boss: true, charge: true, score: 4500 },
   xu: { name: '异化许怀远', sprites: ['xu'], h: 2.3, hp: 1300, speed: 2.8, dmg: 20, reach: 2.2, windup: 0.6, cd: 1.1, headFrac: 0.15, headMult: 1.5, armor: 0.35, weak: [[0.55, 0.45, 0.95, 0.85]], weakMult: 2.2, bright: 1.2, radius: 0.6, boss: true, ranged: { proj: 'proj_red', dmg: 12, speed: 18, cd: 1.4, range: 26, keep: 6 }, score: 5000 },
   mother: { name: '蛊母 · 苏明远', sprites: ['coffin'], h: 3.6, hp: 2200, speed: 0, dmg: 20, reach: 4.5, windup: 1.0, cd: 2.2, headFrac: 0, headMult: 1, armor: 0.05, weak: [[0.35, 0.35, 0.65, 0.7]], weakMult: 4, bright: 1.3, radius: 2.4, boss: true, ranged: { proj: 'proj_bug', dmg: 12, speed: 10, cd: 2.0, range: 30 }, score: 8000 },
+  // ---- 联动支线《丹字档案》：美术取自《侠客行1971》----
+  noh_gun: { name: '能面众枪手', sprites: ['noh_gun'], h: 1.8, hp: 55, speed: 2.3, dmg: 8, reach: 1.4, windup: 0.4, cd: 1.0, headFrac: 0.15, headMult: 3, armor: 1, bright: 1.5, radius: 0.35, human: true, ranged: { proj: 'proj_red', dmg: 9, speed: 18, cd: 1.5, range: 22, keep: 7 }, anim: { walk: ['noh_gun_w1', 'noh_gun_w2'], hurt: 'noh_gun_hit', dead: 'noh_dead' }, score: 150 },
+  noh_blade: { name: '能面众剑手', sprites: ['noh_blade'], h: 1.8, hp: 75, speed: 3.0, dmg: 14, reach: 1.7, windup: 0.45, cd: 1.0, headFrac: 0.15, headMult: 3, armor: 1, bright: 1.5, radius: 0.38, human: true, anim: { walk: ['noh_blade_w', 'noh_blade'], attack: 'noh_blade_atk', dead: 'noh_dead' }, score: 150 },
+  dannu: { name: '丹奴', sprites: ['water_gu'], h: 1.85, hp: 90, speed: 1.5, dmg: 16, reach: 1.5, windup: 0.6, cd: 1.3, headFrac: 0.16, headMult: 4, armor: 0.5, tint: 0xe6b4a8, bright: 1.15, radius: 0.4, revive: 3.2, score: 150 },
+  tsuchigumo: { name: '能面众 · 土蜘蛛', sprites: ['tsuchigumo'], h: 2.3, hp: 1500, speed: 2.7, dmg: 20, reach: 2.3, windup: 0.6, cd: 1.2, headFrac: 0.13, headMult: 2, armor: 0.45, bright: 1.7, radius: 0.7, boss: true, human: true, charge: true, anim: { walk: ['tsuchigumo_w', 'tsuchigumo'], attack: 'tsuchigumo_atk', dead: 'tsuchigumo_dead' }, score: 4000 },
+  specimen: { name: '棺中之物 · 丹字班试验体', sprites: ['mandrill'], h: 3.0, hp: 1800, speed: 1.4, dmg: 26, reach: 2.6, windup: 0.9, cd: 1.6, headFrac: 0.15, headMult: 1, armor: 0.25, weak: [[0.15, 0, 0.85, 0.16]], weakMult: 2.5, tint: 0xd8b8b0, bright: 1.1, radius: 0.9, boss: true, ranged: { proj: 'proj_bug', dmg: 10, speed: 9, cd: 2.8, range: 24 }, score: 6000 },
   anchor: { name: '菌丝锚点', sprites: ['coffin'], h: 2.2, hp: 260, speed: 0, dmg: 0, reach: 0, windup: 1, cd: 9, headFrac: 0, headMult: 1, armor: 1, tint: 0xff6060, bright: 1.6, radius: 0.8, score: 300 },
 };
 
@@ -92,6 +101,11 @@ export class Enemy {
   freezeBuild = 0;
   charmT = 0; // 被铜铃反向驱使（攻击人类）
   behavior: ((e: Enemy, dt: number) => boolean) | null = null;
+  interrupt: (() => void) | null = null; // 被近战打断（Boss 招式）
+  killCounted = false;
+  private reviveAt = 0;
+  private baseSprite = '';
+  private curSprite = '';
   onDamaged: ((e: Enemy, dmg: number, part: HitPart) => void) | null = null;
   private walkT = Math.random() * 10;
   private attackCd = 0;
@@ -109,7 +123,8 @@ export class Enemy {
   constructor(kindName: string, x: number, z: number, yaw: number, state: EnemyState = 'idle', scale = 1) {
     this.kind = KINDS[kindName];
     const k = this.kind;
-    this.info = sprite(k.sprites[(Math.random() * k.sprites.length) | 0]);
+    this.baseSprite = this.curSprite = k.sprites[(Math.random() * k.sprites.length) | 0];
+    this.info = sprite(this.baseSprite);
     this.height = k.h * scale * (k.boss ? 1 : 0.94 + Math.random() * 0.12);
     this.maxHp = this.hp = k.hp;
     this.speed = k.speed * (k.boss ? 1 : 0.85 + Math.random() * 0.3);
@@ -199,7 +214,7 @@ export class Enemy {
     }
   }
 
-  damage(amount: number, part: HitPart, opts: { electric?: boolean; cryo?: boolean } = {}): number {
+  damage(amount: number, part: HitPart, opts: { electric?: boolean; cryo?: boolean; melee?: boolean; fire?: boolean } = {}): number {
     if (!this.alive || this.invulnerable) return 0;
     const k = this.kind;
     let mult = part === 'head' ? k.headMult : part === 'weak' ? (k.weakMult ?? 2) : 1;
@@ -224,8 +239,21 @@ export class Enemy {
       if (this.freezeBuild >= 1) { this.freeze(k.boss ? 2.5 : 4); this.freezeBuild = 0; }
     }
     this.onDamaged?.(this, dmg, part);
-    if (this.hp <= 0) this.die();
+    if (this.hp <= 0) {
+      // 丹奴：只有爆头、斩首或火烧才算真正死亡
+      this.reviveAt = k.revive && !(part === 'head' || opts.melee || opts.fire) ? k.revive : 0;
+      this.die();
+    }
     return dmg;
+  }
+
+  // 倒地的丹奴：用火 / 赤霄补刀彻底处理
+  finish() {
+    this.reviveAt = 0;
+  }
+
+  get downed() {
+    return this.state === 'dead' && this.reviveAt > 0;
   }
 
   freeze(sec: number) {
@@ -279,6 +307,34 @@ export class Enemy {
 
     if (this.state === 'dead') {
       this.deathT += dt;
+      if (this.reviveAt > 0) {
+        // 倒地抽搐，随后爬起
+        this.mesh.rotation.x = -1.35 + Math.max(0, this.deathT - this.reviveAt + 0.8) * 1.6;
+        this.mesh.position.y = 0;
+        this.mat.opacity = 1;
+        this.group.position.set(this.pos.x, 0, this.pos.z);
+        if (this.deathT > this.reviveAt) {
+          this.reviveAt = 0;
+          this.state = 'awaken';
+          this.stateT = 0.4;
+          this.hp = this.maxHp * 0.5;
+          this.mat.transparent = false;
+          this.mesh.rotation.x = 0;
+          this.shadow.visible = true;
+          audio.roar({ x: this.pos.x, y: 1.6, z: this.pos.z });
+        }
+        return;
+      }
+      if (this.kind.anim?.dead) {
+        this.useSprite(this.kind.anim.dead);
+        this.mesh.rotation.set(0, 0, 0);
+        this.mesh.scale.set(this.height * 0.9 * this.info.aspect * 0.42, this.height * 0.42, 1);
+        this.mesh.position.set(0, 0, 0);
+        if (this.deathT > 6) this.mat.opacity = Math.max(0, 1 - (this.deathT - 6) * 0.5);
+        this.shadow.visible = false;
+        this.group.position.set(this.pos.x, 0, this.pos.z);
+        return;
+      }
       const t = Math.min(1, this.deathT * 1.6);
       this.mesh.rotation.x = -t * 1.35;
       this.mesh.position.y = -t * 0.1;
@@ -425,8 +481,25 @@ export class Enemy {
     this.group.position.set(this.pos.x, 0, this.pos.z);
   }
 
+  private useSprite(name: string) {
+    if (name === this.curSprite) return;
+    this.curSprite = name;
+    this.info = sprite(name);
+    this.mat.map = this.info.tex;
+    this.mat.needsUpdate = true;
+  }
+
   private animate(dt: number, move: number, host: EnemyHost) {
     const k = this.kind;
+    // 逐帧动作（联动敌人）：行走 / 出招 / 受击
+    if (k.anim) {
+      let want = this.baseSprite;
+      if (this.state === 'attack' || this.state === 'windup' || this.state === 'charge') want = k.anim.attack ?? want;
+      else if (this.flashT > 0 && k.anim.hurt) want = k.anim.hurt;
+      else if (this.state === 'stunned' && k.anim.hurt) want = k.anim.hurt;
+      else if (move > 0 && k.anim.walk) want = k.anim.walk[Math.floor(this.walkT * 1.2) % k.anim.walk.length];
+      this.useSprite(want);
+    }
     // 根据相对镜头的横向移动翻转立绘
     const camRightX = Math.cos(this.group.rotation.y), camRightZ = -Math.sin(this.group.rotation.y);
     const vx = this.pos.x - this.lastX;

@@ -8,6 +8,7 @@ const SPEAKERS: Record<string, { p?: string; c: string }> = {
   老周: { p: 'zhou', c: '#ffd27a' }, 小满: { p: 'man', c: '#ffe08a' }, 阿婆: { p: 'apo', c: '#e6c9a0' },
   许怀远: { p: 'xu', c: '#c0c8ff' }, 钟曼: { p: 'zhong', c: '#ff9a9a' }, 方鹤年: { c: '#d8d0b8' }, 苏明远: { c: '#ff8a7a' },
   广播: { c: '#ff6a5a' }, 蛊母: { c: '#ff5040' }, 新娘: { c: '#ff6a8a' }, 技术员: { c: '#cccccc' },
+  唐武男: { p: 'tang', c: '#ff7a5a' }, 土蜘蛛: { c: '#b0b8c8' }, 傩戏班姑娘: { c: '#e6c9a0' }, 船长: { c: '#d8d0b8' }, 押运员: { c: '#cccccc' }, 能面众: { c: '#e8e8e8' },
 };
 
 const el = (tag: string, cls: string, parent: HTMLElement, html = '') => {
@@ -21,9 +22,10 @@ const el = (tag: string, cls: string, parent: HTMLElement, html = '') => {
 export interface HudState {
   hp: number;
   armor: number;
-  ammo: number;
+  ammo: number | string;
   ammoName: string;
   reserve: { ammo: number; mg_ammo: number; cryo_ammo: number };
+  reserveNames?: [string, string, string | null];
   weapons: { slot: number; name: string; owned: boolean; active: boolean }[];
   keys: string[];
   herbs: number;
@@ -161,7 +163,8 @@ export class Hud {
     this.ammoEl.innerHTML = s.reloading ? '<b class="dim">··</b><small>换弹中</small>' : `<b>${s.ammo}</b><small>${s.ammoName}</small>`;
     this.armsEl.innerHTML = `<small>武器</small><div>${s.weapons.map((w) => `<span class="${w.owned ? 'own' : ''} ${w.active ? 'act' : ''}">${w.slot}</span>`).join('')}</div>`;
     this.keysEl.innerHTML = ['red', 'blue', 'yellow'].map((k) => `<i class="k-${k} ${s.keys.includes(k) ? 'has' : ''}"></i>`).join('') + `<span class="herb">草药×${s.herbs}</span>`;
-    this.tableEl.innerHTML = `<div>手枪弹 <b>${s.reserve.ammo}</b></div><div>机枪弹 <b>${s.reserve.mg_ammo}</b></div><div>冷凝弹 <b>${s.reserve.cryo_ammo}</b></div>`;
+    const rn = s.reserveNames ?? ['手枪弹', '机枪弹', '冷凝弹'];
+    this.tableEl.innerHTML = `<div>${rn[0]} <b>${s.reserve.ammo}</b></div><div>${rn[1]} <b>${s.reserve.mg_ammo}</b></div>` + (rn[2] ? `<div>${rn[2]} <b>${s.reserve.cryo_ammo}</b></div>` : '<div>赤霄 <b>∞</b></div>');
     if (!IS_MOBILE) {
       this.abilEl.innerHTML = s.abilities.filter((a) => a.on).map((a) =>
         `<div class="ab ${a.cd > 0 ? 'cd' : ''}"><b>${a.key}</b>${a.name}${a.cd > 0 ? `<i>${Math.ceil(a.cd)}</i>` : ''}<s style="width:${a.cd > 0 ? (1 - a.cd / a.max) * 100 : 100}%"></s></div>`).join('');

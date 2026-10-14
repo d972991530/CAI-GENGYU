@@ -16,6 +16,12 @@ import { ch5 } from './ch5';
 import { ch6 } from './ch6';
 import { ch7 } from './ch7';
 import { ch8 } from './ch8';
+import { side1 as s1 } from './data/side1';
+import { side2 as s2 } from './data/side2';
+import { side3 as s3 } from './data/side3';
+import { side1 } from './side1';
+import { side2 } from './side2';
+import { side3 } from './side3';
 
 export interface Chapter {
   data: ChapterData;
@@ -26,3 +32,6 @@ export const CHAPTERS: Chapter[] = [
   { data: d1, run: ch1 }, { data: d2, run: ch2 }, { data: d3, run: ch3 }, { data: d4, run: ch4 },
   { data: d5, run: ch5 }, { data: d6, run: ch6 }, { data: d7, run: ch7 }, { data: d8, run: ch8 },
 ];
+
+// 联动支线《丹字档案》（× 侠客行1971），独立于主线进度
+export const SIDE: Chapter[] = [{ data: s1, run: side1 }, { data: s2, run: side2 }, { data: s3, run: side3 }];

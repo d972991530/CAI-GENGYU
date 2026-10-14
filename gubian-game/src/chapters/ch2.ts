@@ -36,7 +36,8 @@ export async function ch2(g: Game) {
   await g.interact('terminal', 'terminal', '黑入终端', undefined, -1.2, 0);
   while (!(await g.mg.hack('黑入百慧终端', 4, 30))) g.hud.message('连线超时，重新尝试……');
   await g.hud.showDocument('档案二 · “万蛊计划”项目概述',
-    '<p>万蛊计划（WG Project）——1976 年立项。</p><p>以战国朱砂菌为基底，研究神经接管技术。</p><p>早期研究员：<b class="red">苏明远</b>，方鹤年……</p>');
+    '<p>万蛊计划（WG Project）——1976 年立项。</p><p>以战国朱砂菌为基底，研究神经接管技术。</p><p>早期研究员：<b class="red">苏明远</b>，方鹤年……</p>' +
+    '<p class="dim">附件：一张泛黄的交接清单复印件，抬头印着「防疫给水部 · 丹字班」。“丹-7”一栏被红笔圈出，旁注：<b class="red">CG-7</b>。</p>');
   await g.say('陈砚', '苏明远……苏晚的父亲？');
   await g.say('老周（皱眉）', '这事不能让丫头知道。至少现在不能。');
   g.setFlag('hack');

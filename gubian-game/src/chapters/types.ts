@@ -49,7 +49,8 @@ export interface ChapterData {
   id: number;
   title: string;
   place: string;
-  pov: 'lin' | 'zhou' | 'su';
+  pov: 'lin' | 'zhou' | 'su' | 'tang';
+  side?: string; // 联动支线：脚本文件名（如 'side1'），校验用
   map: string[];
   doors: DoorDef[];
   marks: Record<string, [number, number]>;

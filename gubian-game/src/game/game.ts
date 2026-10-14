@@ -10,7 +10,7 @@ import {
 import { Enemy, EnemyHost, EnemyState, HitPart } from '../entities/enemy';
 import { Npc } from '../entities/npc';
 import { sprite as spriteInfo, imageTexture } from '../core/assets';
-import { WEAPONS, WeaponId, WeaponView, AmmoType } from './weapons';
+import { WEAPONS, WeaponId, WeaponView, AmmoType, WeaponDef, setArsenal, arsenal } from './weapons';
 import { Hud } from '../ui/hud';
 import { Cinematic, Shot } from '../ui/cinematic';
 import { Minigames } from '../ui/minigames';
@@ -132,6 +132,7 @@ export class Game implements EnemyHost {
   scanUnlocked = false;
   flashUnlocked = true;
   bellUnlocked = false;
+  bellOwn = false; // 玩家自己持铃（联动支线：镇魂铜铃），不需要小满
   zhenyinUnlocked = false;
   scanCd = 0;
   scanT = 0;
@@ -282,6 +283,9 @@ export class Game implements EnemyHost {
     this.exitEnabled = false;
     this.face = data.pov;
     this.hud.setFace(this.face);
+    setArsenal(data.pov === 'tang' ? 'tang' : 'default');
+    this.weapon.refresh(WEAPONS[this.current]);
+    this.bellOwn = false;
     this.scanUnlocked = this.flashUnlocked = true;
     this.bellUnlocked = this.zhenyinUnlocked = false;
     this.scanCd = this.flashCd = this.bellCd = this.zhenyinCd = 0;
@@ -410,7 +414,7 @@ export class Game implements EnemyHost {
     this.hp = Math.max(c.hp, 75);
     this.oxygen = 100;
     this.reserve.ammo = Math.max(this.reserve.ammo, 24);
-    if (this.owned.has('mg')) this.reserve.mg_ammo = Math.max(this.reserve.mg_ammo, 60);
+    if (this.owned.has('mg')) this.reserve.mg_ammo = Math.max(this.reserve.mg_ammo, arsenal === 'tang' ? 12 : 60);
     if (this.owned.has('cryo')) this.reserve.cryo_ammo = Math.max(this.reserve.cryo_ammo, 12);
     this.weapon.reloading = 0;
     for (const e of this.enemies) e.reset();
@@ -494,6 +498,7 @@ export class Game implements EnemyHost {
   }
 
   giveWeapon(w: WeaponId, ammo = 0) {
+    if (!this.owned.has(w)) this.mags[w] = WEAPONS[w].mag;
     this.owned.add(w);
     this.reserve[WEAPONS[w].ammo] += ammo;
     this.switchWeapon(w);
@@ -546,9 +551,12 @@ export class Game implements EnemyHost {
 
   addPickup(type: ItemType, col: number, row: number, respawn = 0, ox = 0, oz = 0) {
     const { x, z } = cellCenter(col, row);
-    const prop = type === 'medkit' ? 'prop:medkit' : type.endsWith('ammo') ? 'prop:ammo' : null;
+    const tang = arsenal === 'tang';
+    const prop = type === 'medkit' ? (tang ? 'prop:x_medkit' : 'prop:medkit')
+      : type === 'mg_ammo' && tang ? 'prop:x_shells'
+      : type.endsWith('ammo') ? (tang ? 'prop:x_ammo' : 'prop:ammo') : null;
     const ptex = prop ? imageTexture(prop) : null;
-    const s = new THREE.Sprite(new THREE.SpriteMaterial({ map: ptex ?? iconTexture(type), depthWrite: false, color: type === 'cryo_ammo' ? 0x9ff : type === 'mg_ammo' ? 0xffd090 : 0xffffff }));
+    const s = new THREE.Sprite(new THREE.SpriteMaterial({ map: ptex ?? iconTexture(type), depthWrite: false, color: tang ? 0xffffff : type === 'cryo_ammo' ? 0x9ff : type === 'mg_ammo' ? 0xffd090 : 0xffffff }));
     const big = type.startsWith('weapon') || type.startsWith('key') || !!ptex;
     s.scale.set(big ? 0.9 : 0.7, big ? 0.9 : 0.7, 1);
     s.position.set(x + ox, 0.45, z + oz);
@@ -697,6 +705,7 @@ export class Game implements EnemyHost {
     if (this.fireCd > 0 || this.weapon.busy || this.weapon.reloading > 0) return;
     if (!def.auto && this.triggerHeld) return;
     this.triggerHeld = true;
+    if (def.melee) { this.slash(def); return; }
     if (this.mags[this.current] <= 0) {
       audio.dryFire();
       this.fireCd = 0.3;
@@ -708,17 +717,23 @@ export class Game implements EnemyHost {
     this.weapon.kick();
     this.stats.shots++;
     if (def.id === 'cryo') audio.sample('cryo_blast', 0.7) || audio.flash();
+    else if (def.pellets) { audio.sample('pistol_shot', 1, 0.6) || audio.gunshot(); audio.explosion(); setTimeout(() => audio.reload(), 380); }
     else if (!audio.sample('pistol_shot', def.id === 'mg' ? 0.5 : 0.8, def.id === 'mg' ? 0.85 : 1)) audio.gunshot();
     this.onShot?.();
-    this.pitch += def.id === 'mg' ? 0.006 : 0.014;
+    this.pitch += def.pellets ? 0.03 : def.id === 'mg' ? 0.006 : 0.014;
     this.yaw += (Math.random() - 0.5) * (def.id === 'mg' ? 0.01 : 0.004);
-    this.flashBurst = Math.max(this.flashBurst, 0.05);
+    this.flashBurst = Math.max(this.flashBurst, def.pellets ? 0.1 : 0.05);
+    if (def.pellets) this.shake = Math.max(this.shake, 0.25);
+    for (let i = 0; i < (def.pellets ?? 1); i++) this.shootRay(def, i > 0);
+  }
 
+  // 单条弹道：先找立绘命中，再比较墙体距离
+  private shootRay(def: WeaponDef, quiet: boolean) {
     const moving = Math.min(1, this.vel.length() / 3);
     const spread = def.spread * (1 + moving);
     const origin = this.camera.getWorldPosition(new THREE.Vector3());
     const dir = new THREE.Vector3((Math.random() - 0.5) * spread * 2, (Math.random() - 0.5) * spread * 2, -1).normalize().applyQuaternion(this.camera.quaternion);
-    if (this.settings.aimAssist) {
+    if (this.settings.aimAssist && !def.pellets) {
       let best = IS_MOBILE ? 0.09 : 0.05, bd: THREE.Vector3 | null = null;
       for (const e of this.enemies) {
         if (!e.alive || e.state === 'dormant' || (e.kind.passive && !e.enraged)) continue;
@@ -743,11 +758,11 @@ export class Game implements EnemyHost {
       const e = eh.e;
       const cryo = def.id === 'cryo';
       e.damage(def.dmg, eh.part, { cryo });
-      this.stats.hits++;
-      if (eh.part === 'head') this.stats.headshots++;
+      if (!quiet) this.stats.hits++;
+      if (eh.part === 'head' && !quiet) this.stats.headshots++;
       this.hud.hit(!e.alive, eh.part !== 'body');
       const n = dir.clone().negate();
-      for (let i = 0; i < (eh.part === 'head' ? 14 : 8); i++) {
+      for (let i = 0; i < (quiet ? 3 : eh.part === 'head' ? 14 : 8); i++) {
         this.particle(eh.point, cryo ? 0xbff6ff : i % 3 ? 0x7a0a05 : 0xd02810, new THREE.Vector3((Math.random() - 0.5) * 3, Math.random() * 3, (Math.random() - 0.5) * 3).addScaledVector(n, 2), 0.6);
       }
       if (cryo) for (const o of this.enemies) if (o !== e && o.alive && o.pos.distanceTo(e.pos) < 2.5) o.damage(def.dmg * 0.5, 'body', { cryo: true });
@@ -758,14 +773,71 @@ export class Game implements EnemyHost {
         if (pipe) this.burstPipe(pipe);
       }
       const n = wh.face ? wh.face.normal.clone().transformDirection(wh.object.matrixWorld) : dir.clone().negate();
-      this.decal(wh.point, n);
-      for (let i = 0; i < 5; i++) this.particle(wh.point.clone().addScaledVector(n, 0.03), def.id === 'cryo' ? 0x9ff : 0xffc060, n.clone().multiplyScalar(2).add(new THREE.Vector3((Math.random() - 0.5) * 3, Math.random() * 2, (Math.random() - 0.5) * 3)), 0.25, -6, 0.025);
+      if (!quiet || Math.random() < 0.4) this.decal(wh.point, n);
+      for (let i = 0; i < (quiet ? 2 : 5); i++) this.particle(wh.point.clone().addScaledVector(n, 0.03), def.id === 'cryo' ? 0x9ff : 0xffc060, n.clone().multiplyScalar(2).add(new THREE.Vector3((Math.random() - 0.5) * 3, Math.random() * 2, (Math.random() - 0.5) * 3)), 0.25, -6, 0.025);
     }
   }
 
+  // 赤霄：扇形斩击（不耗弹）。斩到的蛊化者算“断首”，丹奴不会再爬起来
+  private slash(def: WeaponDef) {
+    this.fireCd = def.rate;
+    this.weapon.kick();
+    this.stats.shots++;
+    const a = audio;
+    a.noise(0.18, a.out(), 'bandpass', 2600, 0.35, 1.2, 0.01);
+    a.tone('sine', 900, 300, 0.15, 0.06, a.out());
+    const fwd = new THREE.Vector3(-Math.sin(this.yaw), 0, -Math.cos(this.yaw));
+    let hit = 0;
+    setTimeout(() => {
+      for (const e of this.enemies) {
+        const to = new THREE.Vector3(e.pos.x - this.playerPos.x, 0, e.pos.z - this.playerPos.z);
+        const d = to.length() - e.kind.radius;
+        if (e.downed && d < 2.2) {
+          // 倒地的丹奴：补刀斩首
+          e.finish();
+          this.hud.message('赤霄斩首——它不会再爬起来了');
+          for (let i = 0; i < 12; i++) this.particle(e.pos.clone().setY(0.3), 0x7a0a05, new THREE.Vector3((Math.random() - 0.5) * 3, Math.random() * 3, (Math.random() - 0.5) * 3), 0.6);
+          hit++;
+          continue;
+        }
+        if (!e.alive || e.state === 'dormant' && e.kind.passive) continue;
+        if (d > 2.4 || to.normalize().dot(fwd) < 0.45) continue;
+        e.damage(def.dmg, 'body', { melee: true });
+        if (e.kind.boss) e.interrupt?.();
+        hit++;
+        const p = e.center();
+        for (let i = 0; i < 10; i++) this.particle(p, i % 3 ? 0x7a0a05 : 0xd02810, new THREE.Vector3((Math.random() - 0.5) * 4, Math.random() * 3, (Math.random() - 0.5) * 4), 0.6);
+        this.hud.hit(!e.alive, false);
+      }
+      if (hit) { this.stats.hits++; a.hitFlesh(); this.shake = Math.max(this.shake, 0.2); }
+      this.onSlash?.(this.playerPos, fwd);
+    }, 120);
+  }
+
+  onBell: (() => void) | null = null;
+
+  // 火：煤油灯 / 火油。范围内的蛊化者受火伤，倒地的丹奴被彻底烧尽
+  fireBurst(x: number, z: number, radius = 4) {
+    const c = new THREE.Vector3(x, 0.4, z);
+    audio.explosion(c);
+    this.shake = Math.max(this.shake, 0.5);
+    this.flashBurst = Math.max(this.flashBurst, 0.3);
+    for (let i = 0; i < 40; i++) {
+      this.particle(c.clone().add(new THREE.Vector3((Math.random() - 0.5) * radius, Math.random() * 0.6, (Math.random() - 0.5) * radius)),
+        i % 3 ? 0xff8020 : 0xffd060, new THREE.Vector3((Math.random() - 0.5) * 2, 2 + Math.random() * 3, (Math.random() - 0.5) * 2), 0.9, 2, 0.08);
+    }
+    for (const e of this.enemies) {
+      if (Math.hypot(e.pos.x - x, e.pos.z - z) > radius) continue;
+      if (e.downed) e.finish();
+      else if (e.alive) e.damage(e.kind.boss ? 120 : 140, 'body', { fire: true });
+    }
+    if (Math.hypot(this.playerPos.x - x, this.playerPos.z - z) < radius * 0.6) this.damagePlayer(15, c);
+  }
+  onSlash: ((pos: THREE.Vector3, fwd: THREE.Vector3) => void) | null = null;
+
   private startReload() {
     const def = WEAPONS[this.current];
-    if (this.weapon.reloading > 0 || this.mags[this.current] >= def.mag || this.reserve[def.ammo] <= 0) return;
+    if (def.melee || this.weapon.reloading > 0 || this.mags[this.current] >= def.mag || this.reserve[def.ammo] <= 0) return;
     this.weapon.reloading = def.reload;
     audio.reload();
   }
@@ -805,6 +877,18 @@ export class Game implements EnemyHost {
   useBell() {
     const man = this.npcs.get('man');
     if (!this.bellUnlocked || this.bellCd > 0) return;
+    if (this.bellOwn) {
+      // 镇魂铜铃：6 米内的蛊化者僵直，对人类无效
+      this.bellCd = 12;
+      this.weapon.showBell();
+      if (!audio.sample('bronze_bell_long', 0.8)) audio.bellRing();
+      for (const e of this.enemies) {
+        if (!e.alive || e.kind.human) continue;
+        if (Math.hypot(e.pos.x - this.playerPos.x, e.pos.z - this.playerPos.z) < 6.5) e.stun(e.kind.boss ? 1.5 : 2.5);
+      }
+      this.onBell?.();
+      return;
+    }
     this.bellCd = 60;
     if (man) man.ringT = 1.2;
     this.weapon.showBell();
@@ -1110,7 +1194,8 @@ export class Game implements EnemyHost {
 
     const manHere = !!this.npcs.get('man')?.following;
     this.hud.set({
-      hp: this.hp, armor: this.armor, ammo: this.mags[this.current], ammoName: def.name, reserve: this.reserve,
+      hp: this.hp, armor: this.armor, ammo: def.melee ? '—' : this.mags[this.current], ammoName: def.name, reserve: this.reserve,
+      reserveNames: arsenal === 'tang' ? ['手枪弹', '霰弹', null] : undefined,
       weapons: (['pistol', 'mg', 'cryo'] as WeaponId[]).map((w) => ({ slot: WEAPONS[w].slot, name: WEAPONS[w].name, owned: this.owned.has(w), active: this.current === w })),
       keys: [...this.keys], herbs: this.herbs, stamina: this.stamina,
       oxygen: this.oxygen < 99.5 || this.water ? this.oxygen : null,
@@ -1118,14 +1203,14 @@ export class Game implements EnemyHost {
       abilities: [
         { key: 'F', name: '强光', cd: this.flashCd, max: 8, on: this.flashUnlocked },
         { key: 'C', name: '勘察镜', cd: this.scanCd, max: 12, on: this.scanUnlocked },
-        { key: 'Q', name: '铜铃', cd: this.bellCd, max: 60, on: this.bellUnlocked && manHere },
+        { key: 'Q', name: '铜铃', cd: this.bellCd, max: this.bellOwn ? 12 : 60, on: this.bellUnlocked && (manHere || this.bellOwn) },
         { key: 'Z', name: '镇音', cd: this.zhenyinCd, max: 25, on: this.zhenyinUnlocked },
         { key: 'Space', name: '闪避', cd: Math.max(0, this.dashCd), max: 1.2, on: true },
       ],
     });
     this.input.setButton('scan', { visible: this.scanUnlocked, cooldown: this.scanCd / 12 });
     this.input.setButton('flash', { visible: this.flashUnlocked, cooldown: this.flashCd / 8 });
-    this.input.setButton('bell', { visible: this.bellUnlocked && manHere, cooldown: this.bellCd / 60 });
+    this.input.setButton('bell', { visible: this.bellUnlocked && (manHere || this.bellOwn), cooldown: this.bellCd / (this.bellOwn ? 12 : 60) });
     this.input.setButton('zhenyin', { visible: this.zhenyinUnlocked, cooldown: this.zhenyinCd / 25 });
     this.input.setButton('weapon', { visible: this.owned.size > 1 });
     this.input.setButton('dash', { cooldown: Math.max(0, this.dashCd) / 1.2 });
@@ -1141,15 +1226,19 @@ export class Game implements EnemyHost {
     const msg = (s: string) => this.hud.message(s);
     switch (t) {
       case 'ammo': this.reserve.ammo += 12; msg('拾取 手枪弹 ×12'); return true;
-      case 'mg_ammo': this.reserve.mg_ammo += 50; msg('拾取 机枪弹 ×50'); return true;
+      case 'mg_ammo':
+        if (arsenal === 'tang') { this.reserve.mg_ammo += 8; msg('拾取 霰弹 ×8'); return true; }
+        this.reserve.mg_ammo += 50; msg('拾取 机枪弹 ×50'); return true;
       case 'cryo_ammo': this.reserve.cryo_ammo += 6; msg('拾取 冷凝弹 ×6'); return true;
       case 'herb': this.herbs++; msg('拾取 草药'); return true;
       case 'medkit': if (this.hp >= 100) return false; this.hp = Math.min(100, this.hp + 25); msg('急救包：生命 +25'); return true;
-      case 'armor': if (this.armor >= 100) return false; this.armor = Math.min(100, this.armor + 50); msg('NBER 防弹背心：护甲 +50'); return true;
+      case 'armor': if (this.armor >= 100) return false; this.armor = Math.min(100, this.armor + 50); msg(arsenal === 'tang' ? '牛皮护甲：护甲 +50' : 'NBER 防弹背心：护甲 +50'); return true;
       case 'key_red': this.keys.add('red'); msg('获得 红色钥匙卡'); return true;
       case 'key_blue': this.keys.add('blue'); msg('获得 蓝色钥匙卡'); return true;
       case 'key_yellow': this.keys.add('yellow'); msg('获得 黄色钥匙卡'); return true;
-      case 'weapon_mg': this.giveWeapon('mg', 60); msg('获得 重机枪'); return true;
+      case 'weapon_mg':
+        if (arsenal === 'tang') { this.giveWeapon('mg', 8); msg('缴获 短管霰弹枪'); return true; }
+        this.giveWeapon('mg', 60); msg('获得 重机枪'); return true;
       case 'weapon_cryo': this.giveWeapon('cryo', 12); msg('获得 冷凝枪'); return true;
     }
     return false;
@@ -1178,7 +1267,8 @@ export class Game implements EnemyHost {
         e.update(dt, this);
         if (e.justDied) {
           e.justDied = false;
-          if (e.kind.name !== '菌丝锚点') this.stats.kills++;
+          if (e.kind.name !== '菌丝锚点' && !e.killCounted) this.stats.kills++;
+          e.killCounted = true;
           const fx = this.camPos.x - e.pos.x, fz = this.camPos.z - e.pos.z;
           const fl = Math.hypot(fx, fz) || 1;
           const bp = new THREE.Vector3(e.pos.x - (fx / fl) * 0.6, 0.02, e.pos.z - (fz / fl) * 0.6);
@@ -1232,7 +1322,7 @@ export class Game implements EnemyHost {
   private dropLoot(p: THREE.Vector3) {
     const types: ItemType[] = ['ammo', 'ammo', 'herb', 'medkit'];
     if (this.owned.has('mg')) types.push('mg_ammo');
-    if (this.owned.has('cryo')) types.push('cryo_ammo');
+    if (this.owned.has('cryo') && !WEAPONS.cryo.melee) types.push('cryo_ammo');
     const t = types[(Math.random() * types.length) | 0];
     const { col, row } = toCell(p.x, p.z);
     const c = cellCenter(col, row);
