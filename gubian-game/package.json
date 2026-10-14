@@ -1,20 +1,23 @@
 {
   "name": "gubian-yangtze",
   "productName": "蛊变：长江启示录",
-  "version": "0.1.0",
+  "version": "0.2.0",
   "description": "《蛊变：长江启示录》第一章「云梦号」—— 第一人称丧尸惊悚射击游戏（Windows / Android）",
   "private": true,
   "type": "module",
   "main": "electron/main.cjs",
   "author": "CAI-GENGYU",
   "scripts": {
-    "dev": "vite",
-    "build": "tsc --noEmit && vite build",
-    "preview": "vite preview",
-    "electron": "npm run build && electron .",
-    "dist:win": "npm run build && electron-builder --win --x64 --publish never",
-    "android:init": "npm run build && npx cap add android && node scripts/patch-android.mjs && npx cap sync android",
-    "android:sync": "npm run build && npx cap sync android"
+    "dev": "vite --mode desktop",
+    "dev:mobile": "vite --mode mobile",
+    "build": "tsc --noEmit && vite build --mode desktop && vite build --mode mobile",
+    "build:desktop": "vite build --mode desktop",
+    "build:mobile": "vite build --mode mobile",
+    "validate": "node --experimental-strip-types tools/validate.mts",
+    "electron": "npm run build:desktop && electron .",
+    "dist:win": "npm run build:desktop && electron-builder --win --x64 --publish never",
+    "android:init": "npm run build:mobile && npx cap add android && node scripts/patch-android.mjs && npx cap sync android",
+    "android:sync": "npm run build:mobile && npx cap sync android"
   },
   "build": {
     "appId": "com.caigengyu.gubian",
@@ -23,7 +26,7 @@
       "output": "release"
     },
     "files": [
-      "dist/**/*",
+      "dist-desktop/**/*",
       "electron/**/*"
     ],
     "win": {

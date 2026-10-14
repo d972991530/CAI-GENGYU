@@ -49,7 +49,7 @@ export class Audio {
     }
   }
 
-  private out(pos?: { x: number; y: number; z: number }): AudioNode {
+  out(pos?: { x: number; y: number; z: number }): AudioNode {
     if (!pos || !this.ctx) return this.sfx;
     const p = this.ctx.createPanner();
     p.panningModel = 'HRTF';
@@ -62,7 +62,7 @@ export class Audio {
     return p;
   }
 
-  private noise(dur: number, dest: AudioNode, filterType: BiquadFilterType, freq: number, gain: number, q = 1, attack = 0.002) {
+  noise(dur: number, dest: AudioNode, filterType: BiquadFilterType, freq: number, gain: number, q = 1, attack = 0.002) {
     const ctx = this.ctx!;
     const src = ctx.createBufferSource();
     src.buffer = this.noiseBuf;
@@ -79,7 +79,7 @@ export class Audio {
     return f;
   }
 
-  private tone(type: OscillatorType, f0: number, f1: number, dur: number, gain: number, dest: AudioNode, delay = 0) {
+  tone(type: OscillatorType, f0: number, f1: number, dur: number, gain: number, dest: AudioNode, delay = 0) {
     const ctx = this.ctx!;
     const o = ctx.createOscillator();
     o.type = type;
@@ -277,6 +277,67 @@ export class Audio {
       this.tone('sine', 62, 40, 0.18, 0.5 * intensity, this.sfx);
       this.tone('sine', 55, 36, 0.18, 0.35 * intensity, this.sfx, 0.22);
     }
+  }
+
+  // ---------- 采样音效（用户提供的 wav）----------
+  private samples = new Map<string, AudioBuffer>();
+  async loadSamples(names: string[], base: string) {
+    if (!this.ctx) return;
+    await Promise.all(names.map(async (n) => {
+      try {
+        const r = await fetch(`${base}${n}.wav`);
+        const buf = await this.ctx!.decodeAudioData(await r.arrayBuffer());
+        this.samples.set(n, buf);
+      } catch {
+        /* 缺失时回退到合成音效 */
+      }
+    }));
+  }
+
+  sample(name: string, gain = 0.8, rate = 1, pos?: { x: number; y: number; z: number }) {
+    if (!this.ctx) return false;
+    const b = this.samples.get(name);
+    if (!b) return false;
+    const src = this.ctx.createBufferSource();
+    src.buffer = b;
+    src.playbackRate.value = rate;
+    const g = this.ctx.createGain();
+    g.gain.value = gain;
+    src.connect(g).connect(this.out(pos));
+    src.start();
+    return true;
+  }
+
+  // 跳脸惊吓：撕裂尖叫 + 低频冲击
+  scream() {
+    if (!this.ctx) return;
+    const ctx = this.ctx;
+    const t = ctx.currentTime;
+    for (const [f, v] of [[620, 0.35], [910, 0.25], [1400, 0.15]] as const) {
+      const o = ctx.createOscillator();
+      o.type = 'sawtooth';
+      o.frequency.setValueAtTime(f, t);
+      o.frequency.exponentialRampToValueAtTime(f * 0.55, t + 1.1);
+      const vib = ctx.createOscillator();
+      vib.frequency.value = 23;
+      const vg = ctx.createGain();
+      vg.gain.value = f * 0.08;
+      vib.connect(vg).connect(o.frequency);
+      const g = ctx.createGain();
+      g.gain.setValueAtTime(0, t);
+      g.gain.linearRampToValueAtTime(v, t + 0.03);
+      g.gain.exponentialRampToValueAtTime(0.0001, t + 1.2);
+      o.connect(g).connect(this.sfx);
+      o.start(t); vib.start(t);
+      o.stop(t + 1.3); vib.stop(t + 1.3);
+    }
+    this.noise(1.0, this.sfx, 'highpass', 2500, 0.6, 0.7, 0.01);
+    this.tone('sine', 70, 25, 0.9, 1.2, this.sfx);
+  }
+
+  whisper() {
+    if (!this.ctx) return;
+    for (let i = 0; i < 3; i++) setTimeout(() => this.ctx && this.noise(0.6, this.amb, 'bandpass', 1800 + Math.random() * 1500, 0.12, 8, 0.2), i * 380);
   }
 }
 

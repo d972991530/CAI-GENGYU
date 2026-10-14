@@ -2,106 +2,228 @@ import './style.css';
 import { Capacitor } from '@capacitor/core';
 import { StatusBar } from '@capacitor/status-bar';
 import { audio } from './core/audio';
-import { Game, Settings } from './game/game';
-import { chapterOne } from './game/story';
+import { loadAll, artUrl } from './core/assets';
+import { Game, Settings, ChapterStats } from './game/game';
+import { CHAPTERS } from './chapters';
+import { IS_MOBILE, PLATFORM, SAVE_KEY } from './platform';
 
-const SETTINGS_KEY = 'gubian.settings';
-const isTouch = matchMedia('(pointer: coarse)').matches || 'ontouchstart' in window;
-if (isTouch) document.body.classList.add('touch');
+document.body.classList.add(IS_MOBILE ? 'mobile' : 'desktop');
 
-function loadSettings(): Settings {
-  const defaults: Settings = { quality: isTouch ? 'low' : 'mid', sensitivity: 1, volume: 0.8, aimAssist: isTouch };
+interface Save {
+  unlocked: number; // 已解锁的最高章节（1 起）
+  current: number;
+  choices: Record<string, number>;
+  settings: Settings;
+}
+
+const defaults: Settings = { quality: IS_MOBILE ? 'low' : 'mid', sensitivity: 1, volume: 0.8, aimAssist: IS_MOBILE, easyQte: IS_MOBILE, subtitleSize: 1 };
+
+function loadSave(): Save {
   try {
-    const raw = localStorage.getItem(SETTINGS_KEY);
-    return raw ? { ...defaults, ...JSON.parse(raw) } : defaults;
-  } catch {
-    return defaults;
-  }
+    const raw = localStorage.getItem(SAVE_KEY);
+    if (raw) {
+      const s = JSON.parse(raw) as Save;
+      return { ...{ unlocked: 1, current: 1, choices: {} }, ...s, settings: { ...defaults, ...s.settings } };
+    }
+  } catch { /* 忽略损坏的存档 */ }
+  return { unlocked: 1, current: 1, choices: {}, settings: { ...defaults } };
 }
+const save = loadSave();
+const persist = () => {
+  try { localStorage.setItem(SAVE_KEY, JSON.stringify(save)); } catch { /* 隐私模式 */ }
+};
 
-function saveSettings(s: Settings) {
-  try {
-    localStorage.setItem(SETTINGS_KEY, JSON.stringify(s));
-  } catch {
-    /* 隐私模式下忽略 */
-  }
-}
+if (Capacitor.isNativePlatform()) StatusBar.hide().catch(() => {});
 
-if (Capacitor.isNativePlatform()) {
-  StatusBar.hide().catch(() => {});
-}
-
-const settings = loadSettings();
 const canvas = document.querySelector<HTMLCanvasElement>('#game')!;
-const game = new Game(canvas, settings);
-audio.volume = settings.volume;
+const game = new Game(canvas, save.settings);
+game.applySettings();
 
-const screens = ['menu', 'pause', 'dead', 'ended', 'settings', 'controls'] as const;
-type Screen = (typeof screens)[number];
-let settingsReturn: Screen = 'menu';
+const SCREENS = ['menu', 'chapters', 'pause', 'dead', 'inter', 'ending', 'settings', 'controls'] as const;
+type Screen = (typeof SCREENS)[number];
+let back: Screen = 'menu';
+const show = (n: Screen | null) => SCREENS.forEach((s) => document.getElementById(s)!.classList.toggle('on', s === n));
+const $ = (id: string) => document.getElementById(id)!;
 
-function show(name: Screen | null) {
-  for (const s of screens) document.getElementById(s)!.classList.toggle('on', s === name);
+$('platform-label').textContent = IS_MOBILE ? '安卓手机版' : 'Windows 电脑版';
+$('ctl').innerHTML = IS_MOBILE
+  ? `<h4>手机版操作</h4>
+     <p>左半屏任意位置按下：浮动摇杆移动（推到底小跑，消耗体力）</p>
+     <p>右半屏滑动：转动视角　·　按住「开火」时也能拖动瞄准</p>
+     <p>「互动」开门 / 拾取 / 对话　·　「换弹」「换枪」「闪避」</p>
+     <p>「强光」手电爆闪使蛊化者硬直　·　「勘察」扫描弱点与暗门</p>
+     <p>「铜铃」小满摇铃驱散　·　「镇音」三长两短定住蛊群</p>
+     <p>「草药」恢复生命　·　「地图」自动地图　·　右上角暂停</p>`
+  : `<h4>电脑版操作（键鼠 / Xbox 手柄）</h4>
+     <p>WASD 移动　Shift 小跑（耗体力）　鼠标 视角　空格 闪避</p>
+     <p>左键 射击　R 换弹　1 / 2 / 3 或滚轮 切换武器</p>
+     <p>E 互动 / 开门 / 推开暗门　F 或右键 手电强光</p>
+     <p>C 勘察镜　Q 小满的铜铃　Z 镇音（三长两短）　H 草药</p>
+     <p>Tab 自动地图　Esc 暂停　F11 全屏</p>`;
+
+// ---------- 设置 ----------
+const sq = $('s-quality') as HTMLSelectElement, ss = $('s-sens') as HTMLInputElement, sv = $('s-vol') as HTMLInputElement;
+const sa = $('s-assist') as HTMLInputElement, se = $('s-easy') as HTMLInputElement, sb = $('s-sub') as HTMLInputElement;
+sq.value = save.settings.quality; ss.value = String(save.settings.sensitivity); sv.value = String(save.settings.volume);
+sa.checked = save.settings.aimAssist; se.checked = save.settings.easyQte; sb.value = String(save.settings.subtitleSize);
+const onSettings = () => {
+  Object.assign(save.settings, {
+    quality: sq.value, sensitivity: Number(ss.value), volume: Number(sv.value), aimAssist: sa.checked, easyQte: se.checked, subtitleSize: Number(sb.value),
+  });
+  game.settings = save.settings;
+  game.applySettings();
+  persist();
+};
+[sq, ss, sv, sa, se, sb].forEach((e) => e.addEventListener('input', onSettings));
+
+// ---------- 章节选择 ----------
+function renderChapters() {
+  $('chapter-grid').innerHTML = CHAPTERS.map((c, i) => {
+    const locked = i + 1 > save.unlocked;
+    return `<button class="ch-card ${locked ? 'locked' : ''}" data-ch="${i + 1}" ${locked ? 'disabled' : ''}>
+      <div class="ch-img" style="background-image:url(${artUrl(`tex/${c.data.mural.slice(4)}.webp`)})"></div>
+      <b>第${'一二三四五六七八'[i]}章　${c.data.title}</b><small>${locked ? '未解锁' : c.data.place}</small></button>`;
+  }).join('');
+  $('chapter-grid').querySelectorAll<HTMLButtonElement>('.ch-card').forEach((b) => b.addEventListener('click', () => {
+    audio.init();
+    show(null);
+    runFrom(Number(b.dataset.ch));
+  }));
+}
+
+// ---------- 章节流程 ----------
+let running = 0;
+async function runFrom(n: number) {
+  const token = ++running;
+  for (let i = n; i <= CHAPTERS.length; i++) {
+    if (token !== running) return;
+    save.current = i;
+    persist();
+    const ch = CHAPTERS[i - 1];
+    game.choices = save.choices;
+    game.loadChapter(ch.data);
+    game.setState('playing');
+    game.hud.setFade(0, 600);
+    audio.setAmbientLevel(0.55);
+    try {
+      await ch.run(game);
+    } catch (e) {
+      console.error(e);
+      if (token !== running) return;
+    }
+    if (token !== running) return;
+    save.choices = game.choices;
+    save.unlocked = Math.max(save.unlocked, Math.min(CHAPTERS.length, i + 1));
+    persist();
+    const goOn = await intermission(i, game.stats);
+    if (!goOn || token !== running) return;
+  }
+  if (token === running) ending();
+}
+
+function fmt(sec: number) {
+  const s = Math.round(sec);
+  return `${Math.floor(s / 60)}:${String(s % 60).padStart(2, '0')}`;
+}
+
+// Doom 式章节结算
+function intermission(n: number, st: ChapterStats): Promise<boolean> {
+  game.setState('inter');
+  const ch = CHAPTERS[n - 1].data;
+  $('inter-bg').style.backgroundImage = `url(${artUrl(`tex/${ch.mural.slice(4)}.webp`)})`;
+  $('inter-ch').textContent = `第${'一二三四五六七八'[n - 1]}章　完成`;
+  $('inter-title').textContent = ch.title;
+  const pct = (a: number, b: number) => (b ? Math.round((a / b) * 100) : 100);
+  const rows: [string, number, string][] = [
+    ['击杀', pct(st.kills, st.totalKills), `${st.kills} / ${st.totalKills}`],
+    ['物品', pct(st.items, st.totalItems), `${st.items} / ${st.totalItems}`],
+    ['隐藏区域', pct(st.secrets, st.totalSecrets), `${st.secrets} / ${st.totalSecrets}`],
+    ['命中率', pct(st.hits, st.shots), `爆头 ${st.headshots}`],
+  ];
+  $('inter-rows').innerHTML = rows.map(([k, , d]) => `<div class="ir"><span>${k}</span><b data-v="0">0%</b><small>${d}</small></div>`).join('') +
+    `<div class="ir"><span>用时</span><b>${fmt(st.time)}</b><small>参考 ${fmt(st.par)}</small></div>`;
+  const score = (rows[0][1] + rows[1][1] + rows[2][1]) / 3 + (st.time < st.par ? 15 : 0);
+  const grade = score >= 95 ? 'S' : score >= 80 ? 'A' : score >= 60 ? 'B' : 'C';
+  $('inter-grade').textContent = '';
+  $('btn-next').textContent = n >= CHAPTERS.length ? '观看结局' : '下一章';
+  show('inter');
+  // 数字滚动
+  const els = [...$('inter-rows').querySelectorAll<HTMLElement>('.ir b')];
+  rows.forEach(([, v], i) => {
+    let cur = 0;
+    const iv = setInterval(() => {
+      cur = Math.min(v, cur + 3);
+      els[i].textContent = `${cur}%`;
+      audio.dryFire();
+      if (cur >= v) clearInterval(iv);
+    }, 30 + i * 6);
+  });
+  setTimeout(() => { $('inter-grade').textContent = `评级 ${grade}`; audio.stinger(); }, 1600);
+  return new Promise((res) => { interResolve = res; });
+}
+let interResolve: ((v: boolean) => void) | null = null;
+
+function ending() {
+  game.setState('menu');
+  $('credits').innerHTML = `<h2>蛊变：长江启示录</h2><p>第一季　完</p>
+    <p class="cr">原作剧本 · 美术设定：CAI-GENGYU</p><p class="cr">游戏开发：Claude Code</p>
+    <p class="cr">${PLATFORM === 'mobile' ? '安卓手机版' : 'Windows 电脑版'} · 通关总用时 ${fmt(game.totalTime)}</p>
+    <p class="tease">黑屏。一辆冷链卡车驶过夜色中的山路。<br>车厢内，一支标着「CG-7 · 备份」的样本管，在黑暗中微微发出红光。</p>`;
+  show('ending');
 }
 
 game.onStateChange = (s) => {
   if (s === 'paused') show('pause');
-  else if (s === 'dead') show('dead');
-  else if (s === 'ended') {
-    const st = game.stats;
-    const secs = Math.round((performance.now() - st.start) / 1000);
-    document.getElementById('stats')!.innerHTML =
-      `通关用时　${Math.floor(secs / 60)} 分 ${secs % 60} 秒<br>` +
-      `击倒蛊化者　${st.kills}<br>` +
-      `爆头　${st.headshots}<br>` +
-      `命中率　${st.shots ? Math.round((st.hits / st.shots) * 100) : 0}%`;
-    show('ended');
-  } else if (s === 'playing') show(null);
+  else if (s === 'dead') {
+    $('dead-tip').textContent = ['蛊化者畏光——手电强光能让它们硬直。', '勘察镜能看到首领的弱点。', '小跑会消耗体力，留一点用来闪避。', '铜铃声能驱散成群的蛊化者。', '被包围时用镇音：三长两短。'][Math.floor(Math.random() * 5)];
+    show('dead');
+  } else if (s === 'playing' || s === 'cine') show(null);
+  updateClickLock();
 };
 
-// ---------- 设置 ----------
-const q = document.querySelector<HTMLSelectElement>('#s-quality')!;
-const sens = document.querySelector<HTMLInputElement>('#s-sens')!;
-const vol = document.querySelector<HTMLInputElement>('#s-vol')!;
-const assist = document.querySelector<HTMLInputElement>('#s-assist')!;
-q.value = settings.quality;
-sens.value = String(settings.sensitivity);
-vol.value = String(settings.volume);
-assist.checked = settings.aimAssist;
-const onSettings = () => {
-  settings.quality = q.value as Settings['quality'];
-  settings.sensitivity = Number(sens.value);
-  settings.volume = Number(vol.value);
-  settings.aimAssist = assist.checked;
-  saveSettings(settings);
-  game.applySettings();
-};
-[q, sens, vol, assist].forEach((el) => el.addEventListener('input', onSettings));
+function updateClickLock() {
+  const need = !IS_MOBILE && game.state === 'playing' && document.pointerLockElement !== canvas && !game.mg.active && !game.hud.documentOpen;
+  $('clicklock').style.display = need ? 'flex' : 'none';
+}
+document.addEventListener('pointerlockchange', updateClickLock);
+setInterval(updateClickLock, 500);
+$('clicklock').addEventListener('click', () => game.input.lock());
 
-// ---------- 按钮 ----------
-let started = false;
-document.querySelectorAll<HTMLButtonElement>('.screen button').forEach((b) => {
-  b.addEventListener('click', () => {
+document.querySelectorAll<HTMLButtonElement>('.screen button[data-act]').forEach((b) => {
+  b.addEventListener('click', async () => {
     const act = b.dataset.act;
     const from = b.closest('.screen')!.id as Screen;
     audio.init();
+    audio.startAmbient();
     switch (act) {
-      case 'start':
-        if (started) return;
-        started = true;
+      case 'new':
+        save.unlocked = Math.max(save.unlocked, 1);
+        save.choices = {};
+        game.totalTime = 0;
         show(null);
-        startGame();
+        runFrom(1);
+        break;
+      case 'continue':
+        show(null);
+        runFrom(save.current || 1);
+        break;
+      case 'chapters':
+        renderChapters();
+        back = from;
+        show('chapters');
+        break;
+      case 'trailer':
+        show(null);
+        await game.cineP.play([{ video: 'opening', from: 0, to: 31 }]);
+        show('menu');
         break;
       case 'settings':
-        settingsReturn = from;
-        show('settings');
-        break;
       case 'controls':
-        settingsReturn = from;
-        show('controls');
+        back = from;
+        show(act);
         break;
       case 'back':
-        show(settingsReturn);
+        show(back);
         break;
       case 'resume':
         game.resume();
@@ -110,32 +232,36 @@ document.querySelectorAll<HTMLButtonElement>('.screen button').forEach((b) => {
         show(null);
         game.respawn();
         break;
+      case 'restart':
+        show(null);
+        runFrom(save.current);
+        break;
+      case 'next':
+        interResolve?.(true);
+        interResolve = null;
+        break;
       case 'quit':
+        running++;
+        interResolve?.(false);
+        interResolve = null;
         location.reload();
         break;
     }
   });
 });
 
-async function startGame() {
+// ---------- 启动 ----------
+(async () => {
+  await loadAll((k) => {
+    ($('ld-fill') as HTMLElement).style.width = `${Math.round(k * 100)}%`;
+  });
   audio.init();
-  audio.startAmbient();
-  if (isTouch) {
-    // 安卓浏览器中尝试全屏横屏（App 内已由原生层锁定）
-    try {
-      await document.documentElement.requestFullscreen?.();
-      await (screen.orientation as unknown as { lock?: (o: string) => Promise<void> }).lock?.('landscape');
-    } catch {
-      /* 不支持时忽略 */
-    }
-  }
-  game.stats.start = performance.now();
-  game.setState('playing');
-  chapterOne(game).catch((e) => console.error(e));
-}
+  await audio.loadSamples(['pistol_shot', 'cryo_blast', 'scanner_pulse', 'bronze_bell_long', 'bronze_bell_short'], artUrl('sfx/'));
+  ($('btn-continue') as HTMLButtonElement).style.display = save.current > 1 || save.unlocked > 1 ? '' : 'none';
+  $('loading').remove();
+  game.start();
+  show('menu');
+})();
 
-game.start();
-document.getElementById('loading')!.remove();
-
-// 调试：?debug 时暴露游戏对象，便于自动化测试
-if (location.search.includes('debug')) (window as unknown as { __game: Game }).__game = game;
+// 调试：?debug 时暴露对象，供自动化测试使用
+if (location.search.includes('debug')) Object.assign(window, { __game: game, __save: save, __run: runFrom, __next: () => { interResolve?.(true); interResolve = null; } });

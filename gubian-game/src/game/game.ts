@@ -1,21 +1,30 @@
 import * as THREE from 'three';
 import { audio } from '../core/audio';
-import { Input } from '../core/input';
-import { makeTextures, Textures } from '../core/textures';
-import { Level, regionOf } from '../world/level';
-import { CELL, cellCenter, collide, DoorId, FlowField, isExterior, toCell, lineOfSight, resetDoors } from '../world/map';
-import { Enemy, EnemyHost, EnemyKind, EnemyState, HitPart } from '../entities/enemy';
-import { Companion, CompanionId } from '../entities/companion';
-import { Pistol } from './weapon';
+import { createInput, Input } from '../core/input';
+import { iconTexture } from '../core/textures';
+import { Level } from '../world/level';
+import {
+  WALL_H, cellCenter, collide, FlowField, toCell, lineOfSight, loadMap, charAt, isDoorChar, isDoorOpen,
+  blocked, findChar, MAP, ROWS, COLS,
+} from '../world/map';
+import { Enemy, EnemyHost, EnemyState, HitPart } from '../entities/enemy';
+import { Npc } from '../entities/npc';
+import { sprite as spriteInfo, imageTexture } from '../core/assets';
+import { WEAPONS, WeaponId, WeaponView, AmmoType } from './weapons';
 import { Hud } from '../ui/hud';
+import { Cinematic, Shot } from '../ui/cinematic';
+import { Minigames } from '../ui/minigames';
+import { IS_MOBILE } from '../platform';
+import type { ChapterData, ItemType, KeyColor } from '../chapters/types';
 
 export type Quality = 'low' | 'mid' | 'high';
-
 export interface Settings {
   quality: Quality;
   sensitivity: number;
   volume: number;
   aimAssist: boolean;
+  easyQte: boolean;
+  subtitleSize: number;
 }
 
 interface Interactable {
@@ -23,17 +32,27 @@ interface Interactable {
   pos: THREE.Vector3;
   label: string;
   active: boolean;
-  mesh?: THREE.Object3D;
+  icon?: THREE.Sprite;
   onUse: () => void;
 }
 
 interface Pickup {
-  type: 'ammo' | 'herb';
-  amount: number;
-  mesh: THREE.Object3D;
+  type: ItemType;
+  sprite: THREE.Sprite;
   taken: boolean;
-  respawn: number; // >0 表示被拾取后若干秒重新出现
+  counted: boolean;
+  respawn: number;
   timer: number;
+}
+
+interface Projectile {
+  sprite: THREE.Sprite;
+  vel: THREE.Vector3;
+  dmg: number;
+  life: number;
+  owner: Enemy | null;
+  falling?: boolean;
+  warn?: THREE.Mesh;
 }
 
 interface Particle {
@@ -41,77 +60,112 @@ interface Particle {
   vel: THREE.Vector3;
   life: number;
   gravity: number;
-  grow: number;
 }
 
-interface Waiter {
-  cond: () => boolean;
-  resolve: () => void;
-}
-
-type GameState = 'menu' | 'playing' | 'paused' | 'dead' | 'ended';
-
+type GameState = 'menu' | 'playing' | 'paused' | 'dead' | 'cine' | 'inter';
 const EYE = 1.62;
+
+export interface ChapterStats {
+  kills: number;
+  totalKills: number;
+  items: number;
+  totalItems: number;
+  secrets: number;
+  totalSecrets: number;
+  time: number;
+  par: number;
+  headshots: number;
+  shots: number;
+  hits: number;
+}
 
 export class Game implements EnemyHost {
   renderer: THREE.WebGLRenderer;
   scene = new THREE.Scene();
   camera: THREE.PerspectiveCamera;
-  private viewScene = new THREE.Scene();
-  private viewCam: THREE.PerspectiveCamera;
-  tex: Textures;
-  level: Level;
   input: Input;
   hud = new Hud();
-  pistol: Pistol;
+  weapon = new WeaponView();
+  cineP = new Cinematic();
+  mg = new Minigames();
   flow = new FlowField();
+  level: Level | null = null;
+  chapter: ChapterData | null = null;
   enemies: Enemy[] = [];
-  companions = new Map<CompanionId, Companion>();
+  npcs = new Map<string, Npc>();
   interactables: Interactable[] = [];
   pickups: Pickup[] = [];
+  private projectiles: Projectile[] = [];
   private particles: Particle[] = [];
   private decals: THREE.Mesh[] = [];
-  private waiters: Waiter[] = [];
+  private props: THREE.Mesh[] = [];
+  private waiters: { cond: () => boolean; resolve: () => void }[] = [];
   private flashlight: THREE.SpotLight;
   private hemi: THREE.HemisphereLight;
-  private moon: THREE.DirectionalLight;
   private raycaster = new THREE.Raycaster();
+  private world = new THREE.Group();
 
   state: GameState = 'menu';
   time = 0;
   playerPos = new THREE.Vector3();
+  camPos = new THREE.Vector3();
   yaw = 0;
   pitch = 0;
   hp = 100;
+  armor = 0;
   herbs = 1;
+  stamina = 1;
+  oxygen = 100;
+  keys = new Set<KeyColor>();
+  owned = new Set<WeaponId>(['pistol']);
+  current: WeaponId = 'pistol';
+  mags: Record<WeaponId, number> = { pistol: 12, mg: 60, cryo: 6 };
+  reserve: Record<AmmoType, number> = { ammo: 24, mg_ammo: 0, cryo_ammo: 0 };
+  face = 'lin';
+  flags = new Set<string>();
+  choices: Record<string, number> = {};
+  exitEnabled = true;
   cutscene = false;
-  frozen = false; // 冻结敌人 AI
+  frozen = false;
   lookTarget: THREE.Vector3 | null = null;
   scanning = false;
   scanUnlocked = false;
-  flashUnlocked = false;
+  flashUnlocked = true;
   bellUnlocked = false;
+  zhenyinUnlocked = false;
   scanCd = 0;
   scanT = 0;
   flashCd = 0;
   bellCd = 0;
+  zhenyinCd = 0;
   private healCd = 0;
+  private dashT = 0;
+  private dashCd = 0;
+  private dashDir = new THREE.Vector3();
+  private fireCd = 0;
+  private triggerHeld = false;
   private shake = 0;
   private stepDist = 0;
-  private vel = new THREE.Vector3();
   private bobT = 0;
-  private menuT = 0;
+  private vel = new THREE.Vector3();
   private flashBurst = 0;
-  private checkpoint = { x: 0, z: 0, yaw: 0, mag: 12, reserve: 24, herbs: 1 };
-  stats = { kills: 0, headshots: 0, shots: 0, hits: 0, start: 0 };
+  private menuT = 0;
+  private scareCd = 15;
+  private mapOpen = false;
+  private electrified = new Map<number, number>();
+  private exitPads: { x: number; z: number }[] = [];
+  private exitResolve: (() => void) | null = null;
+  private checkpoint = { x: 0, z: 0, yaw: 0, hp: 100 };
+  stats: ChapterStats = this.freshStats();
+  totalTime = 0;
   boss: Enemy | null = null;
   bossName = '';
   onScan: (() => void) | null = null;
-  onFlash: (() => void) | null = null;
-  onBell: (() => void) | null = null;
   onKill: ((e: Enemy) => void) | null = null;
+  onShot: (() => void) | null = null;
   onStateChange: ((s: GameState) => void) | null = null;
-  private itemMats = new Map<string, THREE.Material>();
+  water = false;
+  flashlightWeak = false;
 
   constructor(canvas: HTMLCanvasElement, public settings: Settings) {
     const q = settings.quality;
@@ -120,59 +174,41 @@ export class Game implements EnemyHost {
     this.renderer.setSize(window.innerWidth, window.innerHeight);
     this.renderer.outputColorSpace = THREE.SRGBColorSpace;
     this.renderer.toneMapping = THREE.ACESFilmicToneMapping;
-    this.renderer.toneMappingExposure = 1.45;
+    this.renderer.toneMappingExposure = 1.35;
     this.renderer.shadowMap.enabled = q === 'high';
     this.renderer.shadowMap.type = THREE.PCFSoftShadowMap;
-    this.renderer.autoClear = false;
-
-    this.camera = new THREE.PerspectiveCamera(72, window.innerWidth / window.innerHeight, 0.05, 140);
+    this.camera = new THREE.PerspectiveCamera(70, window.innerWidth / window.innerHeight, 0.05, 220);
     this.camera.rotation.order = 'YXZ';
-    this.scene.add(this.camera);
-    this.scene.background = new THREE.Color(0x05080a);
-    this.scene.fog = new THREE.FogExp2(0x05080a, 0.05);
-
-    this.viewCam = new THREE.PerspectiveCamera(60, window.innerWidth / window.innerHeight, 0.01, 5);
-    this.viewScene.add(this.viewCam);
-    this.viewScene.add(new THREE.HemisphereLight(0x8090a0, 0x201810, 0.9));
-    const vl = new THREE.DirectionalLight(0xfff0dd, 1.2);
-    vl.position.set(0.5, 1, 0.5);
-    this.viewScene.add(vl);
-
-    this.tex = makeTextures();
-    this.level = new Level(this.tex, q === 'high' ? 6 : q === 'mid' ? 4 : 3);
-    this.scene.add(this.level.group);
-
-    this.hemi = new THREE.HemisphereLight(0x51667a, 0x2a1a10, 0.8);
+    this.scene.add(this.camera, this.world);
+    this.scene.background = new THREE.Color(0x040607);
+    this.scene.fog = new THREE.FogExp2(0x040607, 0.06);
+    this.hemi = new THREE.HemisphereLight(0x51667a, 0x2a1a10, 0.7);
     this.scene.add(this.hemi);
-    this.moon = new THREE.DirectionalLight(0x7f96b8, 0.9);
-    this.moon.position.set(-20, 40, -30);
-    this.scene.add(this.moon);
-
-    // 手电筒
-    this.flashlight = new THREE.SpotLight(0xfff2dc, 60, 34, 0.5, 0.45, 1.3);
-    this.flashlight.position.set(0.2, -0.15, 0);
+    this.flashlight = new THREE.SpotLight(0xfff2dc, 70, 30, 0.48, 0.5, 1.3);
+    this.flashlight.position.set(0.25, -0.2, 0);
     this.flashlight.target.position.set(0, 0, -1);
     this.flashlight.castShadow = q === 'high';
     this.flashlight.shadow.mapSize.set(1024, 1024);
-    this.flashlight.shadow.camera.near = 0.3;
     this.camera.add(this.flashlight, this.flashlight.target);
+    this.mg.easy = settings.easyQte;
 
-    this.pistol = new Pistol(this.viewCam);
-    this.input = new Input(canvas);
+    this.input = createInput(canvas);
     this.input.sensitivity = settings.sensitivity;
     this.input.onPointerLockLost = () => {
-      if (this.state === 'playing' && !this.hud.documentOpen) this.pause();
+      if (this.state === 'playing' && !this.hud.documentOpen && !this.mg.active) this.pause();
     };
-
-    // 阅读档案时释放鼠标，方便点击关闭
     this.hud.onDocOpen = () => this.input.unlock();
-    this.hud.onDocClose = () => {
-      this.input.clear();
-      if (this.state === 'playing') this.input.lock();
-    };
+    this.mg.onOpen = () => this.input.unlock();
+    this.mg.onClose = () => { this.input.clear(); if (this.state === 'playing') this.input.lock(); };
+    this.hud.onDocClose = () => { this.input.clear(); if (this.state === 'playing') this.input.lock(); };
     window.addEventListener('resize', () => this.resize());
     this.hud.show(false);
-    this.input.showTouch(false);
+    this.input.show(false);
+    this.weapon.update(0, 0, false);
+  }
+
+  private freshStats(): ChapterStats {
+    return { kills: 0, totalKills: 0, items: 0, totalItems: 0, secrets: 0, totalSecrets: 0, time: 0, par: 600, headshots: 0, shots: 0, hits: 0 };
   }
 
   private pixelRatio() {
@@ -185,14 +221,14 @@ export class Game implements EnemyHost {
     this.renderer.setPixelRatio(this.pixelRatio());
     this.input.sensitivity = this.settings.sensitivity;
     audio.setVolume(this.settings.volume);
+    this.mg.easy = this.settings.easyQte;
+    document.documentElement.style.setProperty('--sub-size', `${this.settings.subtitleSize}`);
   }
 
   private resize() {
-    const w = window.innerWidth, h = window.innerHeight;
-    this.renderer.setSize(w, h);
-    this.camera.aspect = this.viewCam.aspect = w / h;
+    this.renderer.setSize(window.innerWidth, window.innerHeight);
+    this.camera.aspect = window.innerWidth / window.innerHeight;
     this.camera.updateProjectionMatrix();
-    this.viewCam.updateProjectionMatrix();
   }
 
   setState(s: GameState) {
@@ -200,15 +236,14 @@ export class Game implements EnemyHost {
     const playing = s === 'playing';
     this.hud.show(s === 'playing' || s === 'paused' || s === 'dead');
     this.input.enabled = playing;
-    this.input.showTouch(playing);
+    this.input.show(playing && !this.cutscene);
     if (playing) this.input.lock();
     else this.input.unlock();
     this.onStateChange?.(s);
   }
 
   pause() {
-    if (this.state !== 'playing') return;
-    this.setState('paused');
+    if (this.state === 'playing') this.setState('paused');
   }
 
   resume() {
@@ -217,7 +252,75 @@ export class Game implements EnemyHost {
     this.setState('playing');
   }
 
-  // ---------------- 剧情工具 ----------------
+  // ======================= 章节载入 =======================
+  loadChapter(data: ChapterData) {
+    this.clearWorld();
+    this.chapter = data;
+    loadMap(data.map);
+    this.level = new Level(data, this.settings.quality === 'high' ? 6 : this.settings.quality === 'mid' ? 4 : 3);
+    this.world.add(this.level.group);
+    const th = data.theme;
+    (this.scene.fog as THREE.FogExp2).color.setHex(th.fog);
+    (this.scene.fog as THREE.FogExp2).density = th.fogDensity;
+    (this.scene.background as THREE.Color).setHex(th.fog);
+    this.hemi.color.setHex(th.hemi[0]);
+    this.hemi.groundColor.setHex(th.hemi[1]);
+    this.hemi.intensity = th.hemi[2];
+    this.flow.invalidate();
+    this.hud.resetExplored();
+    const start = findChar('@') ?? { col: data.marks.start?.[0] ?? 1, row: data.marks.start?.[1] ?? 1 };
+    const sp = cellCenter(start.col, start.row);
+    this.setPlayer(sp.x, sp.z, data.marks.startYaw ? (data.marks.startYaw[0] * Math.PI) / 2 : 0);
+    this.exitPads = [];
+    for (let r = 0; r < ROWS; r++) for (let c = 0; c < COLS; c++) if (MAP[r][c] === 'X') this.exitPads.push(cellCenter(c, r));
+    this.stats = this.freshStats();
+    this.stats.par = data.par;
+    this.stats.totalSecrets = this.level.secrets.size;
+    for (const it of data.items) this.addPickup(it.type, it.at[0], it.at[1]);
+    this.keys.clear();
+    this.flags.clear();
+    this.exitEnabled = false;
+    this.face = data.pov;
+    this.hud.setFace(this.face);
+    this.scanUnlocked = this.flashUnlocked = true;
+    this.bellUnlocked = this.zhenyinUnlocked = false;
+    this.scanCd = this.flashCd = this.bellCd = this.zhenyinCd = 0;
+    this.oxygen = 100;
+    this.flashlightWeak = false;
+    this.boss = null;
+    this.hud.setBoss(null);
+    this.hud.setObjective('');
+    this.saveCheckpoint();
+  }
+
+  private clearWorld() {
+    if (this.level) {
+      this.world.remove(this.level.group);
+      this.level.dispose();
+      this.level = null;
+    }
+    for (const e of this.enemies) this.world.remove(e.group);
+    for (const n of this.npcs.values()) this.world.remove(n.group);
+    for (const i of this.interactables) if (i.icon) this.world.remove(i.icon);
+    for (const p of this.pickups) this.world.remove(p.sprite);
+    for (const p of this.projectiles) { this.world.remove(p.sprite); if (p.warn) this.world.remove(p.warn); }
+    for (const p of this.particles) this.world.remove(p.mesh);
+    for (const d of this.decals) this.world.remove(d);
+    for (const p of this.props) this.world.remove(p);
+    this.props = [];
+    this.enemies = [];
+    this.npcs.clear();
+    this.interactables = [];
+    this.pickups = [];
+    this.projectiles = [];
+    this.particles = [];
+    this.decals = [];
+    this.waiters = [];
+    this.electrified.clear();
+    this.exitResolve = null;
+  }
+
+  // ======================= 剧情接口 =======================
   until(cond: () => boolean): Promise<void> {
     if (cond()) return Promise.resolve();
     return new Promise((resolve) => this.waiters.push({ cond, resolve }));
@@ -229,168 +332,274 @@ export class Game implements EnemyHost {
   }
 
   async say(speaker: string, text: string, dur?: number) {
-    if (speaker === '陈砚' || speaker === '广播') audio.radio();
+    if (/陈砚|广播|许怀远（电话|许怀远（耳麦/.test(speaker)) audio.radio();
     this.hud.say(speaker, text);
-    await this.wait(dur ?? 1.4 + text.length * 0.11);
+    await this.wait(dur ?? 1.5 + text.length * 0.12);
     this.hud.say('', '');
   }
 
-  objective(text: string) {
-    this.hud.setObjective(text);
+  sayAsync(lines: [string, string][]) {
+    (async () => { for (const [s, t] of lines) await this.say(s, t); })();
   }
 
-  async setCutscene(on: boolean) {
+  objective(t: string) {
+    this.hud.setObjective(t);
+  }
+
+  hint(desktop: string, mobile: string, sec = 7) {
+    this.hud.showHint(IS_MOBILE ? mobile : desktop, sec);
+  }
+
+  setCutscene(on: boolean) {
     this.cutscene = on;
     this.frozen = on;
     this.hud.setLetterbox(on);
-    this.input.showTouch(!on && this.state === 'playing');
+    this.input.show(!on && this.state === 'playing');
     if (!on) this.lookTarget = null;
+  }
+
+  // 全屏过场动画（暂停游戏）
+  async cine(shots: Shot[]) {
+    const prev = this.state;
+    this.setState('cine');
+    audio.setAmbientLevel(0.2);
+    await this.cineP.play(shots);
+    audio.setAmbientLevel(0.55);
+    this.input.clear();
+    if (prev === 'playing' || prev === 'cine') this.setState('playing');
+  }
+
+  at(mark: string, y = 0) {
+    const m = this.chapter!.marks[mark];
+    if (!m) throw new Error(`mark ${mark} missing`);
+    const { x, z } = cellCenter(m[0], m[1]);
+    return new THREE.Vector3(x, y, z);
+  }
+
+  near(mark: string, d: number) {
+    const p = this.at(mark);
+    return Math.hypot(p.x - this.playerPos.x, p.z - this.playerPos.z) < d;
+  }
+
+  inRect(c0: number, r0: number, c1: number, r1: number) {
+    const { col, row } = toCell(this.playerPos.x, this.playerPos.z);
+    return col >= c0 && col <= c1 && row >= r0 && row <= r1;
   }
 
   setPlayer(x: number, z: number, yaw: number) {
     this.playerPos.set(x, 0, z);
     this.yaw = yaw;
     this.pitch = 0;
+    this.vel.set(0, 0, 0);
   }
 
   saveCheckpoint() {
-    this.checkpoint = {
-      x: this.playerPos.x, z: this.playerPos.z, yaw: this.yaw,
-      mag: this.pistol.mag, reserve: this.pistol.reserve, herbs: this.herbs,
-    };
+    this.checkpoint = { x: this.playerPos.x, z: this.playerPos.z, yaw: this.yaw, hp: Math.max(this.hp, 60) };
   }
 
   respawn() {
     const c = this.checkpoint;
     this.setPlayer(c.x, c.z, c.yaw);
-    this.pistol.mag = c.mag;
-    this.pistol.reserve = Math.max(c.reserve, 12);
-    this.pistol.reloading = 0;
-    this.herbs = Math.max(c.herbs, 1);
-    this.hp = 100;
+    this.hp = Math.max(c.hp, 75);
+    this.oxygen = 100;
+    this.reserve.ammo = Math.max(this.reserve.ammo, 24);
+    if (this.owned.has('mg')) this.reserve.mg_ammo = Math.max(this.reserve.mg_ammo, 60);
+    if (this.owned.has('cryo')) this.reserve.cryo_ammo = Math.max(this.reserve.cryo_ammo, 12);
+    this.weapon.reloading = 0;
     for (const e of this.enemies) e.reset();
-    for (const comp of this.companions.values()) {
-      if (comp.following) comp.pos.set(c.x - Math.sin(c.yaw) * 1.5, 0, c.z - Math.cos(c.yaw) * 1.5);
-    }
+    for (const p of this.projectiles) { this.world.remove(p.sprite); if (p.warn) this.world.remove(p.warn); }
+    this.projectiles = [];
+    for (const n of this.npcs.values()) if (n.following) n.pos.set(c.x, 0, c.z + 1);
     this.flow.invalidate();
-    this.hud.setFade(0, 800);
+    this.hud.setFade(0, 600);
     this.setState('playing');
   }
 
-  // ---------------- 实体工厂 ----------------
-  spawnEnemy(kind: EnemyKind, col: number, row: number, yaw = 0, state: EnemyState = 'idle', ox = 0, oz = 0) {
-    const { x, z } = cellCenter(col, row);
-    const e = new Enemy(kind, this.tex, x + ox, z + oz, yaw, state);
+  spawn(kind: string, where: string | [number, number], opts: { state?: EnemyState; ox?: number; oz?: number; scale?: number; tag?: string } = {}) {
+    const [c, r] = typeof where === 'string' ? this.chapter!.marks[where] : where;
+    const { x, z } = cellCenter(c, r);
+    const e = new Enemy(kind, x + (opts.ox ?? 0), z + (opts.oz ?? 0), 0, opts.state ?? 'idle', opts.scale ?? 1);
+    e.tag = opts.tag ?? '';
     this.enemies.push(e);
-    this.scene.add(e.group);
+    this.world.add(e.group);
+    if (kind !== 'anchor') this.stats.totalKills++;
     return e;
   }
 
-  spawnCompanion(id: CompanionId, col: number, row: number, ox = 0, oz = 0) {
-    const { x, z } = cellCenter(col, row);
-    const c = new Companion(id, x + ox, z + oz);
-    this.companions.set(id, c);
-    this.scene.add(c.group);
-    return c;
+  npc(id: string, where: string | [number, number], follow = false) {
+    const [c, r] = typeof where === 'string' ? this.chapter!.marks[where] : where;
+    const { x, z } = cellCenter(c, r);
+    const n = new Npc(id, x, z);
+    n.following = follow;
+    if (id === 'man') n.followDist = 1.6;
+    this.npcs.set(id, n);
+    this.world.add(n.group);
+    return n;
   }
 
-  private itemMesh(kind: string): THREE.Object3D {
-    const g = new THREE.Group();
-    const em = (color: number, emissive: number) => {
-      const key = `${color}-${emissive}`;
-      if (!this.itemMats.has(key)) {
-        this.itemMats.set(key, new THREE.MeshStandardMaterial({ color, emissive, emissiveIntensity: 0.8, roughness: 0.5 }));
-      }
-      return this.itemMats.get(key)!;
-    };
-    if (kind === 'ammo') {
-      const b = new THREE.Mesh(new THREE.BoxGeometry(0.3, 0.16, 0.2), em(0x3b4a2a, 0x223311));
-      b.position.y = 0.08;
-      const label = new THREE.Mesh(new THREE.BoxGeometry(0.12, 0.02, 0.21), em(0xd0b040, 0x664400));
-      label.position.y = 0.12;
-      g.add(b, label);
-    } else if (kind === 'herb') {
-      for (let i = 0; i < 4; i++) {
-        const leaf = new THREE.Mesh(new THREE.ConeGeometry(0.05, 0.25, 5), em(0x2f7a2a, 0x113a10));
-        leaf.position.set(Math.cos(i * 1.6) * 0.05, 0.12, Math.sin(i * 1.6) * 0.05);
-        leaf.rotation.z = Math.cos(i) * 0.4;
-        g.add(leaf);
-      }
-      const pot = new THREE.Mesh(new THREE.CylinderGeometry(0.07, 0.06, 0.08, 8), em(0x6a4a30, 0x221100));
-      pot.position.y = 0.04;
-      g.add(pot);
-    } else if (kind === 'phone') {
-      const b = new THREE.Mesh(new THREE.BoxGeometry(0.08, 0.01, 0.16), em(0x111111, 0x000000));
-      const s = new THREE.Mesh(new THREE.PlaneGeometry(0.07, 0.14), new THREE.MeshBasicMaterial({ color: 0x88aaff }));
-      s.rotation.x = -Math.PI / 2;
-      s.position.y = 0.006;
-      g.add(b, s);
-      g.position.y = 0.01;
-    } else if (kind === 'file') {
-      const p = new THREE.Mesh(new THREE.BoxGeometry(0.22, 0.01, 0.3), em(0xd8cfb0, 0x332e20));
-      g.add(p);
-    } else if (kind === 'keycard') {
-      const k = new THREE.Mesh(new THREE.BoxGeometry(0.09, 0.005, 0.055), em(0xcc2222, 0xaa1010));
-      g.add(k);
-    }
-    g.traverse((o) => { if (o instanceof THREE.Mesh) o.castShadow = true; });
-    return g;
+  // 场景立绘道具（悬吊的青铜棺、培养舱里的人形……），始终面向镜头
+  prop(name: string, where: string | [number, number], h: number, y = 0, emissive = 0x000000) {
+    const [c, r] = typeof where === 'string' ? this.chapter!.marks[where] : where;
+    const { x, z } = cellCenter(c, r);
+    const info = spriteInfo(name);
+    const geo = new THREE.PlaneGeometry(1, 1);
+    geo.translate(0, 0.5, 0);
+    const m = new THREE.Mesh(geo, new THREE.MeshStandardMaterial({ map: info.tex, alphaTest: 0.4, side: THREE.DoubleSide, emissive, roughness: 0.8 }));
+    m.scale.set(h * info.aspect, h, 1);
+    m.position.set(x, y, z);
+    this.world.add(m);
+    this.props.push(m);
+    return m;
   }
 
-  addPickup(type: 'ammo' | 'herb', col: number, row: number, amount: number, ox = 0, oz = 0, y = 0, respawn = 0) {
-    const { x, z } = cellCenter(col, row);
-    const mesh = this.itemMesh(type);
-    mesh.position.set(x + ox, y, z + oz);
-    this.scene.add(mesh);
-    this.pickups.push({ type, amount, mesh, taken: false, respawn, timer: 0 });
+  addObject(o: THREE.Object3D) {
+    this.world.add(o);
   }
 
-  addInteractable(id: string, kind: string, col: number, row: number, label: string, onUse: () => void, ox = 0, oz = 0, y = 0) {
-    const { x, z } = cellCenter(col, row);
-    let mesh: THREE.Object3D | undefined;
-    if (kind) {
-      mesh = this.itemMesh(kind);
-      mesh.position.set(x + ox, y, z + oz);
-      this.scene.add(mesh);
-    }
-    const it: Interactable = { id, pos: new THREE.Vector3(x + ox, y, z + oz), label, active: true, mesh, onUse };
-    this.interactables.push(it);
-    return it;
+  removeObject(o: THREE.Object3D) {
+    this.world.remove(o);
   }
 
-  removeInteractable(id: string) {
-    const it = this.interactables.find((i) => i.id === id);
-    if (!it) return;
-    it.active = false;
-    if (it.mesh) this.scene.remove(it.mesh);
+  removeProp(m: THREE.Mesh) {
+    this.world.remove(m);
+    this.props = this.props.filter((p) => p !== m);
   }
 
-  openDoor(id: DoorId, open = true) {
-    this.level.setDoor(id, open);
+  removeNpc(id: string) {
+    const n = this.npcs.get(id);
+    if (n) { this.world.remove(n.group); this.npcs.delete(id); }
+  }
+
+  openDoor(id: string, open = true) {
+    this.level?.setDoor(id, open);
     this.flow.invalidate();
     audio.door();
   }
 
-  cellOfPlayer() {
-    return toCell(this.playerPos.x, this.playerPos.z);
+  setFlag(f: string) {
+    this.flags.add(f);
+    for (const d of this.level?.doors.values() ?? []) if (d.def.flag === f && !d.open) this.openDoor(d.def.id);
   }
 
-  inCells(c0: number, r0: number, c1: number, r1: number) {
-    const { col, row } = this.cellOfPlayer();
-    return col >= c0 && col <= c1 && row >= r0 && row <= r1;
+  giveKey(k: KeyColor) {
+    this.keys.add(k);
+    audio.pickup();
   }
 
-  // ---------------- EnemyHost ----------------
-  damagePlayer(amount: number, from: THREE.Vector3) {
-    if (this.state !== 'playing' || this.cutscene) return;
-    this.hp -= amount;
-    this.hud.damage();
+  giveWeapon(w: WeaponId, ammo = 0) {
+    this.owned.add(w);
+    this.reserve[WEAPONS[w].ammo] += ammo;
+    this.switchWeapon(w);
+  }
+
+  setLoadout(ws: WeaponId[], reserve: Partial<Record<AmmoType, number>>) {
+    this.owned = new Set(ws);
+    this.current = ws[0];
+    this.weapon.swap(WEAPONS[ws[0]]);
+    for (const w of ws) this.mags[w] = WEAPONS[w].mag;
+    Object.assign(this.reserve, { ammo: 0, mg_ammo: 0, cryo_ammo: 0 }, reserve);
+  }
+
+  switchWeapon(w: WeaponId) {
+    if (!this.owned.has(w) || this.current === w) return;
+    this.current = w;
+    this.weapon.reloading = 0;
+    this.weapon.swap(WEAPONS[w]);
+  }
+
+  addInteract(id: string, where: string | [number, number], label: string, onUse: () => void, icon?: string, ox = 0, oz = 0) {
+    const [c, r] = typeof where === 'string' ? this.chapter!.marks[where] : where;
+    const { x, z } = cellCenter(c, r);
+    const it: Interactable = { id, pos: new THREE.Vector3(x + ox, 0, z + oz), label, active: true, onUse };
+    if (icon) {
+      const s = new THREE.Sprite(new THREE.SpriteMaterial({ map: (icon === 'serum' ? imageTexture('prop:serum') : null) ?? iconTexture(icon), depthWrite: false }));
+      s.scale.set(0.8, 0.8, 1);
+      s.position.set(x + ox, 0.9, z + oz);
+      this.world.add(s);
+      it.icon = s;
+    }
+    this.interactables = this.interactables.filter((i) => i.id !== id);
+    this.interactables.push(it);
+    return it;
+  }
+
+  removeInteract(id: string) {
+    const it = this.interactables.find((i) => i.id === id);
+    if (!it) return;
+    it.active = false;
+    if (it.icon) this.world.remove(it.icon);
+  }
+
+  // 等待交互（返回 Promise）
+  interact(id: string, where: string | [number, number], label: string, icon?: string, ox = 0, oz = 0) {
+    let used = false;
+    this.addInteract(id, where, label, () => { used = true; this.removeInteract(id); }, icon, ox, oz);
+    return this.until(() => used);
+  }
+
+  addPickup(type: ItemType, col: number, row: number, respawn = 0, ox = 0, oz = 0) {
+    const { x, z } = cellCenter(col, row);
+    const prop = type === 'medkit' ? 'prop:medkit' : type.endsWith('ammo') ? 'prop:ammo' : null;
+    const ptex = prop ? imageTexture(prop) : null;
+    const s = new THREE.Sprite(new THREE.SpriteMaterial({ map: ptex ?? iconTexture(type), depthWrite: false, color: type === 'cryo_ammo' ? 0x9ff : type === 'mg_ammo' ? 0xffd090 : 0xffffff }));
+    const big = type.startsWith('weapon') || type.startsWith('key') || !!ptex;
+    s.scale.set(big ? 0.9 : 0.7, big ? 0.9 : 0.7, 1);
+    s.position.set(x + ox, 0.45, z + oz);
+    this.world.add(s);
+    const counted = !type.startsWith('key') && respawn === 0;
+    if (counted) this.stats.totalItems++;
+    this.pickups.push({ type, sprite: s, taken: false, counted, respawn, timer: 0 });
+  }
+
+  // 走到出口才算通关
+  reachExit(): Promise<void> {
+    this.exitEnabled = true;
+    return new Promise((res) => (this.exitResolve = res));
+  }
+
+  electrify(cells: [number, number][], sec: number) {
+    for (const [c, r] of cells) this.electrified.set(r * COLS + c, this.time + sec);
+    audio.explosion();
+  }
+
+  isElectrified(x: number, z: number) {
+    if (!this.electrified.size) return false;
+    const { col, row } = toCell(x, z);
+    const t = this.electrified.get(row * COLS + col);
+    return t !== undefined && t > this.time;
+  }
+
+  jumpscare(spriteName: string, dmg = 0) {
+    this.hud.jumpscare(spriteName);
+    audio.scream();
+    this.shake = Math.max(this.shake, 0.9);
+    if (dmg) this.damagePlayer(dmg, this.playerPos.clone().add(new THREE.Vector3(0.1, 0, 0.1)), 'scare');
+    this.scareCd = 25;
+  }
+
+  shakeCamera(v: number) {
+    this.shake = Math.max(this.shake, v);
+  }
+
+  // ======================= EnemyHost =======================
+  damagePlayer(amount: number, from: THREE.Vector3, kind?: string) {
+    if (this.state !== 'playing' || this.cutscene || this.dashT > 0) return;
+    const absorbed = Math.min(this.armor, amount / 3);
+    this.armor -= absorbed;
+    this.hp -= amount - absorbed;
+    const dx = from.x - this.playerPos.x, dz = from.z - this.playerPos.z;
+    const right = Math.cos(this.yaw) * dx - Math.sin(this.yaw) * dz;
+    this.hud.damage(Math.sign(right));
     this.shake = Math.max(this.shake, 0.35);
     audio.playerHurt();
-    const dx = this.playerPos.x - from.x, dz = this.playerPos.z - from.z;
     const l = Math.hypot(dx, dz) || 1;
-    this.vel.x += (dx / l) * 5;
-    this.vel.z += (dz / l) * 5;
+    this.vel.x -= (dx / l) * 4;
+    this.vel.z -= (dz / l) * 4;
+    // 偶发跳脸：近身被扑时惊吓
+    if (kind && kind !== 'scare' && this.scareCd <= 0 && Math.random() < 0.35) {
+      const e = this.enemies.find((en) => en.kind.name === kind && en.alive);
+      if (e && !e.kind.boss) { this.hud.jumpscare(e.info.name); audio.scream(); this.scareCd = 30; }
+    }
     if (this.hp <= 0) {
       this.hp = 0;
       this.hud.setFade(0.85, 1500);
@@ -398,11 +607,33 @@ export class Game implements EnemyHost {
     }
   }
 
-  onPipeCollision(e: Enemy): boolean {
-    for (const p of this.level.pipes) {
+  spawnProjectile(from: THREE.Vector3, to: THREE.Vector3, kind: string, dmg: number, speed: number, owner: Enemy | null) {
+    const s = new THREE.Sprite(new THREE.SpriteMaterial({ map: iconTexture(kind), blending: THREE.AdditiveBlending, depthWrite: false }));
+    s.scale.setScalar(kind === 'proj_rock' ? 1.1 : 0.6);
+    s.position.copy(from);
+    this.world.add(s);
+    const vel = to.clone().sub(from).normalize().multiplyScalar(speed);
+    this.projectiles.push({ sprite: s, vel, dmg, life: 4, owner });
+  }
+
+  // 从天而降的蛊虫雨/落石，地面有预警圈
+  rainOn(x: number, z: number, kind = 'proj_bug', dmg = 12) {
+    const warn = new THREE.Mesh(new THREE.PlaneGeometry(2.4, 2.4), new THREE.MeshBasicMaterial({ map: iconTexture('warn'), transparent: true, depthWrite: false }));
+    warn.rotation.x = -Math.PI / 2;
+    warn.position.set(x, 0.04, z);
+    this.world.add(warn);
+    const s = new THREE.Sprite(new THREE.SpriteMaterial({ map: iconTexture(kind), blending: THREE.AdditiveBlending, depthWrite: false }));
+    s.scale.setScalar(0.8);
+    s.position.set(x, WALL_H + 3, z);
+    this.world.add(s);
+    this.projectiles.push({ sprite: s, vel: new THREE.Vector3(0, -4, 0), dmg, life: 3, owner: null, falling: true, warn });
+  }
+
+  onChargeHit(e: Enemy): boolean {
+    for (const p of this.level?.pipes ?? []) {
       if (p.burst) continue;
       const { x, z } = cellCenter(p.col, p.row);
-      if (Math.hypot(e.pos.x - x, e.pos.z - z) < 2.0) {
+      if (Math.hypot(e.pos.x - x, e.pos.z - z) < 2.2) {
         this.burstPipe(p);
         return true;
       }
@@ -417,107 +648,119 @@ export class Game implements EnemyHost {
     audio.explosion({ x, y: 1.5, z });
     this.shake = Math.max(this.shake, 0.6);
     (p.mesh.material as THREE.MeshStandardMaterial) = (p.mesh.material as THREE.MeshStandardMaterial).clone();
-    (p.mesh.material as THREE.MeshStandardMaterial).color.setHex(0x55606a);
-    for (let i = 0; i < 40; i++) {
-      this.particle(new THREE.Vector3(x, 1.2 + Math.random() * 1.5, z), 0xe8f4ff,
-        new THREE.Vector3((Math.random() - 0.5) * 6, Math.random() * 2, (Math.random() - 0.5) * 6), 1.6, -0.5, 0.35, 2.5);
-    }
+    (p.mesh.material as THREE.MeshStandardMaterial).color.setHex(0x40484f);
+    for (let i = 0; i < 40; i++) this.particle(new THREE.Vector3(x, 1 + Math.random() * 2, z), 0xe8f4ff, new THREE.Vector3((Math.random() - 0.5) * 6, Math.random() * 2, (Math.random() - 0.5) * 6), 1.4, -0.4, 0.3);
     for (const e of this.enemies) {
       if (!e.alive) continue;
-      const d = Math.hypot(e.pos.x - x, e.pos.z - z);
-      if (d < 4.5) {
-        e.damage(e.kind === 'butcher' ? 30 : 100, 'weak');
-        e.stun(e.kind === 'butcher' ? 4.5 : 3);
-        if (e.kind === 'butcher') e.yaw += Math.PI * 0.9; // 踉跄转身，背部囊泡暴露
+      if (Math.hypot(e.pos.x - x, e.pos.z - z) < 5) {
+        e.vulnerable = true;
+        e.damage(e.kind.boss ? 60 : 120, 'weak');
+        e.freeze(e.kind.boss ? 5 : 4);
+        setTimeout(() => (e.vulnerable = false), 5000);
       }
     }
-    const pd = Math.hypot(this.playerPos.x - x, this.playerPos.z - z);
-    if (pd < 3) this.damagePlayer(15, new THREE.Vector3(x, 0, z));
+    if (Math.hypot(this.playerPos.x - x, this.playerPos.z - z) < 3) this.damagePlayer(12, new THREE.Vector3(x, 0, z));
   }
 
-  // ---------------- 特效 ----------------
+  // ======================= 战斗 =======================
   private particleGeo = new THREE.BoxGeometry(1, 1, 1);
-  private particle(pos: THREE.Vector3, color: number, vel: THREE.Vector3, life: number, gravity = -9, size = 0.04, grow = 0) {
-    if (this.particles.length > 220) {
-      const old = this.particles.shift()!;
-      this.scene.remove(old.mesh);
-    }
-    const m = new THREE.Mesh(this.particleGeo, new THREE.MeshBasicMaterial({ color, transparent: true, opacity: 0.9, depthWrite: false }));
+  private particle(pos: THREE.Vector3, color: number, vel: THREE.Vector3, life: number, gravity = -9, size = 0.05) {
+    if (this.particles.length > 200) this.world.remove(this.particles.shift()!.mesh);
+    const m = new THREE.Mesh(this.particleGeo, new THREE.MeshBasicMaterial({ color, transparent: true, depthWrite: false }));
     m.scale.setScalar(size);
     m.position.copy(pos);
-    this.scene.add(m);
-    this.particles.push({ mesh: m, vel, life, gravity, grow });
+    this.world.add(m);
+    this.particles.push({ mesh: m, vel, life, gravity });
   }
 
-  private bulletHole(point: THREE.Vector3, normal: THREE.Vector3) {
-    const m = new THREE.Mesh(new THREE.CircleGeometry(0.04, 6), new THREE.MeshBasicMaterial({ color: 0x080808, depthWrite: false }));
-    m.position.copy(point).addScaledVector(normal, 0.01);
+  private decal(point: THREE.Vector3, normal: THREE.Vector3, blood = false, size = 0.08) {
+    const mat = blood
+      ? new THREE.MeshBasicMaterial({ map: iconTexture('blood'), transparent: true, depthWrite: false })
+      : new THREE.MeshBasicMaterial({ color: 0x080808, depthWrite: false });
+    const m = new THREE.Mesh(blood ? new THREE.PlaneGeometry(size, size) : new THREE.CircleGeometry(size / 2, 6), mat);
+    m.position.copy(point).addScaledVector(normal, 0.012);
     m.lookAt(point.clone().add(normal));
-    this.scene.add(m);
+    this.world.add(m);
     this.decals.push(m);
-    if (this.decals.length > 40) this.scene.remove(this.decals.shift()!);
+    if (this.decals.length > 60) this.world.remove(this.decals.shift()!);
   }
 
-  // ---------------- 战斗 ----------------
   private fire() {
-    if (!this.pistol.tryFire()) return;
-    this.stats.shots++;
-    const moving = Math.min(1, this.vel.length() / 4);
-    const spread = this.pistol.aimK > 0.8 ? 0.003 : 0.012 + moving * 0.03;
-    const dir = new THREE.Vector3(
-      (Math.random() - 0.5) * spread * 2, (Math.random() - 0.5) * spread * 2, -1,
-    ).normalize().applyQuaternion(this.camera.quaternion);
-    const origin = this.camera.getWorldPosition(new THREE.Vector3());
-
-    // 触屏辅助瞄准：吸附到准星附近的头部
-    if (this.settings.aimAssist) {
-      let best = 0.06, bestDir: THREE.Vector3 | null = null;
-      for (const e of this.enemies) {
-        if (!e.alive || e.state === 'dormant') continue;
-        const to = e.headPos.sub(origin);
-        const d = to.length();
-        if (d > 25) continue;
-        to.normalize();
-        const ang = to.angleTo(dir);
-        if (ang < best && lineOfSight(origin.x, origin.z, e.pos.x, e.pos.z)) { best = ang; bestDir = to; }
-      }
-      if (bestDir) dir.copy(bestDir);
+    const def = WEAPONS[this.current];
+    if (this.fireCd > 0 || this.weapon.busy || this.weapon.reloading > 0) return;
+    if (!def.auto && this.triggerHeld) return;
+    this.triggerHeld = true;
+    if (this.mags[this.current] <= 0) {
+      audio.dryFire();
+      this.fireCd = 0.3;
+      this.startReload();
+      return;
     }
+    this.mags[this.current]--;
+    this.fireCd = def.rate;
+    this.weapon.kick();
+    this.stats.shots++;
+    if (def.id === 'cryo') audio.sample('cryo_blast', 0.7) || audio.flash();
+    else if (!audio.sample('pistol_shot', def.id === 'mg' ? 0.5 : 0.8, def.id === 'mg' ? 0.85 : 1)) audio.gunshot();
+    this.onShot?.();
+    this.pitch += def.id === 'mg' ? 0.006 : 0.014;
+    this.yaw += (Math.random() - 0.5) * (def.id === 'mg' ? 0.01 : 0.004);
+    this.flashBurst = Math.max(this.flashBurst, 0.05);
 
-    this.raycaster.set(origin, dir);
-    this.raycaster.far = 80;
-    const targets: THREE.Object3D[] = [...this.level.colliders];
-    for (const e of this.enemies) if (e.alive) targets.push(...e.hitMeshes);
-    const hits = this.raycaster.intersectObjects(targets, false);
-    this.pitch += 0.018; // 后坐力
-    this.yaw += (Math.random() - 0.5) * 0.008;
-    const h = hits[0];
-    if (!h) return;
-    const ud = h.object.userData;
-    if (ud.enemy) {
-      const e = ud.enemy as Enemy;
-      const part = ud.part as HitPart;
-      e.damage(25, part);
-      this.stats.hits++;
-      if (part === 'head') this.stats.headshots++;
-      const kill = !e.alive;
-      this.hud.hit(kill, part === 'weak' || part === 'head');
-      for (let i = 0; i < (part === 'head' ? 14 : 8); i++) {
-        this.particle(h.point, i % 3 ? 0x7a0a05 : 0xd02810,
-          new THREE.Vector3((Math.random() - 0.5) * 3, Math.random() * 3, (Math.random() - 0.5) * 3).addScaledVector(dir, -2), 0.6);
+    const moving = Math.min(1, this.vel.length() / 3);
+    const spread = def.spread * (1 + moving);
+    const origin = this.camera.getWorldPosition(new THREE.Vector3());
+    const dir = new THREE.Vector3((Math.random() - 0.5) * spread * 2, (Math.random() - 0.5) * spread * 2, -1).normalize().applyQuaternion(this.camera.quaternion);
+    if (this.settings.aimAssist) {
+      let best = IS_MOBILE ? 0.09 : 0.05, bd: THREE.Vector3 | null = null;
+      for (const e of this.enemies) {
+        if (!e.alive || e.state === 'dormant' || (e.kind.passive && !e.enraged)) continue;
+        const to = e.center().sub(origin);
+        if (to.length() > 30) continue;
+        to.normalize();
+        const a = to.angleTo(dir);
+        if (a < best && lineOfSight(origin.x, origin.z, e.pos.x, e.pos.z)) { best = a; bd = to; }
       }
-    } else {
+      if (bd) dir.lerp(bd, 0.75).normalize();
+    }
+    // 先找立绘命中，再比较墙体距离
+    let eh: { e: Enemy; dist: number; part: HitPart; point: THREE.Vector3 } | null = null;
+    for (const e of this.enemies) {
+      const h = e.hitTest(origin, dir);
+      if (h && (!eh || h.dist < eh.dist)) eh = { e, ...h };
+    }
+    this.raycaster.set(origin, dir);
+    this.raycaster.far = 90;
+    const wh = this.raycaster.intersectObjects(this.level?.colliders ?? [], false)[0];
+    if (eh && (!wh || eh.dist < wh.distance)) {
+      const e = eh.e;
+      const cryo = def.id === 'cryo';
+      e.damage(def.dmg, eh.part, { cryo });
+      this.stats.hits++;
+      if (eh.part === 'head') this.stats.headshots++;
+      this.hud.hit(!e.alive, eh.part !== 'body');
+      const n = dir.clone().negate();
+      for (let i = 0; i < (eh.part === 'head' ? 14 : 8); i++) {
+        this.particle(eh.point, cryo ? 0xbff6ff : i % 3 ? 0x7a0a05 : 0xd02810, new THREE.Vector3((Math.random() - 0.5) * 3, Math.random() * 3, (Math.random() - 0.5) * 3).addScaledVector(n, 2), 0.6);
+      }
+      if (cryo) for (const o of this.enemies) if (o !== e && o.alive && o.pos.distanceTo(e.pos) < 2.5) o.damage(def.dmg * 0.5, 'body', { cryo: true });
+    } else if (wh) {
+      const ud = wh.object.userData;
       if (ud.pipe) {
-        const pipe = this.level.pipes.find((p) => p.mesh === h.object);
+        const pipe = this.level!.pipes.find((p) => p.mesh === wh.object);
         if (pipe) this.burstPipe(pipe);
       }
-      const n = h.face ? h.face.normal.clone().transformDirection(h.object.matrixWorld) : dir.clone().negate();
-      this.bulletHole(h.point, n);
-      for (let i = 0; i < 6; i++) {
-        this.particle(h.point.clone().addScaledVector(n, 0.02), 0xffc060,
-          n.clone().multiplyScalar(2).add(new THREE.Vector3((Math.random() - 0.5) * 3, Math.random() * 2, (Math.random() - 0.5) * 3)), 0.25, -6, 0.02);
-      }
+      const n = wh.face ? wh.face.normal.clone().transformDirection(wh.object.matrixWorld) : dir.clone().negate();
+      this.decal(wh.point, n);
+      for (let i = 0; i < 5; i++) this.particle(wh.point.clone().addScaledVector(n, 0.03), def.id === 'cryo' ? 0x9ff : 0xffc060, n.clone().multiplyScalar(2).add(new THREE.Vector3((Math.random() - 0.5) * 3, Math.random() * 2, (Math.random() - 0.5) * 3)), 0.25, -6, 0.025);
     }
+  }
+
+  private startReload() {
+    const def = WEAPONS[this.current];
+    if (this.weapon.reloading > 0 || this.mags[this.current] >= def.mag || this.reserve[def.ammo] <= 0) return;
+    this.weapon.reloading = def.reload;
+    audio.reload();
   }
 
   useScan() {
@@ -526,7 +769,12 @@ export class Game implements EnemyHost {
     this.scanCd = 12;
     this.scanning = true;
     this.hud.setScan(true);
-    audio.scan();
+    if (!audio.sample('scanner_pulse', 0.6)) audio.scan();
+    for (const e of this.enemies) if (e.kind.boss) e.weakVisible = true;
+    // 勘察镜也能发现暗门
+    for (const m of this.level?.secrets.values() ?? []) {
+      if (m.position.distanceTo(this.playerPos) < 15) (m.material as THREE.MeshStandardMaterial).emissive?.setHex(0x331100);
+    }
     this.onScan?.();
   }
 
@@ -534,48 +782,100 @@ export class Game implements EnemyHost {
     if (!this.flashUnlocked || this.flashCd > 0) return;
     this.flashCd = 8;
     this.flashBurst = 0.6;
+    this.hud.whiteFlash();
     audio.flash();
-    const fwd = new THREE.Vector3(0, 0, -1).applyQuaternion(this.camera.quaternion);
-    fwd.y = 0;
-    fwd.normalize();
-    let n = 0;
+    const fwd = new THREE.Vector3(-Math.sin(this.yaw), 0, -Math.cos(this.yaw));
     for (const e of this.enemies) {
       if (!e.alive || e.state === 'dormant') continue;
       const to = new THREE.Vector3(e.pos.x - this.playerPos.x, 0, e.pos.z - this.playerPos.z);
       const d = to.length();
-      if (d > 12) continue;
-      to.normalize();
-      if (to.dot(fwd) < 0.82 && d > 2) continue;
+      if (d > 13 || (to.normalize().dot(fwd) < 0.8 && d > 2)) continue;
       if (!lineOfSight(this.playerPos.x, this.playerPos.z, e.pos.x, e.pos.z)) continue;
-      e.stun(e.kind === 'butcher' ? 1.0 : 3);
-      n++;
+      e.stun(e.kind.boss ? 1.0 : 3.2);
     }
-    if (n) this.onFlash?.();
   }
 
   useBell() {
-    const man = this.companions.get('man');
-    if (!this.bellUnlocked || this.bellCd > 0 || !man) return;
+    const man = this.npcs.get('man');
+    if (!this.bellUnlocked || this.bellCd > 0) return;
     this.bellCd = 60;
-    man.ringT = 1.2;
-    audio.bellRing({ x: man.pos.x, y: 1, z: man.pos.z });
+    if (man) man.ringT = 1.2;
+    this.weapon.showBell();
+    if (!audio.sample('bronze_bell_long', 0.8)) audio.bellRing();
     for (const e of this.enemies) {
       if (!e.alive) continue;
-      if (Math.hypot(e.pos.x - this.playerPos.x, e.pos.z - this.playerPos.z) < 15) e.flee(6);
+      if (Math.hypot(e.pos.x - this.playerPos.x, e.pos.z - this.playerPos.z) < 16) {
+        if (this.flags.has('bellCharm') && e.kind.name !== '无名会武装') e.charmT = 8;
+        else if (e.kind.boss) e.stun(2);
+        else e.flee(6);
+      }
     }
-    this.onBell?.();
+  }
+
+  useZhenyin() {
+    if (!this.zhenyinUnlocked || this.zhenyinCd > 0) return;
+    this.zhenyinCd = 25;
+    this.weapon.showBell();
+    // 三长两短
+    const seq = [0, 520, 1040, 1420, 1640];
+    seq.forEach((ms, i) => setTimeout(() => audio.sample(i < 3 ? 'bronze_bell_long' : 'bronze_bell_short', 0.6) || audio.bell(undefined, 0.5), ms));
+    for (const e of this.enemies) {
+      if (!e.alive) continue;
+      if (Math.hypot(e.pos.x - this.playerPos.x, e.pos.z - this.playerPos.z) < 13) e.stun(e.kind.boss ? 1.5 : 4);
+    }
   }
 
   private useHerb() {
     if (this.herbs <= 0 || this.hp >= 100 || this.healCd > 0) return;
     this.herbs--;
-    this.hp = Math.min(100, this.hp + 45);
+    this.hp = Math.min(100, this.hp + 40);
     this.healCd = 1;
     audio.pickup();
-    this.hud.showHint('使用草药：生命恢复', 2);
+    this.hud.message('使用草药：生命 +40');
   }
 
-  // ---------------- 主循环 ----------------
+  private tryUse() {
+    const fx = -Math.sin(this.yaw), fz = -Math.cos(this.yaw);
+    // 潜行：从背后无声击倒未察觉的人类守卫
+    for (const e of this.enemies) {
+      if (!e.alive || (e.state !== 'idle' && e.state !== 'dormant') || !e.kind.ranged || e.kind.boss) continue;
+      const dx = e.pos.x - this.playerPos.x, dz = e.pos.z - this.playerPos.z, d = Math.hypot(dx, dz);
+      if (d < 1.8 && (dx * fx + dz * fz) / d > 0.6) {
+        e.damage(9999, 'head');
+        audio.hitFlesh();
+        this.hud.message('无声击倒');
+        return true;
+      }
+    }
+    // 前方的门 / 暗门
+    for (const d of [0.9, 1.8, 2.6]) {
+      const { col, row } = toCell(this.playerPos.x + fx * d, this.playerPos.z + fz * d);
+      const ch = charAt(col, row);
+      if (isDoorChar(ch) && !isDoorOpen(ch)) {
+        const door = this.level!.doors.get(ch)!;
+        const def = door.def;
+        if (def.key && !this.keys.has(def.key)) {
+          this.hud.message(`需要${({ red: '红色', blue: '蓝色', yellow: '黄色' } as Record<string, string>)[def.key]}钥匙卡`);
+          audio.dryFire();
+        } else if (def.flag && !this.flags.has(def.flag)) {
+          this.hud.message(def.label ? `${def.label}：被封锁` : '门被锁住了');
+          audio.dryFire();
+        } else this.openDoor(ch);
+        return true;
+      }
+      if (ch === '$' && this.level!.openSecretAt(col, row)) {
+        this.stats.secrets++;
+        this.flow.invalidate();
+        audio.door();
+        this.hud.message('发现隐藏区域！');
+        return true;
+      }
+      if (blocked(col, row)) break;
+    }
+    return false;
+  }
+
+  // ======================= 主循环 =======================
   start() {
     let last = performance.now();
     const loop = (now: number) => {
@@ -588,294 +888,397 @@ export class Game implements EnemyHost {
   }
 
   private frame(dt: number) {
-    if (this.state === 'menu') {
+    if (this.state === 'menu' || this.state === 'inter') {
       this.menuT += dt;
-      const { x, z } = cellCenter(10, 2);
-      this.camera.position.set(x + Math.sin(this.menuT * 0.05) * 6, 2.2, z - 6);
-      this.camera.lookAt(x, 2.2, z + 30);
-      this.flashlight.intensity = 0;
-      this.level.update(dt, this.camera.position);
-      this.render();
+      if (this.level) {
+        this.camera.position.set(this.playerPos.x + Math.sin(this.menuT * 0.1) * 2, 1.8, this.playerPos.z + Math.cos(this.menuT * 0.1) * 2);
+        this.camera.rotation.set(0, this.menuT * 0.05, 0);
+        this.level.update(dt, this.camera.position, this.camera.position);
+        this.renderer.render(this.scene, this.camera);
+      } else {
+        this.renderer.setClearColor(0x000000);
+        this.renderer.clear();
+      }
+      this.weapon.update(dt, 0, false);
       return;
     }
-
+    if (this.state === 'cine') { this.weapon.update(dt, 0, false); return; }
     if (this.state === 'playing') {
       this.input.update();
-      if (this.input.consume('pause')) {
-        if (!this.hud.documentOpen) this.pause();
+      if (this.input.consume('pause') && !this.hud.documentOpen && !this.mg.active) this.pause();
+      if (this.mg.active || this.hud.documentOpen) {
+        this.input.takeLook();
+      } else {
+        this.time += dt;
+        this.stats.time += dt;
+        this.totalTime += dt;
+        this.updatePlayer(dt);
+        this.updateWorld(dt);
       }
-      this.time += dt;
-      this.updatePlayer(dt);
-      this.updateWorld(dt);
-      // 剧情等待
       for (let i = this.waiters.length - 1; i >= 0; i--) {
         const w = this.waiters[i];
-        if (w.cond()) {
-          this.waiters.splice(i, 1);
-          w.resolve();
-        }
+        if (w.cond()) { this.waiters.splice(i, 1); w.resolve(); }
       }
     } else if (this.state === 'dead') {
-      this.updateWorld(dt * 0.2);
+      this.updateWorld(dt * 0.25);
     }
     this.syncCamera(dt);
-    this.render();
+    this.renderer.render(this.scene, this.camera);
   }
 
   private updatePlayer(dt: number) {
     const inp = this.input;
-    const docOpen = this.hud.documentOpen;
-    const canAct = !this.cutscene && !docOpen;
+    const canAct = !this.cutscene;
     const look = inp.takeLook();
     if (canAct) {
-      const sens = this.pistol.aimK > 0.5 ? 0.6 : 1;
-      this.yaw -= look.dx * sens;
-      this.pitch -= look.dy * sens;
-      this.pitch = Math.max(-1.35, Math.min(1.35, this.pitch));
+      this.yaw -= look.dx;
+      this.pitch = Math.max(-1.3, Math.min(1.3, this.pitch - look.dy));
     } else if (this.lookTarget) {
       const dx = this.lookTarget.x - this.playerPos.x, dz = this.lookTarget.z - this.playerPos.z;
-      const ty = Math.atan2(-dx, -dz);
-      let d = ty - this.yaw;
+      let d = Math.atan2(-dx, -dz) - this.yaw;
       while (d > Math.PI) d -= Math.PI * 2;
       while (d < -Math.PI) d += Math.PI * 2;
       this.yaw += d * Math.min(1, dt * 2.5);
-      const tp = Math.atan2(this.lookTarget.y - EYE, Math.hypot(dx, dz));
-      this.pitch += (tp - this.pitch) * Math.min(1, dt * 2.5);
+      this.pitch += (Math.atan2(this.lookTarget.y - EYE, Math.hypot(dx, dz)) - this.pitch) * Math.min(1, dt * 2.5);
     }
 
-    // 移动
-    const aiming = canAct && inp.aim;
+    // 恐怖游戏的移动节奏：慢走、短促奔跑（耗体力）、翻滚闪避
     let mx = canAct ? inp.moveX : 0, my = canAct ? inp.moveY : 0;
     const ml = Math.hypot(mx, my);
     if (ml > 1) { mx /= ml; my /= ml; }
-    const sprint = inp.sprint && my > 0.3 && !aiming;
-    const speed = aiming ? 2.0 : sprint ? 5.4 : 3.3;
+    const { col, row } = toCell(this.playerPos.x, this.playerPos.z);
+    this.water = charAt(col, row) === '~';
+    const sprinting = inp.sprint && my > 0.3 && this.stamina > 0.05 && !this.water;
+    let speed = (my < -0.1 ? 1.7 : 2.4) * (sprinting ? 1.75 : 1);
+    if (this.water) speed *= 0.6;
+    if (sprinting) this.stamina = Math.max(0, this.stamina - dt * 0.22);
+    else this.stamina = Math.min(1, this.stamina + dt * 0.12);
     const sin = Math.sin(this.yaw), cos = Math.cos(this.yaw);
-    const wx = (mx * cos - my * sin) * speed;
-    const wz = (-mx * sin - my * cos) * speed;
-    const k = Math.min(1, dt * 10);
+    let wx = (mx * cos - my * sin) * speed;
+    let wz = (-mx * sin - my * cos) * speed;
+    if (canAct && inp.consume('dash') && this.dashCd <= 0 && this.stamina > 0.3) {
+      this.dashT = 0.28;
+      this.dashCd = 1.2;
+      this.stamina -= 0.3;
+      if (ml > 0.1) this.dashDir.set(wx, 0, wz).normalize(); else this.dashDir.set(-mx || sin, 0, cos);
+      audio.step(false);
+    }
+    if (this.dashT > 0) {
+      this.dashT -= dt;
+      wx = this.dashDir.x * 7;
+      wz = this.dashDir.z * 7;
+    }
+    this.dashCd -= dt;
+    const k = Math.min(1, dt * 8);
     this.vel.x += (wx - this.vel.x) * k;
     this.vel.z += (wz - this.vel.z) * k;
     const before = this.playerPos.clone();
     this.playerPos.x += this.vel.x * dt;
     this.playerPos.z += this.vel.z * dt;
     collide(this.playerPos, 0.38);
+    // 撞到普通门时自动开门
+    {
+      const ahead = toCell(this.playerPos.x + this.vel.x * 0.25, this.playerPos.z + this.vel.z * 0.25);
+      const ch = charAt(ahead.col, ahead.row);
+      if (isDoorChar(ch) && !isDoorOpen(ch)) {
+        const d = this.level!.doors.get(ch);
+        if (d && !d.def.key && !d.def.flag) this.openDoor(ch);
+      }
+    }
     const moved = before.distanceTo(this.playerPos);
     this.stepDist += moved;
-    this.bobT += moved * 2.4;
-    if (this.stepDist > (sprint ? 2.2 : 1.8)) {
+    this.bobT += moved * 2.2;
+    if (this.stepDist > (sprinting ? 1.9 : 1.6)) {
       this.stepDist = 0;
-      const { col, row } = this.cellOfPlayer();
-      audio.step(isExterior(col, row));
+      audio.step(charAt(col, row) === ',' || this.water);
     }
 
-    // 武器与能力
+    // 武器与技能
+    const def = WEAPONS[this.current];
+    this.fireCd -= dt;
+    if (!inp.fire) this.triggerHeld = false;
     if (canAct) {
       if (inp.fire) this.fire();
-      if (inp.consume('reload')) this.pistol.startReload();
+      if (inp.consume('reload')) this.startReload();
       if (inp.consume('scan')) this.useScan();
       if (inp.consume('flash')) this.useFlash();
       if (inp.consume('bell')) this.useBell();
+      if (inp.consume('zhenyin')) this.useZhenyin();
       if (inp.consume('heal')) this.useHerb();
-      if (this.pistol.mag === 0 && this.pistol.reserve > 0 && !inp.fire) this.pistol.startReload();
+      if (inp.consume('weapon1')) this.switchWeapon('pistol');
+      if (inp.consume('weapon2')) this.switchWeapon('mg');
+      if (inp.consume('weapon3')) this.switchWeapon('cryo');
+      if (inp.consume('nextWeapon')) {
+        const list = (['pistol', 'mg', 'cryo'] as WeaponId[]).filter((w) => this.owned.has(w));
+        this.switchWeapon(list[(list.indexOf(this.current) + 1) % list.length]);
+      }
+      if (inp.consume('map')) this.mapOpen = !this.mapOpen;
+      if (this.mags[this.current] === 0 && this.reserve[def.ammo] > 0 && !inp.fire) this.startReload();
     } else {
-      inp.consume('reload'); inp.consume('scan'); inp.consume('flash'); inp.consume('bell'); inp.consume('heal');
+      for (const a of ['reload', 'scan', 'flash', 'bell', 'zhenyin', 'heal', 'weapon1', 'weapon2', 'weapon3', 'nextWeapon', 'map'] as const) inp.consume(a);
     }
-    this.pistol.update(dt, Math.min(1, this.vel.length() / 4), aiming);
+    if (this.weapon.reloading > 0) {
+      this.weapon.reloading -= dt;
+      if (this.weapon.reloading <= 0) {
+        const need = def.mag - this.mags[this.current];
+        const take = Math.min(need, this.reserve[def.ammo]);
+        this.mags[this.current] += take;
+        this.reserve[def.ammo] -= take;
+      }
+    }
 
     // 互动
     let best: Interactable | null = null, bestD = 2.4;
-    if (canAct) {
-      const fwd = new THREE.Vector3(-Math.sin(this.yaw), 0, -Math.cos(this.yaw));
-      for (const it of this.interactables) {
-        if (!it.active) continue;
-        const to = new THREE.Vector3(it.pos.x - this.playerPos.x, 0, it.pos.z - this.playerPos.z);
-        const d = to.length();
-        if (d > bestD) continue;
-        if (d > 0.6 && to.normalize().dot(fwd) < 0.35) continue;
-        best = it;
-        bestD = d;
+    const fwd = new THREE.Vector3(-sin, 0, -cos);
+    if (canAct) for (const it of this.interactables) {
+      if (!it.active) continue;
+      const to = new THREE.Vector3(it.pos.x - this.playerPos.x, 0, it.pos.z - this.playerPos.z);
+      const d = to.length();
+      if (d > bestD || (d > 0.7 && to.normalize().dot(fwd) < 0.3)) continue;
+      best = it;
+      bestD = d;
+    }
+    let doorPrompt: string | null = null;
+    if (!best && canAct) {
+      for (const d of [0.9, 1.8]) {
+        const c = toCell(this.playerPos.x + fwd.x * d, this.playerPos.z + fwd.z * d);
+        const ch = charAt(c.col, c.row);
+        if (isDoorChar(ch) && !isDoorOpen(ch)) { doorPrompt = '开门'; break; }
+        if (blocked(c.col, c.row)) break;
       }
     }
-    this.hud.setPrompt(best ? `${inp.touchMode ? '【互动】' : '[E]'} ${best.label}` : null);
-    this.input.setButtonState('interact', { visible: !!best });
-    const wantsUse = inp.consume('interact');
-    if (best && wantsUse) {
-      audio.pickup();
-      best.onUse();
+    const useLabel = best ? best.label : doorPrompt;
+    this.hud.setPrompt(useLabel ? `${IS_MOBILE ? '【互动】' : '[E]'} ${useLabel}` : null);
+    this.input.setButton('use', { visible: !!useLabel || true });
+    if (inp.consume('use') && canAct) {
+      if (best) { audio.pickup(); best.onUse(); } else this.tryUse();
     }
 
     // 拾取
     for (const p of this.pickups) {
       if (p.taken) {
-        if (p.respawn > 0) {
-          p.timer -= dt;
-          if (p.timer <= 0) { p.taken = false; p.mesh.visible = true; }
-        }
+        if (p.respawn > 0) { p.timer -= dt; if (p.timer <= 0) { p.taken = false; p.sprite.visible = true; } }
         continue;
       }
-      p.mesh.rotation.y += dt;
-      if (Math.hypot(p.mesh.position.x - this.playerPos.x, p.mesh.position.z - this.playerPos.z) < 1.1) {
-        p.taken = true;
-        p.mesh.visible = false;
-        p.timer = p.respawn;
-        audio.pickup();
-        if (p.type === 'ammo') {
-          this.pistol.reserve += p.amount;
-          this.hud.showHint(`拾取 手枪弹药 ×${p.amount}`, 2);
-        } else {
-          this.herbs += p.amount;
-          this.hud.showHint(`拾取 草药 ×${p.amount}`, 2);
-        }
-      }
+      p.sprite.position.y = 0.45 + Math.sin(this.time * 2.5 + p.sprite.position.x) * 0.06;
+      if (Math.hypot(p.sprite.position.x - this.playerPos.x, p.sprite.position.z - this.playerPos.z) > 1.1) continue;
+      if (!this.takePickup(p.type)) continue;
+      p.taken = true;
+      p.sprite.visible = false;
+      p.timer = p.respawn;
+      if (p.counted) { this.stats.items++; p.counted = false; }
+      audio.pickup();
+    }
+
+    // 出口
+    if (this.exitPads.some((e) => Math.hypot(e.x - this.playerPos.x, e.z - this.playerPos.z) < 1.2)) {
+      if (this.exitResolve) {
+        const r = this.exitResolve;
+        this.exitResolve = null;
+        audio.door();
+        r();
+      } else if (!this.exitEnabled) this.hud.message('还有未完成的目标');
     }
 
     // 计时
     this.scanCd = Math.max(0, this.scanCd - dt);
     this.flashCd = Math.max(0, this.flashCd - dt);
     this.bellCd = Math.max(0, this.bellCd - dt);
+    this.zhenyinCd = Math.max(0, this.zhenyinCd - dt);
     this.healCd = Math.max(0, this.healCd - dt);
+    this.scareCd -= dt;
     if (this.scanT > 0) {
       this.scanT -= dt;
       if (this.scanT <= 0) {
         this.scanning = false;
         this.hud.setScan(false);
+        for (const e of this.enemies) e.weakVisible = false;
       }
     }
+    if (this.water) {
+      this.oxygen = Math.max(0, this.oxygen - dt * 4.5);
+      if (this.oxygen <= 0) { this.hp -= dt * 8; this.hud.damage(); if (this.hp <= 0) { this.hp = 0; this.setState('dead'); } }
+    } else this.oxygen = Math.min(100, this.oxygen + dt * 25);
+    this.hud.setWater(this.water);
 
-    // HUD
-    this.hud.setHealth(this.hp);
-    this.hud.setAmmo(this.pistol.mag, this.pistol.reserve, this.pistol.reloading > 0);
-    this.hud.setHerbs(this.herbs);
-    this.hud.setAbilities([
-      { key: 'Q', name: '勘察镜', cd: this.scanCd, unlocked: this.scanUnlocked },
-      { key: 'F', name: '强光', cd: this.flashCd, unlocked: this.flashUnlocked },
-      { key: 'G', name: '铜铃', cd: this.bellCd, unlocked: this.bellUnlocked },
-      { key: 'H', name: '草药', cd: 0, unlocked: true },
-    ], inp.touchMode);
-    this.input.setButtonState('scan', { visible: this.scanUnlocked, cooldown: this.scanCd / 12 });
-    this.input.setButtonState('flash', { visible: this.flashUnlocked, cooldown: this.flashCd / 8 });
-    this.input.setButtonState('bell', { visible: this.bellUnlocked, cooldown: this.bellCd / 60 });
-    this.hud.setCrosshair(this.pistol.aimK > 0.8 ? 0 : Math.min(1, this.vel.length() / 4), !this.cutscene);
+    const manHere = !!this.npcs.get('man')?.following;
+    this.hud.set({
+      hp: this.hp, armor: this.armor, ammo: this.mags[this.current], ammoName: def.name, reserve: this.reserve,
+      weapons: (['pistol', 'mg', 'cryo'] as WeaponId[]).map((w) => ({ slot: WEAPONS[w].slot, name: WEAPONS[w].name, owned: this.owned.has(w), active: this.current === w })),
+      keys: [...this.keys], herbs: this.herbs, stamina: this.stamina,
+      oxygen: this.oxygen < 99.5 || this.water ? this.oxygen : null,
+      reloading: this.weapon.reloading > 0,
+      abilities: [
+        { key: 'F', name: '强光', cd: this.flashCd, max: 8, on: this.flashUnlocked },
+        { key: 'C', name: '勘察镜', cd: this.scanCd, max: 12, on: this.scanUnlocked },
+        { key: 'Q', name: '铜铃', cd: this.bellCd, max: 60, on: this.bellUnlocked && manHere },
+        { key: 'Z', name: '镇音', cd: this.zhenyinCd, max: 25, on: this.zhenyinUnlocked },
+        { key: 'Space', name: '闪避', cd: Math.max(0, this.dashCd), max: 1.2, on: true },
+      ],
+    });
+    this.input.setButton('scan', { visible: this.scanUnlocked, cooldown: this.scanCd / 12 });
+    this.input.setButton('flash', { visible: this.flashUnlocked, cooldown: this.flashCd / 8 });
+    this.input.setButton('bell', { visible: this.bellUnlocked && manHere, cooldown: this.bellCd / 60 });
+    this.input.setButton('zhenyin', { visible: this.zhenyinUnlocked, cooldown: this.zhenyinCd / 25 });
+    this.input.setButton('weapon', { visible: this.owned.size > 1 });
+    this.input.setButton('dash', { cooldown: Math.max(0, this.dashCd) / 1.2 });
+    this.hud.setCrosshair(Math.min(1, this.vel.length() / 3), !this.cutscene);
     this.hud.update(dt, this.hp);
     audio.heartbeat(dt, this.hp < 35 ? (35 - this.hp) / 35 : 0);
-    if (this.boss) this.hud.setBoss(this.boss.alive ? this.bossName : null, this.boss.hp / this.boss.maxHp);
+    if (this.boss) this.hud.setBoss(this.boss.alive ? this.bossName || this.boss.name : null, this.boss.hp / this.boss.maxHp);
+    this.hud.markExplored(this.playerPos.x, this.playerPos.z);
+    this.hud.drawMap(this.mapOpen, this.playerPos.x, this.playerPos.z, this.yaw, this.exitEnabled ? this.exitPads : []);
+  }
 
-    const { col, row } = this.cellOfPlayer();
-    const region = regionOf(col, row);
-    this.hud.setFrost(region === 'cold' ? 0.55 : 0);
-    const fog = this.scene.fog as THREE.FogExp2;
-    const targetFog = region === 'deck' ? 0.04 : region === 'cold' ? 0.07 : 0.05;
-    fog.density += (targetFog - fog.density) * Math.min(1, dt);
+  private takePickup(t: ItemType): boolean {
+    const msg = (s: string) => this.hud.message(s);
+    switch (t) {
+      case 'ammo': this.reserve.ammo += 12; msg('拾取 手枪弹 ×12'); return true;
+      case 'mg_ammo': this.reserve.mg_ammo += 50; msg('拾取 机枪弹 ×50'); return true;
+      case 'cryo_ammo': this.reserve.cryo_ammo += 6; msg('拾取 冷凝弹 ×6'); return true;
+      case 'herb': this.herbs++; msg('拾取 草药'); return true;
+      case 'medkit': if (this.hp >= 100) return false; this.hp = Math.min(100, this.hp + 25); msg('急救包：生命 +25'); return true;
+      case 'armor': if (this.armor >= 100) return false; this.armor = Math.min(100, this.armor + 50); msg('NBER 防弹背心：护甲 +50'); return true;
+      case 'key_red': this.keys.add('red'); msg('获得 红色钥匙卡'); return true;
+      case 'key_blue': this.keys.add('blue'); msg('获得 蓝色钥匙卡'); return true;
+      case 'key_yellow': this.keys.add('yellow'); msg('获得 黄色钥匙卡'); return true;
+      case 'weapon_mg': this.giveWeapon('mg', 60); msg('获得 重机枪'); return true;
+      case 'weapon_cryo': this.giveWeapon('cryo', 12); msg('获得 冷凝枪'); return true;
+    }
+    return false;
   }
 
   private updateWorld(dt: number) {
-    const { col, row } = this.cellOfPlayer();
+    const { col, row } = toCell(this.playerPos.x, this.playerPos.z);
     this.flow.update(col, row);
     if (!this.frozen) {
       for (const e of this.enemies) {
-        if (!e.alive && !e.justDied && e.group.position.y < -0.14) continue;
-        if (Math.abs(e.pos.x - this.playerPos.x) + Math.abs(e.pos.z - this.playerPos.z) > 45 && e.alive) continue;
+        if (!e.alive && !e.justDied && e.mat.opacity <= 0) { e.group.visible = false; continue; }
+        if (e.alive && Math.abs(e.pos.x - this.playerPos.x) + Math.abs(e.pos.z - this.playerPos.z) > 55) continue;
+        // 被铜铃驱使的蛊化者攻击附近的无名会成员
+        if (e.charmT > 0) {
+          const victim = this.enemies.find((o) => o.alive && o.kind.name === '无名会武装' && o.pos.distanceTo(e.pos) < 14);
+          if (victim) {
+            const dx = victim.pos.x - e.pos.x, dz = victim.pos.z - e.pos.z, d = Math.hypot(dx, dz);
+            if (d > 1.3) { e.pos.x += (dx / d) * e.speed * dt; e.pos.z += (dz / d) * e.speed * dt; collide(e.pos, e.kind.radius); }
+            else if (Math.random() < dt * 1.5) victim.damage(30, 'body');
+            e.group.position.set(e.pos.x, 0, e.pos.z);
+            e.group.rotation.y = Math.atan2(this.camPos.x - e.pos.x, this.camPos.z - e.pos.z);
+            e.charmT -= dt;
+            continue;
+          }
+        }
         e.update(dt, this);
         if (e.justDied) {
           e.justDied = false;
-          this.stats.kills++;
+          if (e.kind.name !== '菌丝锚点') this.stats.kills++;
+          const fx = this.camPos.x - e.pos.x, fz = this.camPos.z - e.pos.z;
+          const fl = Math.hypot(fx, fz) || 1;
+          const bp = new THREE.Vector3(e.pos.x - (fx / fl) * 0.6, 0.02, e.pos.z - (fz / fl) * 0.6);
+          this.decal(bp, new THREE.Vector3(0, 1, 0), true, e.height * 0.9);
+          if (!e.kind.boss && Math.random() < 0.3) this.dropLoot(e.pos);
           this.onKill?.(e);
         }
       }
-      // 敌人互相推开
       for (let i = 0; i < this.enemies.length; i++) {
         const a = this.enemies[i];
-        if (!a.alive) continue;
+        if (!a.alive || a.kind.speed === 0) continue;
         for (let j = i + 1; j < this.enemies.length; j++) {
           const b = this.enemies[j];
-          if (!b.alive) continue;
-          const dx = b.pos.x - a.pos.x, dz = b.pos.z - a.pos.z;
-          const min = a.radius + b.radius;
-          const d2 = dx * dx + dz * dz;
+          if (!b.alive || b.kind.speed === 0) continue;
+          const dx = b.pos.x - a.pos.x, dz = b.pos.z - a.pos.z, min = a.kind.radius + b.kind.radius, d2 = dx * dx + dz * dz;
           if (d2 < min * min && d2 > 1e-6) {
-            const d = Math.sqrt(d2), push = (min - d) / 2;
-            a.pos.x -= (dx / d) * push; a.pos.z -= (dz / d) * push;
-            b.pos.x += (dx / d) * push; b.pos.z += (dz / d) * push;
+            const d = Math.sqrt(d2), p = (min - d) / 2;
+            a.pos.x -= (dx / d) * p; a.pos.z -= (dz / d) * p; b.pos.x += (dx / d) * p; b.pos.z += (dz / d) * p;
           }
         }
       }
+      this.updateProjectiles(dt);
     } else {
-      for (const e of this.enemies) {
-        e.group.position.set(e.pos.x, e.alive ? 0 : e.group.position.y, e.pos.z);
-      }
+      for (const e of this.enemies) e.group.rotation.y = Math.atan2(this.camPos.x - e.pos.x, this.camPos.z - e.pos.z);
     }
-    // 同伴：小满跟着苏晚，其余跟着玩家
-    const su = this.companions.get('su');
-    for (const c of this.companions.values()) {
-      c.update(dt, this.playerPos, this.flow, c.id === 'man' && su?.following ? su.pos : undefined);
-    }
-    // 粒子
+    for (const p of this.props) p.rotation.y = Math.atan2(this.camPos.x - p.position.x, this.camPos.z - p.position.z);
+    const su = this.npcs.get('su');
+    for (const n of this.npcs.values()) n.update(dt, this.playerPos, this.camPos, this.flow, n.id === 'man' && su?.following ? su.pos : undefined);
     for (let i = this.particles.length - 1; i >= 0; i--) {
       const p = this.particles[i];
       p.life -= dt;
-      if (p.life <= 0) {
-        this.scene.remove(p.mesh);
-        (p.mesh.material as THREE.Material).dispose();
-        this.particles.splice(i, 1);
-        continue;
-      }
+      if (p.life <= 0) { this.world.remove(p.mesh); (p.mesh.material as THREE.Material).dispose(); this.particles.splice(i, 1); continue; }
       p.vel.y += p.gravity * dt;
       p.mesh.position.addScaledVector(p.vel, dt);
       if (p.mesh.position.y < 0.01) { p.mesh.position.y = 0.01; p.vel.set(0, 0, 0); }
-      if (p.grow) p.mesh.scale.multiplyScalar(1 + p.grow * dt);
       (p.mesh.material as THREE.MeshBasicMaterial).opacity = Math.min(0.9, p.life * 2);
     }
-    // 道具呼吸光
-    const pulse = 0.5 + Math.sin(this.time * 4) * 0.4;
-    for (const m of this.itemMats.values()) (m as THREE.MeshStandardMaterial).emissiveIntensity = this.scanning ? 2 : pulse;
-    this.level.update(dt, this.playerPos);
+    // 通电轨道火花
+    if (this.electrified.size && Math.random() < 0.6) {
+      for (const [idx, t] of this.electrified) {
+        if (t < this.time) { this.electrified.delete(idx); continue; }
+        if (Math.random() < 0.15) {
+          const { x, z } = cellCenter(idx % COLS, Math.floor(idx / COLS));
+          this.particle(new THREE.Vector3(x + (Math.random() - 0.5) * 2, 0.1, z + (Math.random() - 0.5) * 2), 0x9fe8ff, new THREE.Vector3((Math.random() - 0.5) * 2, 2 + Math.random() * 2, (Math.random() - 0.5) * 2), 0.3, -8, 0.04);
+        }
+      }
+    }
+    this.level?.update(dt, this.playerPos, this.camPos);
+  }
+
+  private dropLoot(p: THREE.Vector3) {
+    const types: ItemType[] = ['ammo', 'ammo', 'herb', 'medkit'];
+    if (this.owned.has('mg')) types.push('mg_ammo');
+    if (this.owned.has('cryo')) types.push('cryo_ammo');
+    const t = types[(Math.random() * types.length) | 0];
+    const { col, row } = toCell(p.x, p.z);
+    const c = cellCenter(col, row);
+    this.addPickup(t, col, row, 0, p.x - c.x, p.z - c.z);
+    this.stats.totalItems--; // 掉落物不计入收集率
+    this.pickups[this.pickups.length - 1].counted = false;
+  }
+
+  private updateProjectiles(dt: number) {
+    for (let i = this.projectiles.length - 1; i >= 0; i--) {
+      const p = this.projectiles[i];
+      p.life -= dt;
+      if (p.falling) p.vel.y -= 14 * dt;
+      p.sprite.position.addScaledVector(p.vel, dt);
+      const pos = p.sprite.position;
+      let dead = p.life <= 0;
+      const { col, row } = toCell(pos.x, pos.z);
+      if (!p.falling && (blocked(col, row) && charAt(col, row) !== 'b' && charAt(col, row) !== 'T' || pos.y < 0)) dead = true;
+      if (p.falling && pos.y <= 0.3) {
+        dead = true;
+        if (Math.hypot(pos.x - this.playerPos.x, pos.z - this.playerPos.z) < 1.3) this.damagePlayer(p.dmg, pos.clone());
+        for (let k = 0; k < 8; k++) this.particle(pos.clone(), 0x901008, new THREE.Vector3((Math.random() - 0.5) * 4, Math.random() * 3, (Math.random() - 0.5) * 4), 0.5);
+      }
+      if (!p.falling && !dead && Math.hypot(pos.x - this.playerPos.x, pos.z - this.playerPos.z) < 0.6 && pos.y < 2.1) {
+        this.damagePlayer(p.dmg, p.owner?.pos ?? pos.clone());
+        dead = true;
+      }
+      if (dead) {
+        this.world.remove(p.sprite);
+        if (p.warn) this.world.remove(p.warn);
+        this.projectiles.splice(i, 1);
+      }
+    }
   }
 
   private syncCamera(dt: number) {
-    this.shake = Math.max(0, this.shake - dt * 1.5);
-    const bob = Math.sin(this.bobT) * 0.035;
+    this.shake = Math.max(0, this.shake - dt * 1.4);
+    const bob = Math.sin(this.bobT) * 0.04;
     const s = this.shake * this.shake;
+    const eye = this.water ? 1.25 : EYE;
     this.camera.position.set(
       this.playerPos.x + (Math.random() - 0.5) * s * 0.3,
-      EYE + bob + (Math.random() - 0.5) * s * 0.3,
+      eye + bob + (Math.random() - 0.5) * s * 0.3,
       this.playerPos.z + (Math.random() - 0.5) * s * 0.3,
     );
-    this.camera.rotation.set(this.pitch, this.yaw, Math.sin(this.bobT * 0.5) * 0.004);
-    const targetFov = 72 - this.pistol.aimK * 20;
-    if (Math.abs(this.camera.fov - targetFov) > 0.05) {
-      this.camera.fov = targetFov;
-      this.camera.updateProjectionMatrix();
-    }
+    this.camPos.copy(this.camera.position);
+    this.camera.rotation.set(this.pitch, this.yaw, Math.sin(this.bobT * 0.5) * 0.006 + (this.dashT > 0 ? 0.05 : 0));
     this.flashBurst = Math.max(0, this.flashBurst - dt);
-    this.flashlight.intensity = this.flashBurst > 0 ? 60 + this.flashBurst * 500 : 60;
-    this.flashlight.angle = this.flashBurst > 0 ? 0.7 : 0.5;
-    const fx = -Math.sin(this.yaw), fz = -Math.cos(this.yaw);
-    audio.setListener(this.playerPos.x, EYE, this.playerPos.z, fx, fz);
-  }
-
-  shakeCamera(v: number) {
-    this.shake = Math.max(this.shake, v);
-  }
-
-  private render() {
-    this.renderer.clear();
-    this.renderer.render(this.scene, this.camera);
-    if (this.state !== 'menu' && !this.cutscene) {
-      this.renderer.clearDepth();
-      this.renderer.render(this.viewScene, this.viewCam);
-    }
-  }
-
-  // 第一章结束时清理
-  resetWorld() {
-    resetDoors();
-  }
-
-  cellToWorld(col: number, row: number, y = 0) {
-    const { x, z } = cellCenter(col, row);
-    return new THREE.Vector3(x, y, z);
+    const base = this.flashlightWeak ? 32 : 70;
+    this.flashlight.intensity = this.flashBurst > 0 ? base + this.flashBurst * 500 : base;
+    this.flashlight.angle = this.flashBurst > 0.1 ? 0.7 : 0.48;
+    audio.setListener(this.playerPos.x, EYE, this.playerPos.z, -Math.sin(this.yaw), -Math.cos(this.yaw));
+    const moving = Math.min(1, this.vel.length() / 3);
+    this.weapon.update(dt, moving, (this.state === 'playing' || this.state === 'dead') && !this.cutscene && !this.mapOpen);
   }
 }
-
-export { CELL };

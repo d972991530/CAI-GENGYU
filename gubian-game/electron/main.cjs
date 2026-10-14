@@ -11,7 +11,7 @@ function createWindow() {
     webPreferences: { contextIsolation: true, backgroundThrottling: false },
   });
   Menu.setApplicationMenu(null);
-  win.loadFile(path.join(__dirname, '..', 'dist', 'index.html'));
+  win.loadFile(path.join(__dirname, '..', 'dist-desktop', 'index.html'));
   win.webContents.on('before-input-event', (event, input) => {
     if (input.type === 'keyDown' && input.key === 'F11') {
       win.setFullScreen(!win.isFullScreen());

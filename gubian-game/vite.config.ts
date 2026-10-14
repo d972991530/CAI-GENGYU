@@ -1,8 +1,12 @@
 import { defineConfig } from 'vite';
 
-// base: './' so the build loads from file:// (Electron) and the Capacitor WebView.
-export default defineConfig({
+// 电脑版与手机版分开构建：vite build --mode desktop / --mode mobile
+export default defineConfig(({ mode }) => ({
   base: './',
-  build: { outDir: 'dist', chunkSizeWarningLimit: 1500 },
+  build: {
+    outDir: mode === 'mobile' ? 'dist-mobile' : 'dist-desktop',
+    chunkSizeWarningLimit: 2000,
+    assetsInlineLimit: 0,
+  },
   server: { host: true },
-});
+}));

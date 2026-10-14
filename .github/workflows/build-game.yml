@@ -22,6 +22,7 @@ jobs:
           cache: npm
           cache-dependency-path: gubian-game/package-lock.json
       - run: npm ci
+      - run: npm run validate
       - run: npm run dist:win
       - uses: actions/upload-artifact@v4
         with:
@@ -44,6 +45,7 @@ jobs:
           distribution: temurin
           java-version: 21
       - run: npm ci
+      - run: npm run validate
       - run: npm run android:init
       - name: Gradle assembleDebug
         working-directory: gubian-game/android
@@ -72,14 +74,14 @@ jobs:
         uses: softprops/action-gh-release@v2
         with:
           tag_name: game-build-${{ github.run_number }}
-          name: 蛊变：长江启示录 第一章 · 构建 ${{ github.run_number }}
+          name: 蛊变：长江启示录 · 构建 ${{ github.run_number }}
           target_commitish: ${{ github.sha }}
           make_latest: true
           body: |
-            《蛊变：长江启示录》第一章「云梦号」
+            《蛊变：长江启示录》Doom 风格第一人称恐怖射击 · 全八章
 
-            - 安卓：下载 `GuBian-Android.apk`，在手机上安装（需允许“安装未知来源应用”）
-            - Windows：`GuBian Setup *.exe` 为安装版，`GuBian-Portable-*.exe` 为免安装版
+            - 手机版（安卓）：下载 `GuBian-Android.apk`，在手机上安装（需允许“安装未知来源应用”）。触屏操控界面。
+            - 电脑版（Windows）：`GuBian Setup *.exe` 为安装版，`GuBian-Portable-*.exe` 为免安装版。键鼠 / 手柄操控界面。
           files: |
             out/*.apk
             out/*.exe
