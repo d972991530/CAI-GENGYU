@@ -1,7 +1,7 @@
 // 关卡校验：入口 / 出口 / 钥匙门 / 剧情门 / 物品与刷怪点是否可达
 // 用法：npm run validate
 import { readFileSync, readdirSync } from 'node:fs';
-import { fileURLToPath } from 'node:url';
+import { fileURLToPath, pathToFileURL } from 'node:url';
 import { dirname, join } from 'node:path';
 
 const here = dirname(fileURLToPath(import.meta.url));
@@ -13,7 +13,7 @@ const isDoor = (ch: string) => ch >= '1' && ch <= '9';
 let failures = 0;
 const files = readdirSync(dataDir).filter((f) => f.endsWith('.ts')).sort();
 for (const f of files) {
-  const mod = await import(join(dataDir, f));
+  const mod = await import(pathToFileURL(join(dataDir, f)).href);
   const data = Object.values(mod)[0] as any;
   let script = '';
   try { script = readFileSync(join(here, `../src/chapters/ch${data.id}.ts`), 'utf8'); } catch { script = '*'; }
