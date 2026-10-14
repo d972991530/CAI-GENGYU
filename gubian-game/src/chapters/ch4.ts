@@ -13,6 +13,30 @@ export async function ch4(g: Game) {
     { img: 's3_2', kb: 'in', lines: [['', '林骁独自在巫山江滩苏醒。山路旁散落着老旧的纸钱，树上挂着一张张褪色的傩面。'], ['林骁（自语）', '这是……傩戏？']], sfx: 'whisper' },
   ]);
   g.objective('循着铜铃声，找到雾中的村落');
+  // 联动彩蛋（× 侠客行1971）：江滩崖壁上的能面，只有勘察镜能发现
+  const egg = g.prop('noh_mask', 'nohEgg', 0.85, 1.35, 0x2a2622);
+  egg.position.z -= 1.35;
+  egg.visible = false;
+  g.onScan = () => {
+    if (egg.visible || !g.near('nohEgg', 16)) return;
+    egg.visible = true;
+    g.hud.message('勘察镜：崖壁上嵌着一张白色的面具……');
+    g.addInteract('nohEgg', 'nohEgg', '查看崖壁上的面具', async () => {
+      g.removeInteract('nohEgg');
+      await g.hud.showDocument('现场报告（残页）· 一九七一年十月',
+        `<p class="dim">面具背面用油纸包着一页手写报告，字迹被江水泡得发胀。</p>
+         <p>长江巫山段。能面众的江轮在这里停过一夜，上岸的人在崖壁上嵌了这张面具——是记号，给“下一批人”指路。</p>
+         <p>丰都名山的洞，我已经封了。丹字班留下的九株样本，八株烧在罐里，一株烧在棺里。</p>
+         <p>可交接清单上的“<b class="red">丹-7</b>”，少了一支。</p>
+         <p>如果有人再看见这张面具，说明他们回来了。</p>
+         <p style="text-align:right">——红黑脸谱的那个人</p>`);
+      await g.say('林骁（自语）', '一九七一年……丹-7？CG-7……');
+    }, undefined, 0, -0.8);
+  };
+  (async () => {
+    await g.until(() => g.near('nohEgg', 7) || g.inRect(1, 7, 34, 17));
+    if (!egg.visible && g.near('nohEgg', 7)) g.hud.message('崖壁那边，好像有什么东西在雾里反光……');
+  })();
   g.hint('本章弹药稀缺：多用 <b>手电强光</b> 和潜行，避免无谓战斗', '本章弹药稀缺：多用 <b>强光</b>，避免无谓战斗', 8);
   // 铜铃声指引方向
   (async () => {

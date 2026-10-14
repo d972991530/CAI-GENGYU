@@ -301,6 +301,7 @@ export class Game implements EnemyHost {
     this.frozen = false;
     this.mapOpen = false;
     this.onShot = null;
+    this.onScan = null;
     this.saveCheckpoint();
   }
 

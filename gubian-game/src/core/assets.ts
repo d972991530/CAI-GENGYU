@@ -9,7 +9,7 @@ const SPRITES = [
   'infected', 'miner', 'nuo_mask', 'bride2', 'scare_nuo',
   // 联动《侠客行1971》
   'tang', 'noh_gun', 'noh_gun_w1', 'noh_gun_w2', 'noh_gun_hit', 'noh_blade', 'noh_blade_w', 'noh_blade_atk', 'noh_dead',
-  'tsuchigumo', 'tsuchigumo_w', 'tsuchigumo_atk', 'tsuchigumo_dead', 'civ1', 'civ2',
+  'tsuchigumo', 'tsuchigumo_w', 'tsuchigumo_atk', 'tsuchigumo_dead', 'civ1', 'civ2', 'noh_mask',
 ];
 const TEX = [
   'frost_door', 'tank_wall', 'ship_wall', 'frost_shelf', 'wood_panel', 'carpet', 'wet_tile', 'hold_wall',
