@@ -107,6 +107,8 @@ export class Hud {
     this.scare.appendChild(this.scareImg);
     this.mapCanvas = document.createElement('canvas');
     this.mapCanvas.className = 'h-map';
+    // 点一下地图本身也能关闭
+    this.mapCanvas.addEventListener('pointerdown', (e) => { e.preventDefault(); this.mapTap = true; });
     document.body.appendChild(this.mapCanvas);
     this.oxyEl = el('div', 'h-oxy', r, '<span>氧气</span><div><i></i></div>');
 
@@ -299,6 +301,13 @@ export class Hud {
     this.explored = new Uint8Array(ROWS * COLS);
   }
 
+  private mapTap = false;
+  mapTapped() {
+    const t = this.mapTap;
+    this.mapTap = false;
+    return t;
+  }
+
   markExplored(px: number, pz: number) {
     const c0 = Math.floor(px / CELL), r0 = Math.floor(pz / CELL);
     for (let r = r0 - 3; r <= r0 + 3; r++) for (let c = c0 - 3; c <= c0 + 3; c++) {
@@ -344,7 +353,7 @@ export class Hud {
     g.restore();
     g.fillStyle = '#ddd';
     g.font = '14px sans-serif';
-    g.fillText(IS_MOBILE ? '再点「地图」关闭' : '按 Tab 关闭地图', 12, H - 12);
+    g.fillText(IS_MOBILE ? '点地图或「地图」按钮关闭 · 推摇杆也会关闭' : 'Tab / Esc / 鼠标左键 / 移动 都可关闭地图', 12, H - 12);
   }
 
   update(dt: number, hp: number) {

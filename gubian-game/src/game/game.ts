@@ -149,10 +149,27 @@ export class Game implements EnemyHost {
   private stepDist = 0;
   private bobT = 0;
   private vel = new THREE.Vector3();
+  private lastShotT = -99;
+  get playerVel() { return this.vel; }
+  aimingAt(e: Enemy) {
+    if (this.time - this.lastShotT > 0.35) return false;
+    const fwd = new THREE.Vector3(0, 0, -1).applyQuaternion(this.camera.quaternion);
+    const to = e.center().sub(this.camPos).normalize();
+    return fwd.angleTo(to) < 0.07;
+  }
+  // 枪声：附近的敌人会醒来并朝声源搜索
+  private noise(radius: number) {
+    for (const e of this.enemies) {
+      if (!e.alive) continue;
+      const d = Math.hypot(e.pos.x - this.playerPos.x, e.pos.z - this.playerPos.z);
+      if (d < (e.state === 'dormant' ? radius * 0.4 : radius)) e.alert(this.playerPos.x, this.playerPos.z);
+    }
+  }
   private flashBurst = 0;
   private menuT = 0;
   private scareCd = 15;
   private mapOpen = false;
+  private mapArm = false;
   private electrified = new Map<number, number>();
   private exitPads: { x: number; z: number }[] = [];
   private exitResolve: (() => void) | null = null;
@@ -244,6 +261,7 @@ export class Game implements EnemyHost {
   }
 
   pause() {
+    this.mapOpen = false;
     if (this.state === 'playing') this.setState('paused');
   }
 
@@ -373,6 +391,7 @@ export class Game implements EnemyHost {
   // 全屏过场动画（暂停游戏）
   async cine(shots: Shot[]) {
     const prev = this.state;
+    this.mapOpen = false;
     this.setState('cine');
     audio.setAmbientLevel(0.2);
     await this.cineP.play(shots);
@@ -715,6 +734,8 @@ export class Game implements EnemyHost {
     }
     this.mags[this.current]--;
     this.fireCd = def.rate;
+    this.lastShotT = this.time;
+    this.noise(def.pellets ? 24 : 20);
     this.weapon.kick();
     this.stats.shots++;
     if (def.id === 'cryo') audio.sample('cryo_blast', 0.7) || audio.flash();
@@ -782,6 +803,8 @@ export class Game implements EnemyHost {
   // 赤霄：扇形斩击（不耗弹）。斩到的蛊化者算“断首”，丹奴不会再爬起来
   private slash(def: WeaponDef) {
     this.fireCd = def.rate;
+    this.lastShotT = this.time;
+    this.noise(6);
     this.weapon.kick();
     this.stats.shots++;
     const a = audio;
@@ -997,7 +1020,10 @@ export class Game implements EnemyHost {
     if (this.state === 'cine') { this.weapon.update(dt, 0, false); return; }
     if (this.state === 'playing') {
       this.input.update();
-      if (this.input.consume('pause') && !this.hud.documentOpen && !this.mg.active) this.pause();
+      if (this.input.consume('pause') && !this.hud.documentOpen && !this.mg.active) {
+        if (this.mapOpen) this.mapOpen = false;
+        else this.pause();
+      }
       if (this.mg.active || this.hud.documentOpen) {
         this.input.takeLook();
       } else {
@@ -1041,10 +1067,12 @@ export class Game implements EnemyHost {
     const { col, row } = toCell(this.playerPos.x, this.playerPos.z);
     this.water = charAt(col, row) === '~';
     const sprinting = inp.sprint && my > 0.3 && this.stamina > 0.05 && !this.water;
-    let speed = (my < -0.1 ? 1.7 : 2.4) * (sprinting ? 1.75 : 1);
+    // 基础移动加快（试玩反馈：太慢）；联动支线的唐武男更快
+    const base = arsenal === 'tang' ? 4.4 : 3.8;
+    let speed = (my < -0.1 ? base * 0.75 : base) * (sprinting ? 1.6 : 1);
     if (this.water) speed *= 0.6;
-    if (sprinting) this.stamina = Math.max(0, this.stamina - dt * 0.22);
-    else this.stamina = Math.min(1, this.stamina + dt * 0.12);
+    if (sprinting) this.stamina = Math.max(0, this.stamina - dt * 0.16);
+    else this.stamina = Math.min(1, this.stamina + dt * 0.18);
     const sin = Math.sin(this.yaw), cos = Math.cos(this.yaw);
     let wx = (mx * cos - my * sin) * speed;
     let wz = (-mx * sin - my * cos) * speed;
@@ -1057,8 +1085,8 @@ export class Game implements EnemyHost {
     }
     if (this.dashT > 0) {
       this.dashT -= dt;
-      wx = this.dashDir.x * 7;
-      wz = this.dashDir.z * 7;
+      wx = this.dashDir.x * 9;
+      wz = this.dashDir.z * 9;
     }
     this.dashCd -= dt;
     const k = Math.min(1, dt * 8);
@@ -1090,7 +1118,14 @@ export class Game implements EnemyHost {
     this.fireCd -= dt;
     if (!inp.fire) this.triggerHeld = false;
     if (canAct) {
-      if (inp.fire) this.fire();
+      const moving = Math.hypot(inp.moveX, inp.moveY) > 0.5;
+      if (inp.consume('map')) { this.mapOpen = !this.mapOpen; this.mapArm = false; }
+      // 地图打开时：开火 / Esc / 点地图都会关掉；手机上松开摇杆后再推也会关掉，避免“退不出来”
+      if (this.mapOpen) {
+        if (!moving) this.mapArm = true;
+        if ((inp.fire && !this.triggerHeld) || this.hud.mapTapped() || (IS_MOBILE && this.mapArm && moving)) { this.mapOpen = false; this.triggerHeld = true; }
+      }
+      if (inp.fire && !this.mapOpen) this.fire();
       if (inp.consume('reload')) this.startReload();
       if (inp.consume('scan')) this.useScan();
       if (inp.consume('flash')) this.useFlash();
@@ -1104,10 +1139,10 @@ export class Game implements EnemyHost {
         const list = (['pistol', 'mg', 'cryo'] as WeaponId[]).filter((w) => this.owned.has(w));
         this.switchWeapon(list[(list.indexOf(this.current) + 1) % list.length]);
       }
-      if (inp.consume('map')) this.mapOpen = !this.mapOpen;
       if (this.mags[this.current] === 0 && this.reserve[def.ammo] > 0 && !inp.fire) this.startReload();
     } else {
       for (const a of ['reload', 'scan', 'flash', 'bell', 'zhenyin', 'heal', 'weapon1', 'weapon2', 'weapon3', 'nextWeapon', 'map'] as const) inp.consume(a);
+      this.mapOpen = false;
     }
     if (this.weapon.reloading > 0) {
       this.weapon.reloading -= dt;
@@ -1266,6 +1301,11 @@ export class Game implements EnemyHost {
           }
         }
         e.update(dt, this);
+        if (e.justHurt) {
+          // 同伴受击：周围的敌人一起围上来
+          e.justHurt = false;
+          for (const o of this.enemies) if (o !== e && o.alive && o.pos.distanceTo(e.pos) < 9) o.alert(this.playerPos.x, this.playerPos.z);
+        }
         if (e.justDied) {
           e.justDied = false;
           if (e.kind.name !== '菌丝锚点' && !e.killCounted) this.stats.kills++;

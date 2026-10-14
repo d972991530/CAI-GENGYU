@@ -60,6 +60,8 @@ export const KINDS: Record<string, Kind> = {
 
 export interface EnemyHost {
   playerPos: THREE.Vector3;
+  playerVel: THREE.Vector3;
+  aimingAt(e: Enemy): boolean; // 玩家刚开过枪且准星对着它
   camPos: THREE.Vector3;
   flow: FlowField;
   scanning: boolean;
@@ -103,6 +105,7 @@ export class Enemy {
   behavior: ((e: Enemy, dt: number) => boolean) | null = null;
   interrupt: (() => void) | null = null; // 被近战打断（Boss 招式）
   killCounted = false;
+  justHurt = false;
   private reviveAt = 0;
   private baseSprite = '';
   private curSprite = '';
@@ -119,6 +122,16 @@ export class Enemy {
   private lastX = 0;
   awakeRadius = 14;
   stuck = 0;
+  // 战斗 AI：包抄方位、蛇形走位、扑击、侧移闪避、被卡住时绕开
+  private slot = Math.random() * Math.PI * 2;
+  private strafeDir = Math.random() < 0.5 ? -1 : 1;
+  private strafeT = 0;
+  private lungeCd = 1 + Math.random() * 2;
+  private lungeT = 0;
+  private dodgeCd = 0;
+  private dodgeT = 0;
+  private unstickT = 0;
+  private alertTo: { x: number; z: number } | null = null;
 
   constructor(kindName: string, x: number, z: number, yaw: number, state: EnemyState = 'idle', scale = 1) {
     this.kind = KINDS[kindName];
@@ -127,7 +140,8 @@ export class Enemy {
     this.info = sprite(this.baseSprite);
     this.height = k.h * scale * (k.boss ? 1 : 0.94 + Math.random() * 0.12);
     this.maxHp = this.hp = k.hp;
-    this.speed = k.speed * (k.boss ? 1 : 0.85 + Math.random() * 0.3);
+    // 玩家移动加快后，敌人整体提速，保持压迫感
+    this.speed = k.speed * (k.boss ? 1.1 : (0.85 + Math.random() * 0.3) * 1.22);
     this.state = state;
     this.pos = new THREE.Vector3(x, 0, z);
     this.spawn = this.pos.clone();
@@ -206,6 +220,13 @@ export class Enemy {
     return { dist: t, part, point: origin.clone().addScaledVector(dir, t) };
   }
 
+  // 听到枪声 / 同伴受击：醒来并朝声源方向搜索
+  alert(x: number, z: number) {
+    if (!this.alive || (this.kind.passive && !this.enraged)) return;
+    if (this.state === 'dormant' || this.state === 'idle') this.awaken();
+    this.alertTo = { x, z };
+  }
+
   awaken() {
     if (this.state === 'dormant' || this.state === 'idle') {
       this.state = 'awaken';
@@ -233,7 +254,8 @@ export class Enemy {
       audio.roar({ x: this.pos.x, y: 1.6, z: this.pos.z });
     }
     if (this.state === 'dormant' || this.state === 'idle') this.awaken();
-    if (!k.boss && this.state === 'chase' && Math.random() < 0.25) { this.state = 'stunned'; this.stateT = 0.4; }
+    this.justHurt = true;
+    if (!k.boss && this.state === 'chase' && Math.random() < 0.15) { this.state = 'stunned'; this.stateT = 0.3; }
     if (opts.cryo) {
       this.freezeBuild += k.boss ? 0.2 : 0.45;
       if (this.freezeBuild >= 1) { this.freeze(k.boss ? 2.5 : 4); this.freezeBuild = 0; }
@@ -395,6 +417,47 @@ export class Enemy {
           break;
         }
         const los = lineOfSight(this.pos.x, this.pos.z, tgt.x, tgt.z);
+        if (los) this.alertTo = null;
+        const smart = !k.boss && k.speed > 0;
+        this.lungeCd -= dt;
+        this.dodgeCd -= dt;
+        this.strafeT -= dt;
+        if (this.strafeT <= 0) { this.strafeT = 1.2 + Math.random() * 1.6; if (Math.random() < 0.6) this.strafeDir *= -1; }
+        // 侧移闪避：玩家对准它开枪时，人类敌人有几率横跳
+        if (smart && k.human && this.dodgeCd <= 0 && host.aimingAt(this) && Math.random() < 0.45) {
+          this.dodgeCd = 2.2;
+          this.dodgeT = 0.32;
+        }
+        if (this.dodgeT > 0) {
+          this.dodgeT -= dt;
+          const l = dist || 1;
+          target = { x: this.pos.x + (-dz / l) * this.strafeDir * 3, z: this.pos.z + (dx / l) * this.strafeDir * 3 };
+          move = this.speed * 2.6;
+          break;
+        }
+        // 近战扑击：贴近后突然加速扑上来
+        if (this.lungeT > 0) {
+          this.lungeT -= dt;
+          target = { x: tgt.x, z: tgt.z };
+          move = this.speed * 2.7;
+          if (dist < k.reach && this.attackCd <= 0) { this.state = 'attack'; this.stateT = k.windup * 0.5; this.lungeT = 0; }
+          break;
+        }
+        if (smart && !k.ranged && los && this.lungeCd <= 0 && dist > k.reach && dist < 4.5) {
+          this.lungeT = 0.45;
+          this.lungeCd = 3 + Math.random() * 2;
+          audio.groan({ x: this.pos.x, y: 1.6, z: this.pos.z }, 1.2, 0.9);
+          break;
+        }
+        // 被卡住：换个方向绕开
+        if (this.unstickT > 0) {
+          this.unstickT -= dt;
+          const l = dist || 1;
+          target = { x: this.pos.x + (-dz / l) * this.strafeDir * 2 + (dx / l), z: this.pos.z + (dx / l) * this.strafeDir * 2 + (dz / l) };
+          move = this.speed;
+          break;
+        }
+        if (this.stuck > 0.7) { this.stuck = 0; this.unstickT = 0.6; this.strafeDir *= -1; }
         if (dist < k.reach && this.attackCd <= 0 && k.dmg > 0) {
           this.state = 'attack';
           this.stateT = k.windup;
@@ -412,16 +475,34 @@ export class Enemy {
         if (k.ranged && this.rangedCd <= 0 && los && dist < k.ranged.range && dist > 2.5) {
           this.rangedCd = k.ranged.cd * (0.8 + Math.random() * 0.5);
           const from = new THREE.Vector3(this.pos.x, this.height * 0.65, this.pos.z);
-          host.spawnProjectile(from, new THREE.Vector3(tgt.x, 1.2, tgt.z), k.ranged.proj, k.ranged.dmg, k.ranged.speed, this);
+          // 预判玩家走位（有一定误差）
+          const lead = (dist / k.ranged.speed) * (0.5 + Math.random() * 0.5);
+          host.spawnProjectile(from, new THREE.Vector3(tgt.x + host.playerVel.x * lead, 1.2, tgt.z + host.playerVel.z * lead), k.ranged.proj, k.ranged.dmg, k.ranged.speed, this);
           this.flashT = 0.05;
         }
         const keep = k.ranged?.keep ?? 0;
+        const l = dist || 1;
+        const px = -dz / l, pz = dx / l; // 垂直于玩家方向
         if (keep && los && dist < keep) {
-          target = { x: this.pos.x - dx + dz * 0.5, z: this.pos.z - dz - dx * 0.5 };
-          move = this.speed * 0.7;
+          // 太近：边后退边侧移
+          target = { x: this.pos.x - dx + px * this.strafeDir * 3, z: this.pos.z - dz + pz * this.strafeDir * 3 };
+          move = this.speed * 0.8;
+        } else if (smart && k.ranged && los && dist < k.ranged.range * 0.85) {
+          // 射手：在射程内来回横移，不站桩
+          target = { x: this.pos.x + px * this.strafeDir * 2 + (dist > keep + 4 ? dx / l : 0), z: this.pos.z + pz * this.strafeDir * 2 + (dist > keep + 4 ? dz / l : 0) };
+          move = this.speed * 0.65;
         } else if (dist > k.reach * 0.8 && k.speed > 0) {
           move = this.speed;
-          target = dist < 4 && los ? { x: tgt.x, z: tgt.z } : host.flow.next(this.pos.x, this.pos.z) ?? { x: tgt.x, z: tgt.z };
+          if (!los && this.alertTo && Math.hypot(this.alertTo.x - this.pos.x, this.alertTo.z - this.pos.z) > 1.5) target = host.flow.next(this.pos.x, this.pos.z) ?? this.alertTo;
+          else if (dist < 6 && los) {
+            // 近距离：从各自的包抄方位逼近，避免排成一列
+            const side = smart ? 1.4 : 0;
+            target = { x: tgt.x + Math.cos(this.slot) * side, z: tgt.z + Math.sin(this.slot) * side };
+          } else if (smart && los && dist < 16) {
+            // 中距离：蛇形走位，难以瞄准
+            const w = Math.sin(this.walkT * 0.9 + this.slot) * 2.2;
+            target = { x: tgt.x + px * w, z: tgt.z + pz * w };
+          } else target = host.flow.next(this.pos.x, this.pos.z) ?? { x: tgt.x, z: tgt.z };
         }
         break;
       }
