@@ -88,5 +88,5 @@ export const ch1: ChapterData = {
       { rect: [1, 22, 22, 26], wall: 'tex:frost_door', floor: 'p:frost' },
     ],
   },
-  route: ['phone', 'hall', 'aw3', 'list', 'card', 'wardrobe', 'kitchen', 'cold', 'butcher', 'exit'],
+  route: ['phone', 'hall', 'aw3', 'corridor', 'list', 'card', 'wardrobe', 'kitchen', 'cold', 'butcher', 'exit'],
 };

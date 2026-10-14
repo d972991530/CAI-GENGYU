@@ -38,6 +38,7 @@ class DesktopInput implements Input {
   private lookDY = 0;
   private mouseFire = false;
   private padPrev: boolean[] = [];
+  private selfUnlock = false;
 
   constructor(private canvas: HTMLElement) {
     const map: Record<string, Action> = {
@@ -67,10 +68,11 @@ class DesktopInput implements Input {
       this.lookDY += e.movementY * 0.0022 * this.sensitivity;
     });
     document.addEventListener('pointerlockchange', () => {
-      if (document.pointerLockElement !== canvas && this.enabled) {
-        this.mouseFire = false;
-        this.onPointerLockLost?.();
-      }
+      if (document.pointerLockElement === canvas) return;
+      this.mouseFire = false;
+      // 游戏自己释放的（打开档案、小游戏、过场）不算玩家暂停
+      if (this.selfUnlock) { this.selfUnlock = false; return; }
+      if (this.enabled) this.onPointerLockLost?.();
     });
   }
 
@@ -79,7 +81,10 @@ class DesktopInput implements Input {
     p?.catch?.(() => {});
   }
   unlock() {
-    if (document.pointerLockElement) document.exitPointerLock();
+    if (document.pointerLockElement) {
+      this.selfUnlock = true;
+      document.exitPointerLock();
+    }
   }
   show() {}
   setButton() {}

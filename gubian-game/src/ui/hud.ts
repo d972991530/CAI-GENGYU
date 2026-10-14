@@ -137,6 +137,18 @@ export class Hud {
     this.root.style.display = v ? 'block' : 'none';
   }
 
+  // 换章时清掉残留的提示、字幕和消息
+  reset() {
+    this.hint.classList.remove('on');
+    this.msg.classList.remove('on');
+    this.subtitle.classList.remove('on');
+    this.hintT = this.msgT = 0;
+    this.setPrompt(null);
+    this.setCaption('');
+    this.setLetterbox(false);
+    this.setScan(false);
+  }
+
   setFace(id: string) {
     this.face.src = portraitUrl(id);
   }

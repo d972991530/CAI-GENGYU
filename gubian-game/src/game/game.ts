@@ -290,6 +290,13 @@ export class Game implements EnemyHost {
     this.boss = null;
     this.hud.setBoss(null);
     this.hud.setObjective('');
+    this.hud.reset();
+    this.scanning = false;
+    this.scanT = 0;
+    this.cutscene = false;
+    this.frozen = false;
+    this.mapOpen = false;
+    this.onShot = null;
     this.saveCheckpoint();
   }
 
