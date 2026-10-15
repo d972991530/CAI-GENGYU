@@ -1,5 +1,11 @@
 # 分镜动态预览台 · 数据格式
 
+> 一般不需要手写这份数据：在页面的「剧本 → 分镜」里粘贴或打开剧本（.txt / .md / .fountain / .docx），点「拆分场次并生成预览」，页面会按场次自动生成。
+> - **快速拆镜**：本页按规则完成，离线也能用，适合先看走位和节奏。能识别「第一场 / 1-2 / INT. / 【场景】」等场次标题、「人物：甲、乙」和「名字：台词」格式，以及劈、刺、推、踢、闯入、拔刀、烛灭、落地等常见动作。
+> - **Claude 拆镜**：在 claude.ai 里打开页面时可用，按导演技能的六条分镜原则逐镜设计，输出的就是下面这份数据。
+>
+> 下面的格式用于手动微调，或让 Claude 在对话里直接生成。
+
 `index.html` 是一个单文件页面，整部预览由页面里 `<script type="application/json" id="storyboard-data">` 中的 JSON 驱动。
 也可以在页面「分镜数据」标签里粘贴、导入、修改后点「应用」。
 
@@ -20,7 +26,7 @@
 | 字段 | 说明 |
 | --- | --- |
 | `title` | 标题，如「西廊书房·夜取信」 |
-| `line` | 默认视觉线：`A` 影戏线 / `B` 现实线 / `C` 回忆线（对应 Seedance 导演技能的三条线，决定配色） |
+| `line` | 默认视觉线：`A` 影戏线 / `B` 现实线 / `C` 回忆线（对应 Seedance 导演技能的三条线）/ `N` 通用（日景、现代或其他题材），决定配色 |
 | `place` `time` | 地点、时间，显示在标题上方 |
 | `aspect` | `16:9`（默认）或更宽的画幅如 `2.39:1`（会加遮幅） |
 | `fps` | 帧率，仅显示 |
@@ -92,7 +98,7 @@
 }
 ```
 
-- **姿态** `pose`：`stand` `walk` `run` `guard` `crouch` `reach` `crouchLook` `thrust` `chop` `raise` `dodge` `stagger` `pinned` `push` `threaten` `look` `kick` `kneel` `fall` `down`。相邻关键帧之间自动插值。
+- **姿态** `pose`：`stand` `walk` `run` `sit` `guard` `crouch` `reach` `crouchLook` `thrust` `chop` `raise` `dodge` `stagger` `pinned` `push` `threaten` `look` `kick` `kneel` `fall` `down`。相邻关键帧之间自动插值。
 - `face`：1 面向画右，-1 面向画左；`head`：头部俯仰角（负为抬头）。
 - `weapon`（关键帧）：`hand` 持在手 / `sheath` 入鞘 / `none` 脱手。
 - **插入特写** `insert.kind`：`eye`（`look`、`narrow`）/ `boots` / `draw` 拔刀 / `candle`（`out`、`tip`）/ `drop` 兵器落地 / `hand` 握柄 / `throat` 刃抵喉 / 其他值显示 `label` 文字卡。

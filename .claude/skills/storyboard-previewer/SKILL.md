@@ -7,6 +7,11 @@ description: 把已确认的 AI 影片分镜（通常来自 seedance-live-action
 
 模板在仓库 `tools/storyboard-previewer/index.html`，数据格式见同目录 `SCHEMA.md`。
 
+## 两种用法
+
+- **用户自己导入剧本**：发布后的页面里有「剧本 → 分镜」区，任何剧本粘贴或打开文件即可按场次生成预览；在 claude.ai 中打开时还能点「Claude 拆镜」由页面直接调用 Claude（发布时须声明 `capabilities: {sample: {}}`）。用户只要工具本身时，直接发布模板即可。
+- **在对话里由 Claude 拆镜**：按下面的流程把确认过的分镜写成 JSON 填入模板。
+
 ## 流程
 
 1. **先有确认过的分镜。** 若还没有，按 `seedance-live-action-film-director` 的流程与导演讨论出信息清单表；预览不替代那次讨论。
@@ -17,7 +22,7 @@ description: 把已确认的 AI 影片分镜（通常来自 seedance-live-action
    - 手、刀、眼睛、烛火等因果物与转折用 `view: "insert"`；局势用全景，必要时用 `view: "plan"` 高机位俯视。
    - 为每个实景镜头填 `plan.cam` 与 `plan.actors`，让页面检查越轴；同一场人物的左右关系保持一致。
    - 视觉线 `meta.line` / `shot.line` 与剧本标记一致（A 影戏线、B 现实线、C 回忆线）。
-3. **生成页面。** 复制模板，只替换 `<script type="application/json" id="storyboard-data">` 里的 JSON（保持合法 JSON，不加注释），其余代码不改。用 Artifact 工具发布（或把文件交给用户本地打开）。
+3. **生成页面。** 复制模板，只替换 `<script type="application/json" id="storyboard-data">` 里的 JSON（保持合法 JSON，不加注释），其余代码不改。用 Artifact 工具发布，并声明 `capabilities: {sample: {}}`（或把文件交给用户本地打开，本地只能用快速拆镜）。
 4. **交付后**，告诉导演可以在页面「分镜数据」里直接改数值重演，在「提示词导出」里复制信息清单表与【CAMERA】骨架；正式八模块仍按导演技能完整写出。
 
 ## 注意
