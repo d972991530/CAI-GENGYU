@@ -1554,6 +1554,8 @@ ${scene.text.slice(0,30000)}`;
 }
 let samplePromise=null;
 function getSample(){
+  // 桌面版 / 安卓版由 claude-bridge.js 提供 window.sbpNative.sample（用户自己的 API 密钥）
+  if(!samplePromise&&window.sbpNative&&window.sbpNative.sample) samplePromise=Promise.resolve(window.sbpNative.sample);
   if(!samplePromise) samplePromise=(window.claude&&typeof window.claude.use==="function")?Promise.resolve(window.claude.use("sample")).catch(()=>null):Promise.resolve(null);
   return samplePromise;
 }
@@ -1562,7 +1564,9 @@ const SAMPLE_ERR={
   rate_limited:"Claude 调用太频繁或已到用量上限，请稍后再试。",session_expired:"登录已过期，请重新登录 claude.ai 后刷新本页。",
   prompt_too_large:"这一场太长，请把它拆成几场再试。",refused:"Claude 没有处理这一场，请检查剧本内容后再试。",
   empty_completion:"Claude 没有返回内容，请稍后再试。",invalid_json:"Claude 返回的分镜格式不完整，可以再试一次，或先用快速拆镜。",
-  upstream_error:"连接 Claude 时出错，请稍后再试。"
+  upstream_error:"连接 Claude 时出错，请稍后再试。",
+  no_key:"还没有填 Claude API 密钥：点「Claude 设置」填入后再试。",auth_error:"API 密钥无效或没有权限，请在「Claude 设置」里检查。",
+  network:"连不上 Claude，请检查网络后再试。",bad_request:"Claude 拒绝了这次请求的参数，请在「Claude 设置」里换个模型再试。"
 };
 let aiCtl=null, busy=false;
 async function genClaude(i){
@@ -1759,7 +1763,7 @@ $("asset-one").onchange=async e=>{
 };
 
 /* ---------- PDF 剧本 ---------- */
-const PDFJS="https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/";
+const PDFJS=(window.SBP_VENDOR&&window.SBP_VENDOR.pdfjs)||"https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/";
 let pdfReady=null;
 function loadScript(src){ return new Promise((res,rej)=>{ const s=document.createElement("script"); s.src=src; s.onload=res; s.onerror=()=>rej(new Error("load")); document.head.appendChild(s); }); }
 function unwrapLines(lines){
