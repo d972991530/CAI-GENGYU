@@ -98,7 +98,7 @@ textarea{width:100%;min-height:360px;background:#0b0e0d;color:var(--fg);border:1
 .msg.err{color:#ffb3ab}.msg.ok{color:#9fd8c4}
 .hint{color:var(--muted);font-size:13px;max-width:80ch}
 .hint code{font-family:var(--f-mono);font-size:12px;color:var(--fg)}
-.head-row{display:flex;flex-wrap:wrap;gap:12px 20px;align-items:flex-end;justify-content:space-between}
+.head-row{display:flex;flex-direction:row;flex-wrap:wrap;gap:12px 20px;align-items:flex-end;justify-content:space-between}
 .head-row > div{min-width:0;flex:1 1 420px;display:flex;flex-direction:column;gap:6px}
 .importer h2{margin-bottom:4px}
 .imp-grid{display:grid;grid-template-columns:minmax(0,1fr) minmax(0,1fr);gap:16px;margin-top:10px}
@@ -118,6 +118,18 @@ button:disabled{opacity:.45;cursor:not-allowed}
 .method{font-size:12.5px;color:var(--muted);margin:8px 0 0;max-width:70ch}
 .method b{color:var(--fg);font-weight:500}
 #scene-sel{max-width:240px}
+.stage-box{display:flex;justify-content:center}
+.stage-box.vertical{background:#050606}
+.stage-box.vertical #stage{width:auto;height:min(78vh,860px);max-width:100%}
+.assets{margin-top:14px;border-top:1px solid var(--line);padding-top:12px}
+.assets h3{margin:0 0 4px;font-size:14px;font-weight:700;display:flex;gap:10px;align-items:baseline;flex-wrap:wrap}
+.assets h3 span{font-weight:400;font-size:12px;color:var(--muted)}
+.asset-list{list-style:none;margin:8px 0 0;padding:0;display:grid;grid-template-columns:repeat(auto-fill,minmax(150px,1fr));gap:8px}
+.asset{display:grid;grid-template-columns:44px minmax(0,1fr);gap:4px 8px;align-items:center;padding:6px;border:1px solid var(--line);border-radius:5px;background:var(--panel-2)}
+.asset .thumb{grid-row:1/span 2;width:44px;height:58px;border-radius:3px;background:#0b0e0d center/contain no-repeat;border:1px solid var(--line);display:flex;align-items:center;justify-content:center;font-size:18px;color:var(--muted);font-family:var(--f-display)}
+.asset .nm{font-weight:700;font-size:13px;min-width:0;overflow-wrap:anywhere}
+.asset .ctl{display:flex;gap:4px;flex-wrap:wrap}
+.asset .ctl button,.asset .ctl select{padding:1px 6px;font-size:11.5px}
 @media (prefers-reduced-motion:reduce){.playhead{box-shadow:none}}
 </style>
 
@@ -161,14 +173,14 @@ button:disabled{opacity:.45;cursor:not-allowed}
   </div>
 
   <section class="card importer" id="importer" aria-labelledby="imp-h">
-    <h2 id="imp-h">剧本 → 分镜 <span class="tag">粘贴剧本，或打开 .txt / .md / .fountain / .docx</span></h2>
+    <h2 id="imp-h">剧本 → 分镜 <span class="tag">粘贴剧本，或打开 .pdf / .docx / .txt / .md / .fountain</span></h2>
     <div class="imp-grid">
       <div>
         <textarea id="script-input" spellcheck="false" aria-label="剧本文本"></textarea>
         <div class="row">
           <button class="primary" id="btn-split" type="button">拆分场次并生成预览</button>
           <button id="btn-open-script" type="button">打开剧本文件</button>
-          <input type="file" id="script-file" accept=".txt,.md,.fountain,.docx,.json,text/plain" hidden>
+          <input type="file" id="script-file" accept=".pdf,.txt,.md,.fountain,.docx,.json,text/plain,application/pdf" hidden>
           <span class="hint" id="script-stat"></span>
         </div>
       </div>
@@ -180,8 +192,18 @@ button:disabled{opacity:.45;cursor:not-allowed}
               <option value="B">B 现实线（夜景）</option>
               <option value="C">C 回忆线（胶片暖金）</option>
               <option value="A">A 影戏线（皮影）</option>
-              <option value="N">N 通用（日景 / 其他题材）</option>
+              <option value="N">N 通用（日景 / 现代 / 其他题材）</option>
             </select>
+          </label>
+          <label>画幅
+            <select id="aspect-opt">
+              <option value="16:9" selected>16:9 横屏</option>
+              <option value="9:16">9:16 竖屏短剧</option>
+              <option value="2.39:1">2.39:1 宽银幕</option>
+            </select>
+          </label>
+          <label>「我」是
+            <select id="me-opt"><option value="auto">自动判断</option></select>
           </label>
         </div>
         <p class="method"><b>快速拆镜</b>在本页按规则完成，几秒内出预览，适合先看走位和节奏。<span class="ai-only" id="ai-note" hidden><b>Claude 拆镜</b>按导演技能的六条分镜原则逐镜设计景别、运镜和视线链，更接近成片，每场约需半分钟到两分钟，并会用到你自己的 Claude 用量。</span><span id="ai-off">在 claude.ai 里打开本页时，还可以用 Claude 逐镜设计。</span></p>
@@ -192,6 +214,15 @@ button:disabled{opacity:.45;cursor:not-allowed}
           <button id="btn-stop" type="button" hidden>停止</button>
         </div>
         <p class="msg" id="gen-msg" role="status"></p>
+        <div class="assets">
+          <h3>角色资产 <span>上传定妆照或立绘，预览里的人偶会换成你的角色</span></h3>
+          <div class="row" style="margin-top:4px">
+            <button id="btn-assets" type="button">批量上传（按文件名匹配角色）</button>
+            <input type="file" id="asset-files" accept="image/png,image/jpeg,image/webp" multiple hidden>
+            <input type="file" id="asset-one" accept="image/png,image/jpeg,image/webp" hidden>
+          </div>
+          <ul class="asset-list" id="asset-list"></ul>
+        </div>
       </div>
     </div>
   </section>
@@ -411,6 +442,8 @@ button:disabled{opacity:.45;cursor:not-allowed}
 (function(){
 "use strict";
 const W=1600,H=900,FLOOR=760;
+let VW=1600,VH=900;           // 画框尺寸：横屏 1600×900，竖屏 900×1600
+let ASSETS={};               // 角色资产：名字 → {img, ratio, mode, facing}
 const $=id=>document.getElementById(id);
 const lerp=(a,b,t)=>a+(b-a)*t, clamp=(v,a,b)=>Math.max(a,Math.min(b,v));
 const ease=t=>t<.5?2*t*t:1-Math.pow(-2*t+2,2)/2;
@@ -528,7 +561,7 @@ function sampleActor(kfs,p,T){
 }
 
 /* ---------- 人偶绘制 ---------- */
-function puppet(def,st,silhouette){
+function puppet(def,st,silhouette,uid){
   const s=def.scale||1, f=st.face>=0?1:-1, P=st.pose;
   const T=150*s,UA=72*s,FA=68*s,TH=100*s,SH=98*s,HR=32*s;
   const dn=(a,L)=>[Math.sin(rad(a))*L*f,Math.cos(rad(a))*L];
@@ -580,9 +613,17 @@ function puppet(def,st,silhouette){
   g+=L([wx-uy*32*s,wy+ux*32*s],[wx+uy*32*s,wy-ux*32*s],silhouette?PAL.A.accent:(def.sash||"#c33"),14*s);
   // 头
   const hx=p.head[0],hy2=p.head[1];
-  g+=`<g transform="rotate(${(P.head*f).toFixed(1)} ${hx} ${hy2})">`;
-  g+=`<circle cx="${hx}" cy="${hy2}" r="${HR}" fill="${silhouette?dark:(def.skin||"#e2c9a8")}" stroke="${silhouette?"none":ol}" stroke-width="4"/>`;
+  const asset=!silhouette?assetFor(def.name):null;
   const hairC=silhouette?dark:(def.hairColor||"#151515");
+  g+=`<g transform="rotate(${(P.head*f).toFixed(1)} ${hx} ${hy2})">`;
+  if(asset&&asset.mode==="head"){
+    const r=HR*1.35, cid=`hc_${String(uid||"x").replace(/[^\w-]/g,"")}`;
+    let iw=2*r, ih=2*r, ix=hx-r, iy=hy2-r, par="xMidYMid slice";
+    if(asset.ratio>1.3){ iw=2*r*2.3; ih=iw*asset.ratio; ix=hx-iw/2; iy=hy2-r-iw*.05; par="xMidYMin meet"; }
+    g+=`<clipPath id="${cid}"><circle cx="${hx}" cy="${hy2}" r="${r}"/></clipPath><circle cx="${hx}" cy="${hy2}" r="${r}" fill="#222"/><image href="${asset.img}" x="${ix}" y="${iy}" width="${iw}" height="${ih}" preserveAspectRatio="${par}" clip-path="url(#${cid})"/><circle cx="${hx}" cy="${hy2}" r="${r}" fill="none" stroke="${ol}" stroke-width="4"/></g>`;
+  }else{
+  if(def.hair==="long") g+=`<ellipse cx="${hx-f*HR*.3}" cy="${hy2+HR*.75}" rx="${HR*1.08}" ry="${HR*1.75}" fill="${hairC}"/>`;
+  g+=`<circle cx="${hx}" cy="${hy2}" r="${HR}" fill="${silhouette?dark:(def.skin||"#e2c9a8")}" stroke="${silhouette?"none":ol}" stroke-width="4"/>`;
   g+=`<path d="M ${hx-HR} ${hy2-2} A ${HR} ${HR} 0 0 1 ${hx+HR} ${hy2-2} Q ${hx} ${hy2-HR*.55} ${hx-HR} ${hy2-2} Z" fill="${hairC}" transform="rotate(${-f*18} ${hx} ${hy2})"/>`;
   if(def.hair==="bun") g+=`<circle cx="${hx-f*HR*.55}" cy="${hy2-HR*1.05}" r="${HR*.42}" fill="${hairC}"/>`;
   if(def.hair==="crown") g+=`<rect x="${hx-9*s}" y="${hy2-HR-18*s}" width="${18*s}" height="${16*s}" fill="${silhouette?dark:"#d9b23e"}"/>`;
@@ -590,13 +631,16 @@ function puppet(def,st,silhouette){
   if(def.beard) g+=`<path d="M ${hx+f*HR*.1} ${hy2+HR*.35} Q ${hx+f*HR*.8} ${hy2+HR*1.3} ${hx+f*HR*.95} ${hy2+HR*.25} Z" fill="${silhouette?dark:"#efe9dc"}"/>`;
   if(!silhouette) g+=`<circle cx="${hx+f*HR*.55}" cy="${hy2-3*s}" r="${4*s}" fill="#141414"/>`;
   g+=`</g>`;
+  }
   // 前臂与兵器
+  let wsvg="";
   if(wpn&&wstate==="hand"){
     const dx=p.h1[0]-p.e1[0], dy=p.h1[1]-p.e1[1], d=Math.hypot(dx,dy)||1, u=[dx/d,dy/d];
     const tip=[p.h1[0]+u[0]*wlen*s,p.h1[1]+u[1]*wlen*s];
     const blade=silhouette?dark:"#d8dde0";
-    g+=(silhouette?"":L(p.h1,tip,ol,(wpn==="blade"?13:9)*s))+L(p.h1,tip,blade,(wpn==="blade"?9:5)*s);
-    g+=L([p.h1[0]-u[0]*16*s,p.h1[1]-u[1]*16*s],[p.h1[0]+u[0]*12*s,p.h1[1]+u[1]*12*s],silhouette?dark:"#3b2a1c",11*s);
+    wsvg=(silhouette?"":L(p.h1,tip,ol,(wpn==="blade"?13:9)*s))+L(p.h1,tip,blade,(wpn==="blade"?9:5)*s)
+      +L([p.h1[0]-u[0]*16*s,p.h1[1]-u[1]*16*s],[p.h1[0]+u[0]*12*s,p.h1[1]+u[1]*12*s],silhouette?dark:"#3b2a1c",11*s);
+    g+=wsvg;
   }
   g+=limb(p.sho,p.e1,col("body"),sw*.95)+limb(p.e1,p.h1,col("body"),sw*.9);
   g+=`<circle cx="${p.h1[0]}" cy="${p.h1[1]}" r="${11*s}" fill="${silhouette?dark:(def.skin||"#e2c9a8")}" stroke="${silhouette?"none":ol}" stroke-width="3"/>`;
@@ -605,7 +649,25 @@ function puppet(def,st,silhouette){
     g+=`<line x1="${p.neck[0]}" y1="${p.neck[1]}" x2="${p.neck[0]+20}" y2="${H+40}" stroke="${dark}" stroke-width="3" opacity=".55"/>`;
     g+=`<line x1="${p.h1[0]}" y1="${p.h1[1]}" x2="${p.h1[0]+40}" y2="${H+40}" stroke="${dark}" stroke-width="2.5" opacity=".45"/>`;
   }
+  if(asset&&asset.mode==="standee") g=standeeSVG(p,P,asset,s,HR,f)+wsvg;
   return {svg:g,pts:p};
+}
+function assetFor(name){
+  if(!name) return null; if(ASSETS[name]&&ASSETS[name].img) return ASSETS[name];
+  const short=String(name).split("·")[0];
+  for(const k in ASSETS){ if(ASSETS[k]&&ASSETS[k].img&&(k.split("·")[0]===short)) return ASSETS[k]; }
+  return null;
+}
+/* 立绘模式：角色资产整张贴在人偶位置，姿态用倾斜、压缩和翻转近似 */
+function standeeSVG(p,P,a,s,HR,f){
+  const standH=448*s, top=p.head[1]-HR, lift=P.lift||0;
+  const lying=Math.abs(P.rot||0)>45;
+  const sy=lying?1:clamp((FLOOR-lift-top)/standH,.45,1.05);
+  const rot=(P.rot||0)*f+(lying?0:P.lean*.3*f);
+  const h=standH*1.02, w=h/(a.ratio||2.6);
+  const flip=(a.facing==="right"&&f<0)||(a.facing==="left"&&f>0)?-1:1;
+  const x=lying?p.hip[0]-f*h*.1:p.hip[0], y=FLOOR-lift;
+  return `<ellipse cx="${x}" cy="${FLOOR+4}" rx="${Math.max(60,w*.32)}" ry="12" fill="#000" opacity=".35"/><g transform="translate(${x.toFixed(1)} ${y.toFixed(1)}) rotate(${rot.toFixed(1)}) scale(${flip} ${sy.toFixed(3)})"><image href="${a.img}" x="${(-w/2).toFixed(1)}" y="${(-h).toFixed(1)}" width="${w.toFixed(1)}" height="${h.toFixed(1)}" preserveAspectRatio="xMidYMax meet"/></g>`;
 }
 function shade(hex,amt){
   const m=/^#?([0-9a-f]{6})$/i.exec(hex||""); if(!m) return hex;
@@ -663,6 +725,9 @@ function setSVG(shot,pal,T){
       const y=st.y||300; g+=`<line x1="${x}" y1="-600" x2="${x}" y2="${y-40}" stroke="#111" stroke-width="3"/><ellipse cx="${x}" cy="${y}" rx="36" ry="44" fill="${pal.accent}"/>`;
     }else if(st.type==="bed"){
       const w=st.w||420; g+=`<rect x="${x}" y="${FLOOR-120}" width="${w}" height="120" fill="${A?pal.dark:"#3e2c22"}"/><rect x="${x}" y="${FLOOR-330}" width="20" height="330" fill="#2a1d15"/><rect x="${x+w-20}" y="${FLOOR-330}" width="20" height="330" fill="#2a1d15"/><path d="M ${x} ${FLOOR-330} H ${x+w} V ${FLOOR-250} Q ${x+w/2} ${FLOOR-200} ${x} ${FLOOR-250} Z" fill="#6b5a4a" opacity=".7"/>`;
+    }else if(st.type==="sofa"){
+      const w=st.w||520, c=A?pal.dark:"#4a2f2a";
+      g+=`<rect x="${x}" y="${FLOOR-270}" width="${w}" height="170" rx="26" fill="${shade(c,-.25)}" stroke="#0b0d0c" stroke-width="3"/><rect x="${x-20}" y="${FLOOR-120}" width="${w+40}" height="120" rx="18" fill="${c}" stroke="#0b0d0c" stroke-width="3"/><rect x="${x-40}" y="${FLOOR-180}" width="60" height="180" rx="20" fill="${c}"/><rect x="${x+w-20}" y="${FLOOR-180}" width="60" height="180" rx="20" fill="${c}"/>`;
     }else if(st.type==="screen"){
       const w=st.w||300; g+=`<rect x="${x}" y="${FLOOR-300}" width="${w}" height="300" fill="${A?pal.dark:pal.paper}" opacity="${A?1:.35}" stroke="#2a1d15" stroke-width="8"/>`;
     }
@@ -809,11 +874,13 @@ function cameraFor(shot,p,T,states){
   const tgt=Array.isArray(c.target)?c.target:(c.target?[c.target]:[]);
   const at=st=>{ let xs=[],hy=[],hp=[]; for(const id of tgt){ const s=st[id]; if(s){xs.push(s.pts.head[0]);hy.push(s.pts.head[1]);hp.push(s.pts.hip[1]);} } return xs.length?{x:(Math.min(...xs)+Math.max(...xs))/2,head:Math.min(...hy),hip:Math.max(...hp),spread:Math.max(...xs)-Math.min(...xs)}:null; };
   const live=at(states), ref=(c.move==="track")?live:(states.__mid?at(states.__mid):live)||live;
-  let z=z0, cx=800, cy=450;
+  const vert=VH>VW, vz=vert?1.2:1;
+  let z=z0*vz, cx=800, cy=vert?FLOOR-330:450;
   if(ref){
     cx=ref.x;
-    if(tgt.length>1) z=Math.min(z0,W/(ref.spread+520));
-    cy=z<=1.05?450:z<2?(ref.head+ref.hip)/2+20:z<3?ref.head+80:ref.head+10;
+    if(tgt.length>1) z=Math.min(z,VW/(ref.spread+(vert?260:520)));
+    const zz=z/vz;
+    cy=zz<=1.05?(vert?FLOOR-330:450):zz<2?(ref.head+ref.hip)/2+20:zz<3?ref.head+80:ref.head+10;
   }
   if(c.x!=null) cx=c.x; if(c.y!=null) cy=c.y;
   const e=ease(p), dir=c.dir||1, amt=c.amount||240;
@@ -832,11 +899,12 @@ function moveOverlay(shot,p){
   const c=shot.cam, m=c.move; if(m==="static"||m==="handheld") return "";
   const col="#e9edf0", dir=c.dir||1; let g="";
   const arrow=(x1,y1,x2,y2)=>{ const a=Math.atan2(y2-y1,x2-x1); return `<line x1="${x1}" y1="${y1}" x2="${x2}" y2="${y2}" stroke="${col}" stroke-width="7"/><polygon points="${x2},${y2} ${x2-Math.cos(a-.5)*30},${y2-Math.sin(a-.5)*30} ${x2-Math.cos(a+.5)*30},${y2-Math.sin(a+.5)*30}" fill="${col}"/>`; };
-  if(m==="track"||m==="pan"){ g+=dir<0?arrow(1180,120,560,120):arrow(420,120,1040,120); g+=`<text x="${dir<0?1210:1070}" y="132" font-size="36" font-family="var(--f-mono)" font-weight="600" fill="${col}">${MOVE_EN[m]}</text>`; }
-  else if(m==="tilt"||m==="crane"){ g+=dir<0?arrow(100,220,100,660):arrow(100,660,100,220); g+=`<text x="70" y="720" font-size="34" font-family="var(--f-mono)" font-weight="600" fill="${col}">${MOVE_EN[m]}</text>`; }
-  else { const k=m==="push"?1:-1, s=m==="push"?lerp(0,40,p):lerp(40,0,p);
-    for(const [x,y,sx,sy] of [[80,80,1,1],[1520,80,-1,1],[80,820,1,-1],[1520,820,-1,-1]]){ const ox=x+sx*s, oy=y+sy*s; g+=`<path d="M ${ox} ${oy+sy*70} V ${oy} H ${ox+sx*70}" fill="none" stroke="${col}" stroke-width="7"/>`; }
-    g+=`<text x="800" y="130" text-anchor="middle" font-size="34" font-family="var(--f-mono)" font-weight="600" fill="${col}">${MOVE_EN[m]}</text>`; void k; }
+  const ty=VH>VW?150:120;
+  if(m==="track"||m==="pan"){ const a=VW*.74,b=VW*.35,c=VW*.26,d=VW*.65; g+=dir<0?arrow(a,ty,b,ty):arrow(c,ty,d,ty); g+=`<text x="${dir<0?b:c}" y="${ty+52}" font-size="32" font-family="var(--f-mono)" font-weight="600" fill="${col}">${MOVE_EN[m]}</text>`; }
+  else if(m==="tilt"||m==="crane"){ const y1=VH*.25,y2=VH*.73; g+=dir<0?arrow(80,y1,80,y2):arrow(80,y2,80,y1); g+=`<text x="50" y="${y2+60}" font-size="32" font-family="var(--f-mono)" font-weight="600" fill="${col}">${MOVE_EN[m]}</text>`; }
+  else { const s=m==="push"?lerp(0,40,p):lerp(40,0,p);
+    for(const [x,y,sx,sy] of [[80,100,1,1],[VW-80,100,-1,1],[80,VH-80,1,-1],[VW-80,VH-80,-1,-1]]){ const ox=x+sx*s, oy=y+sy*s; g+=`<path d="M ${ox} ${oy+sy*70} V ${oy} H ${ox+sx*70}" fill="none" stroke="${col}" stroke-width="7"/>`; }
+    g+=`<text x="${VW/2}" y="${ty+10}" text-anchor="middle" font-size="32" font-family="var(--f-mono)" font-weight="600" fill="${col}">${MOVE_EN[m]}</text>`; }
   return `<g opacity=".85">${g}</g>`;
 }
 
@@ -851,8 +919,13 @@ const DEFS=`<defs>
 function shotAt(t){ for(const s of SHOTS) if(t<s.end) return s; return SHOTS[SHOTS.length-1]; }
 function actorStates(shot,p,T,silhouette){
   const out={};
-  for(const id in shot.acts){ const def=DATA.actors[id]; if(!def) continue; const st=sampleActor(shot.acts[id],p,T); if(st) out[id]=puppet(def,st,silhouette); }
+  for(const id in shot.acts){ const def=DATA.actors[id]; if(!def) continue; const st=sampleActor(shot.acts[id],p,T); if(st) out[id]=puppet(def,st,silhouette,id); }
   return out;
+}
+function fit16x9(inner,pal,isPlan){
+  if(VH<=VW) return inner;
+  const s=isPlan?VW/1300:VW/860, tx=VW/2-800*s, ty=VH/2-450*s;
+  return `<rect x="0" y="0" width="${VW}" height="${VH}" fill="${pal.dark}"/><g transform="translate(${tx} ${ty}) scale(${s})">${inner}</g>`;
 }
 function render(t){
   const shot=shotAt(t), local=t-shot.start, p=clamp(local/shot.dur,0,1), pal=PAL[shot.line], T=t;
@@ -870,24 +943,24 @@ function render(t){
     world+=lightSVG(shot,pal,T);
     const pts={}; for(const id in states) pts[id]=states[id].pts;
     world+=fxSVG(shot,local,pts,pal);
-    body=`<g transform="translate(${W/2+cam.jx} ${H/2+cam.jy}) rotate(${cam.jr}) scale(${cam.z}) translate(${-cam.cx} ${-cam.cy})">${world}</g>`;
+    body=`<g transform="translate(${VW/2+cam.jx} ${VH/2+cam.jy}) rotate(${cam.jr}) scale(${cam.z}) translate(${-cam.cx} ${-cam.cy})">${world}</g>`;
   }else if(shot.view==="insert"){
     const cam=cameraFor(shot,p,T,{});
-    body=`<g transform="translate(${cam.jx} ${cam.jy}) rotate(${cam.jr} 800 450)">${insertSVG(shot,p,T,pal)}</g>`;
+    body=fit16x9(`<g transform="translate(${cam.jx} ${cam.jy}) rotate(${cam.jr} 800 450)">${insertSVG(shot,p,T,pal)}</g>`,pal);
   }else{
     const cam=cameraFor(shot,p,T,{});
     const pb=planBody(shot,p,{sx:1.25,ox:175,oy:80,thick:14});
-    body=`<rect x="0" y="0" width="${W}" height="${H}" fill="${pal.dark}"/><g transform="translate(${cam.jx} ${cam.jy}) rotate(${-8+cam.jr} 800 450)">${pb.g}</g>`;
-    if(shot.L.dark>.4) body+=`<rect x="0" y="0" width="${W}" height="${H}" fill="#000" opacity="${(shot.L.dark-.4)*.6}"/>`;
+    body=fit16x9(`<rect x="0" y="0" width="${W}" height="${H}" fill="${pal.dark}"/><g transform="translate(${cam.jx} ${cam.jy}) rotate(${(VH>VW?0:-8)+cam.jr} 800 450)">${pb.g}</g>`,pal,true);
+    if(shot.L.dark>.4) body+=`<rect x="0" y="0" width="${VW}" height="${VH}" fill="#000" opacity="${(shot.L.dark-.4)*.6}"/>`;
   }
   let hud="";
   const asp=DATA.meta.aspect;
-  if(asp&&asp!=="16:9"){ const r=parseFloat(asp.split(":")[0])/parseFloat(asp.split(":")[1]||1); if(r>16/9){ const vh=W/r, bar=(H-vh)/2; hud+=`<rect x="0" y="0" width="${W}" height="${bar}" fill="#000"/><rect x="0" y="${H-bar}" width="${W}" height="${bar}" fill="#000"/>`; } }
+  if(asp&&asp!=="16:9"){ const r=parseFloat(asp.split(":")[0])/parseFloat(asp.split(":")[1]||1); if(r>16/9){ const vh=VW/r, bar=(VH-vh)/2; hud+=`<rect x="0" y="0" width="${VW}" height="${bar}" fill="#000"/><rect x="0" y="${VH-bar}" width="${VW}" height="${bar}" fill="#000"/>`; } }
   if(showOverlay){
     hud+=moveOverlay(shot,p);
     const label=`SHOT ${pad2(shot.i+1)}  ${shot.lens||""} · ${shot.size||""} · ${shot.angle||""}${shot.line!==DATA.meta.line?" · "+PAL[shot.line].name:""}`;
-    hud+=`<rect x="24" y="22" width="${Math.min(1100,label.length*19+40)}" height="46" rx="4" fill="#000" opacity=".45"/><text x="44" y="54" font-size="24" font-family="var(--f-mono)" font-weight="600" fill="#e9edf0" letter-spacing="1">${esc(label)}</text>`;
-    if(shot.tags.includes("slowmo")) hud+=`<rect x="1400" y="22" width="176" height="46" rx="4" fill="#e3b34c"/><text x="1488" y="54" text-anchor="middle" font-size="24" font-family="var(--f-body)" font-weight="700" fill="#1a1405">升格 慢动作</text>`;
+    hud+=`<rect x="24" y="22" width="${Math.min(VW-48,label.length*19+40)}" height="46" rx="4" fill="#000" opacity=".45"/><text x="44" y="54" font-size="24" font-family="var(--f-mono)" font-weight="600" fill="#e9edf0" letter-spacing="1">${esc(label)}</text>`;
+    if(shot.tags.includes("slowmo")) hud+=`<rect x="${VW-200}" y="${VH>VW?80:22}" width="176" height="46" rx="4" fill="#e3b34c"/><text x="${VW-112}" y="${VH>VW?112:54}" text-anchor="middle" font-size="24" font-family="var(--f-body)" font-weight="700" fill="#1a1405">升格 慢动作</text>`;
   }
   stage.innerHTML=DEFS+body+hud;
   return shot;
@@ -1038,6 +1111,10 @@ const DRAFT_KEY="storyboard-previewer-draft";
 function load(raw,{save}={}){
   const d=normalize(raw);
   DATA=d; SHOTS=d.shots; TOTAL=d.total; LINE=d.meta.line; curShot=-1;
+  const ar=String(d.meta.aspect||"16:9").split(/[:：]/).map(Number), ratio=ar[0]/(ar[1]||1);
+  if(ratio<1){ VW=900; VH=1600; } else { VW=1600; VH=900; }
+  stage.setAttribute("viewBox",`0 0 ${VW} ${VH}`); stage.style.aspectRatio=`${VW}/${VH}`;
+  document.querySelector(".stage-box").classList.toggle("vertical",VH>VW);
   const m=d.meta;
   $("eyebrow").innerHTML=[`<b>${esc(PAL[m.line].name)} ${esc(m.line)}</b>`,m.place,m.time].filter(Boolean).map(x=>`<span>${x.startsWith("<b>")?x:esc(x)}</span>`).join("");
   $("title").textContent=m.title; document.title=m.title+" · 分镜动态预览";
@@ -1085,14 +1162,18 @@ const SAMPLE_SCRIPT=`第一场　沈府西廊书房　夜　内
 const PROJECT_KEY="storyboard-previewer-project";
 let project=null;
 function defaultProject(){ return {text:SAMPLE_SCRIPT,cur:0,scenes:[{title:"示例 · 西廊书房·夜取信",text:SAMPLE_SCRIPT,board:JSON.parse(SAMPLE),source:"sample"}]}; }
-function saveProject(){ try{ localStorage.setItem(PROJECT_KEY,JSON.stringify(project)); }catch(e){} }
+let warnedQuota=false;
+function saveProject(){
+  try{ localStorage.setItem(PROJECT_KEY,JSON.stringify(project)); return true; }
+  catch(e){ if(!warnedQuota){ warnedQuota=true; genMsg("浏览器本地存储已满（多半是角色图片太多太大），这次的修改只保留到关闭页面为止。",false); } return false; }
+}
 function onBoardApplied(raw){ const sc=project&&project.scenes[project.cur]; if(sc){ sc.board=raw; sc.source=sc.source==="claude"?"claude":"edited"; saveProject(); renderScenes(); } }
 
 /* ---------- 场次切分 ---------- */
 const NUM="0-9０-９一二三四五六七八九十百零〇两";
 function isHeading(line){
   const t=line.trim(); if(!t||t.length>48) return false;
-  if(new RegExp(`^第[${NUM}]+[场幕集节回]`).test(t)) return true;
+  if(new RegExp(`^第\\s*[${NUM}]+\\s*[场幕集节回]`).test(t)) return true;
   if(/^(INT|EXT|I\/E)[.\s]/i.test(t)) return true;
   if(/^#{1,3}\s/.test(t)) return true;
   if(/^【[^】]{1,40}】$/.test(t)) return true;
@@ -1100,14 +1181,30 @@ function isHeading(line){
   if(/^[0-9０-９]+([-－.．][0-9０-９]+)?[\s、.．]/.test(t)&&/(日|夜|晨|昏|内|外|INT|EXT)/i.test(t)) return true;
   return false;
 }
+const TIMEJUMP=new RegExp(`^(?:旁白\\s*[：:]\\s*|△\\s*[：:]?\\s*)?((?:第二天|次日|翌日|当晚|深夜|清晨|与此同时|多年[后前]|[${NUM}]+(?:年|个月|天|周|小时)[后前])[^，,。]{0,6})`);
+function stripMark(l){ return l.replace(/^\s*(?:旁白|△)\s*[：:]?\s*/,""); }
+function isMetaText(text){
+  const lines=text.split("\n");
+  const dlg=lines.filter(l=>/^\s*△/.test(l)||(DIALOG_RE.test(l)&&!META_WORDS.has((DIALOG_RE.exec(l)||[])[1])&&!/^(姓名|性别|身份|外貌|性格|结局|体型|人物背景|日常穿搭|身份职业|核心执念|标志性|故事中的|外貌气质|性格特质)/.test(l.trim()))).length;
+  return /姓名\s*[：:]|人物小传|故事梗概|人物介绍|角色设定/.test(text)&&dlg<3;
+}
 function splitScenes(text){
   const lines=text.replace(/\r\n?/g,"\n").split("\n"); const out=[]; let cur=null;
   for(const l of lines){
-    if(isHeading(l)){ cur={title:l.trim().replace(/^#+\s*/,"").replace(/^【|】$/g,""),lines:[]}; out.push(cur); }
-    else { if(!cur){ cur={title:"",lines:[]}; out.push(cur); } cur.lines.push(l); }
+    if(isHeading(l)){ cur={title:l.trim().replace(/^#+\s*/,"").replace(/^【|】$/g,""),base:null,lines:[]}; cur.base=cur.title; out.push(cur); continue; }
+    const tj=TIMEJUMP.exec(l.trim());
+    if(tj&&cur&&cur.lines.filter(x=>x.trim()).length>=2){ cur={title:`${cur.base||cur.title||"段落"} · ${tj[1].slice(0,8)}`,base:cur.base||cur.title,lines:[l]}; out.push(cur); continue; }
+    if(!cur){ cur={title:"",base:"",lines:[]}; out.push(cur); }
+    cur.lines.push(l);
   }
-  const sc=out.map(s=>({title:s.title,text:(s.title?s.title+"\n":"")+s.lines.join("\n").trim()})).filter(s=>s.text.replace(s.title,"").trim());
-  sc.forEach((s,i)=>{ if(!s.title){ const first=s.text.split("\n").find(x=>x.trim())||""; s.title=i===0&&sc.length>1?"开场":(first.trim().slice(0,16)||`第${i+1}段`); } });
+  const sc=out.map(s=>({title:s.title,text:(s.title&&!/ · /.test(s.title)?s.title+"\n":"")+s.lines.join("\n").trim()})).filter(s=>s.text.replace(s.title,"").trim());
+  const seen={};
+  sc.forEach((s,i)=>{
+    if(!s.title){ const first=s.text.split("\n").find(x=>x.trim())||""; s.title=i===0&&sc.length>1?"开场":(first.trim().slice(0,16)||`第${i+1}段`); }
+    s.meta=isMetaText(s.text);
+    if(s.meta) s.title="资料 · "+(s.title==="开场"?"人物与梗概":s.title);
+    seen[s.title]=(seen[s.title]||0)+1; if(seen[s.title]>1) s.title+=`（${seen[s.title]}）`;
+  });
   return sc;
 }
 
@@ -1121,9 +1218,36 @@ const COSTUMES=[
   {body:"#6e4a6b",legs:"#2e2230",sash:"#e0c070",skin:"#e8d0b4",hair:"crown",robe:true},
   {body:"#4f6b4a",legs:"#253022",sash:"#e6e0cf",skin:"#dcc0a0",hair:"bun"}
 ];
+const MODERN_F=[{body:"#8c2f3d",legs:"#2a1c22",sash:"#e0c08a",skin:"#f0d8c4",hair:"long"},{body:"#3e5c7a",legs:"#1f2a36",sash:"#e8e2d6",skin:"#ecd3bd",hair:"long"},{body:"#6b5a7e",legs:"#2a2333",sash:"#d9c27a",skin:"#e9cfb8",hair:"long"}];
+const MODERN_M=[{body:"#22262d",legs:"#16191e",sash:"#8a2632",skin:"#e0c2a4",hair:"short",scale:1.06},{body:"#3b3f46",legs:"#1e2126",sash:"#c9b48a",skin:"#dcbb9c",hair:"short",scale:1.04},{body:"#4d5a52",legs:"#252b27",sash:"#d8d2c4",skin:"#e2c6a8",hair:"short"},{body:"#5b4636",legs:"#2a211a",sash:"#cfc4b0",skin:"#d9b896",hair:"short"},{body:"#2e3a4a",legs:"#1a2029",sash:"#b8c4d0",skin:"#e4c7aa",hair:"short"}];
+function guessGender(n,cast){ if(cast&&cast.gender&&cast.gender[n]) return cast.gender[n]; if(/男|先生|哥|爷|公子|父|叔|兄|弟|郎|王|侯/.test(n)) return "男"; if(/女|姐|妹|娘|夫人|小姐|母|婆|姑|妃|嫂/.test(n)) return "女"; return null; }
+function costumeFor(i,n,line,cast){
+  const g=guessGender(n,cast);
+  if(line==="N"){ const fem=g==="女"||(g==null&&i%2===0); const list=fem?MODERN_F:MODERN_M; return Object.assign({},list[i%list.length]); }
+  const c=Object.assign({},COSTUMES[i%COSTUMES.length]);
+  if(g==="女"){ c.hair="bun"; delete c.beard; } else if(g==="男"&&c.hair==="bun"){ c.hair="band"; }
+  return c;
+}
+/* 人物小传里的「姓名：」「性别：」与【主角】标记 */
+function castInfo(text){
+  const lines=text.split("\n"); const names=[], gender={}; let lead=null, cur=[];
+  for(let i=0;i<lines.length;i++){ const l=lines[i].trim();
+    const pn=/^姓名\s*[：:]\s*(.+)$/.exec(l);
+    if(pn){ cur=pn[1].replace(/[（(][^）)]*[）)]/g,"").split(/[、，,\s]+/).map(x=>x.trim()).filter(x=>x&&x.length<=8);
+      cur=cur.flatMap(n=>/·/.test(n)?[n.split("·")[0],n]:[n]);
+      cur.forEach(n=>{ if(!names.includes(n)&&!names.some(o=>o.includes("·")&&o.split("·")[0]===n)) names.push(n); });
+      if(!lead&&/主角|女主|男主/.test(lines.slice(Math.max(0,i-4),i+1).join(""))) lead=cur[0]; continue; }
+    const g=/^性别\s*[：:]\s*(男|女)/.exec(l); if(g) cur.forEach(n=>gender[n]=g[1]);
+  }
+  for(let i=names.length-1;i>=0;i--){ const n=names[i]; if(/·/.test(n)&&names.includes(n.split("·")[0])) names.splice(i,1); }
+  if(!lead){ const cnt=new Map(); for(const l of lines){ const m=DIALOG_RE.exec(l); if(m&&!META_WORDS.has(m[1])) cnt.set(m[1],(cnt.get(m[1])||0)+1); } lead=[...cnt.entries()].sort((a,b)=>b[1]-a[1]).map(e=>e[0])[0]||names[0]||null; }
+  return {names,gender,lead};
+}
 function findNames(lines){
   const score=new Map(), add=(n,v)=>{ n=n.trim(); if(!n||META_WORDS.has(n)||n.length>8) return; score.set(n,(score.get(n)||0)+v); };
   for(const l of lines){
+    const pn=/^\s*姓名\s*[：:]\s*(.+)$/.exec(l);
+    if(pn){ pn[1].replace(/[（(][^）)]*[）)]/g,"").split(/[、，,\s]+/).forEach(n=>add(n,6)); continue; }
     const pm=/^\s*(?:人物|角色|出场人物)\s*[：:]\s*(.+)$/.exec(l);
     if(pm){ pm[1].split(/[、，,；;\s]+/).forEach(n=>add(n.replace(/[（(].*$/,""),4)); continue; }
     const m=DIALOG_RE.exec(l); if(m) add(m[1],3);
@@ -1135,12 +1259,12 @@ function findNames(lines){
   for(const [k,v] of cand) if(v>=2) add(k,v);
   let names=[...score.entries()].sort((a,b)=>b[1]-a[1]).map(e=>e[0]);
   names=names.filter(n=>!names.some(o=>o!==n&&o.includes(n)&&score.get(o)>=score.get(n)));
-  return names.slice(0,4);
+  return names.slice(0,8);
 }
 const ACTIONS=[
   ["enter",/(闯|冲)(了)?进|走进|推门而入|进来|来到|出现在/],
   ["chop",/劈|砍|斩/],["thrust",/刺|捅|戳|扎/],["kick",/踢|踹/],["push",/推|撞|顶/],
-  ["raise",/举/],["dodge",/躲|闪|避开|侧身/],["kneel",/跪/],["fall",/倒地|倒下|摔倒|栽倒|扑倒/],["lie",/躺/],["sit",/坐/],
+  ["raise",/举/],["dodge",/躲|闪|避开|侧身/],["kneel",/跪/],["fall",/倒地|倒下|摔倒|栽倒|扑倒/],["lie",/躺/],["sit",/坐|斜靠|靠在沙发|倚在/],
   ["stagger",/踉跄|后退|退后|连退/],["crouch",/蹲|伏/],["run",/冲|跑|奔|追/],
   ["walk",/走|靠近|上前|离开|绕|穿过|移到/],["look",/回头|抬头|抬眼|望|看|盯|张望|听|环顾|注视/],["reach",/翻|拿|取|捡|摸/]
 ];
@@ -1154,17 +1278,34 @@ function quickBoard(scene,lineOpt){
   const raw=scene.text, lines=raw.split("\n").map(l=>l.trim()).filter(Boolean);
   const heading=scene.title||"";
   const body=lines.filter(l=>l!==heading);
-  let names=(scene.names&&scene.names.length?scene.names.filter(n=>raw.includes(n)):[]).concat(findNames(body)).filter((n,i,a)=>a.indexOf(n)===i).slice(0,4);
-  const hasPron=/[他她]/.test(raw);
-  if(!names.length&&hasPron) names=["人物甲"];
+  const cast=scene.cast||castInfo(raw);
+  const leadName=scene.me&&scene.me!=="auto"?scene.me:cast.lead;
+  const ME=/我(?!们)/;
+  // 只让本场真正出场的人上台：说话的、作为动作主语的，以及「我」
+  const pool=(scene.names||[]).concat(cast.names,findNames(body)).filter((n,i,a)=>n&&a.indexOf(n)===i);
+  const score=new Map(), first=new Map(); let li=0;
+  const bump=(n,v)=>{ score.set(n,(score.get(n)||0)+v); if(!first.has(n)) first.set(n,li); };
+  for(const l0 of body){ li++;
+    if(/^\s*(?:人物|角色|出场人物|时间|地点|姓名|性别)\s*[：:]/.test(l0)) continue;
+    const isAct=/^\s*△/.test(l0), l=isAct?stripMark(l0):l0, m=isAct?null:DIALOG_RE.exec(l);
+    if(m&&!/^(旁白|画外音?|OS|VO)$/i.test(m[1])&&!META_WORDS.has(m[1])){ bump(m[1],3); continue; }
+    const s=m?m[3]:l;
+    for(const n of pool){ const i=s.indexOf(n); if(i>=0&&i<8) bump(n,2); }
+    if(leadName&&ME.test(s)) bump(leadName,1);
+  }
+  let names=[...score.keys()].sort((a,b)=>score.get(b)-score.get(a)).slice(0,6).sort((a,b)=>first.get(a)-first.get(b));
+  if(!names.length&&/[他她]/.test(raw)) names=["人物甲"];
   const night=/夜|晚|深更|三更|子时|烛|月/.test(heading+raw.slice(0,200));
   let line=lineOpt;
   if(line==="auto") line=/皮影|影窗|影戏/.test(raw)?"A":/回忆|闪回|往事|多年前|小时候/.test(heading+raw.slice(0,120))?"C":night?"B":"N";
   // 布景
   const set=[], has=re=>re.test(raw);
-  if(has(/窗/)||!has(/门|柱|案|桌|床|榻/)) set.push({type:"window",x:160,w:330,y:230,h:250});
-  const desk=has(/案|桌|台/); if(desk) set.push({type:"desk",x:600,w:460,h:150});
-  if(has(/烛|蜡烛|油灯|灯/)) set.push({type:"candle",id:"c1",x:desk?980:880,h:desk?150:210});
+  const sofa=has(/沙发|包厢|卡座/);
+  if(has(/窗/)||!has(/门|柱|案|桌|床|榻|沙发|包厢/)) set.push({type:"window",x:160,w:330,y:230,h:250});
+  if(sofa) set.push({type:"sofa",x:560,w:480});
+  const desk=!sofa&&has(/案|桌|台/); if(desk) set.push({type:"desk",x:600,w:460,h:150});
+  if(sofa&&has(/桌|酒|杯/)) set.push({type:"desk",x:1130,w:240,h:110});
+  if(has(line==="N"?/烛|蜡烛|油灯/:/烛|蜡烛|油灯|灯/)) set.push({type:"candle",id:"c1",x:desk?980:880,h:desk?150:210});
   if(has(/床|榻/)) set.push({type:"bed",x:desk?120:520,w:380});
   if(has(/坛|罐|缸/)) set.push({type:"jar",x:1150});
   const pillar=has(/柱|墙/); if(pillar) set.push({type:"pillar",x:1330});
@@ -1174,7 +1315,8 @@ function quickBoard(scene,lineOpt){
   const plan={w:1000,h:600,props:[]};
   for(const it of set){
     if(it.type==="window") plan.props.push({label:"窗",x:90,y:0,w:260,h:18,kind:"window"});
-    if(it.type==="desk") plan.props.push({label:"书案",x:360,y:230,w:260,h:80});
+    if(it.type==="desk") plan.props.push(sofa?{label:"酒桌",x:660,y:300,w:150,h:60}:{label:line==="N"?"桌":"书案",x:360,y:230,w:260,h:80});
+    if(it.type==="sofa") plan.props.push({label:"沙发",x:330,y:40,w:300,h:90});
     if(it.type==="candle") plan.props.push({label:"烛",x:it.x*.6,y:250,w:22,h:22,kind:"candle"});
     if(it.type==="pillar") plan.props.push({label:"柱",x:780,y:400,w:44,h:44});
     if(it.type==="bed") plan.props.push({label:"床",x:it.x*.6,y:40,w:230,h:120});
@@ -1182,12 +1324,12 @@ function quickBoard(scene,lineOpt){
   }
   // 人物
   const ids=names.map((n,i)=>"p"+(i+1)), byName={}, actors={}, st={};
-  const startX=[520,1000,760,300];
+  const startX=[520,1000,760,300,1240,140];
   names.forEach((n,i)=>{ const id=ids[i]; byName[n]=id;
     const firstLine=body.find(l=>l.includes(n)&&!/^\s*(?:人物|角色|出场人物)\s*[：:]/.test(l)&&!DIALOG_RE.test(l))||"";
     const entering=ACTIONS[0][1].test(firstLine)&&!DIALOG_RE.test(firstLine);
     const wk=weaponKind(body.filter(l=>l.startsWith(n)||l.includes(n+"拔")||l.includes(n+"举")).join(""));
-    actors[id]=Object.assign({name:n},COSTUMES[i%COSTUMES.length],wk?{weapon:wk}:{});
+    actors[id]=Object.assign({name:n},costumeFor(i,n,line,cast),wk?{weapon:wk}:{});
     st[id]={x:entering?(door?1600:1720):startX[i],face:i%2?-1:1,pose:"stand",head:0,weapon:wk?"sheath":undefined,present:!entering};
   });
   const presentIds=()=>ids.filter(id=>st[id].present);
@@ -1213,24 +1355,36 @@ function quickBoard(scene,lineOpt){
       cam:{move:"handheld",hh:1},insert:Object.assign({kind},extra||{}),beat:trim(s).slice(0,10),info:trim(s),q:"",action:s+"。",audio:/声|响|脚步/.test(s)?s:""}));
   }
   const sentences=[];
-  for(const l of body){
-    if(/^\s*(?:人物|角色|出场人物|时间|地点)\s*[：:]/.test(l)) continue;
-    const m=DIALOG_RE.exec(l);
-    if(m&&(byName[m[1]]||/旁白|画外/.test(m[1]))){ sentences.push({dialog:true,who:m[1],paren:m[2]||"",text:m[3]}); continue; }
+  for(const l0 of body){
+    if(/^\s*(?:人物|角色|出场人物|时间|地点|姓名|性别)\s*[：:]/.test(l0)) continue;
+    const isAct=/^\s*△/.test(l0), l=isAct?stripMark(l0):l0;
+    const m=isAct?null:DIALOG_RE.exec(l);
+    if(m){ const pm=/^\s*[（(]([^）)]*)[）)]\s*(.*)$/.exec(m[3]); if(pm&&pm[2]){ m[2]=(m[2]?m[2]+"，":"")+pm[1]; m[3]=pm[2]; } }
+    if(m&&/^(旁白|画外音?|OS|VO)$/i.test(m[1])){ const t=m[3].replace(/[。；;]+$/,"").trim(); if(t) sentences.push({narr:true,paren:m[2]||"",text:t}); continue; }
+    if(m&&!META_WORDS.has(m[1])&&(byName[m[1]]||!/[，。,]/.test(m[1]))){ sentences.push({dialog:true,who:m[1],paren:m[2]||"",text:m[3]}); continue; }
     for(const s of l.split(/(?<=[。！？!?；;…])/)){ const t=s.replace(/[。；;]+$/,"").trim(); if(t) sentences.push({text:t}); }
   }
-  for(const S of sentences){
+  const leadId=leadName&&byName[leadName]||null;
+  function narrShot(s){
+    const id=leadId&&st[leadId].present?leadId:null;
+    if(id) push({dur:2,view:"side",lens:"85mm",size:"近景",angle:"平视",cam:{move:"handheld",hh:1,target:id,settle:.4},
+      acts:Object.assign(staticActs([id]),{[id]:[kf(id),kf(id,{t:1,head:(st[id].head||0)+6})]}),plan:{actors:planOf(),cam:camAt(st[id].x)},
+      beat:trim(s).slice(0,10),info:trim(s),q:"",action:s+"。",audio:""});
+    else push({dur:2,view:"side",lens:"24mm",size:"全景",angle:"平视",cam:{move:"handheld",hh:1,settle:.5},
+      acts:staticActs(),plan:{actors:planOf(),cam:camAt(800)},beat:trim(s).slice(0,10),info:trim(s),q:"",action:s+"。",audio:""});
+  }
+  function handle(S){
     if(S.dialog){
       flushEnv();
       const id=byName[S.who];
-      if(!id){ const prev=shots[shots.length-1]; if(prev) prev.audio=(prev.audio?prev.audio+" ":"")+`${S.who}（画外）：「${S.text}」`; continue; }
+      if(!id){ const prev=shots[shots.length-1]; if(prev) prev.audio=(prev.audio?prev.audio+" ":"")+`${S.who}（画外）：「${S.text}」`; return; }
       st[id].present=true;
       const other=presentIds().find(o=>o!==id); if(other) st[id].face=st[other].x>st[id].x?1:-1;
       const len=S.text.replace(/[^一-龥A-Za-z0-9]/g,"").length;
       push({dur:clamp(.8+len*.24,1.4,8),view:"side",lens:"85mm",size:"近景",angle:"平视",cam:{move:"handheld",hh:1,target:id,settle:.35},
         acts:Object.assign(staticActs([id]),{[id]:[kf(id),kf(id,{t:1,head:(st[id].head||0)-4})]}),plan:{actors:planOf(),cam:camAt(st[id].x)},
         beat:`${S.who}说话`,info:`${S.who}：${trim(S.text)}`,q:"",action:`${S.who}${S.paren?"（"+S.paren+"）":""}开口。`,audio:`${S.who}${S.paren?"（"+S.paren+"）":""}：「${S.text}」`});
-      lastSubj=id; continue;
+      lastSubj=id; return;
     }
     const s=S.text;
     if(/月光|月色/.test(s)) light.moon=true;
@@ -1241,8 +1395,13 @@ function quickBoard(scene,lineOpt){
     else if(/[烛灯蜡火].{0,4}(灭|熄)|熄灭/.test(s)) ins=["candle",{out:.5,tip:/倒/.test(s)}];
     else if(/(掉|落|摔)(在)?地|脱手/.test(s)) ins=["drop"];
     else if(/脚步|靴/.test(s)) ins=["boots"];
+    else if(/四目相对|眼神|目光|眼眸|瞳孔/.test(s)) ins=["eye",{narrow:/冷|审视|眯/.test(s),look:/左|一侧/.test(s)?-1:0}];
+    else if(/攥|握紧|握住|指节/.test(s)) ins=["hand"];
+    else if(/烟灰|酒液|杯底|门卡|掌心|手机|照片|戒指|信封/.test(s)&&!/[走跑冲推]/.test(s)) ins=["text",{label:s.length>14?s.slice(0,13)+"…":s}];
     // 主语与对象
-    const found=names.map(n=>({n,i:s.indexOf(n)})).filter(o=>o.i>=0).sort((a,b)=>a.i-b.i).map(o=>byName[o.n]);
+    const foundRaw=names.map(n=>({n,i:s.indexOf(n)})).filter(o=>o.i>=0);
+    if(leadId){ const mi=s.search(ME); if(mi>=0&&!foundRaw.some(o=>o.n===leadName)) foundRaw.push({n:leadName,i:mi}); }
+    const found=foundRaw.sort((a,b)=>a.i-b.i).map(o=>byName[o.n]);
     let subj=found[0]||null, tgt=found[1]||null;
     if(!subj&&/^[他她]/.test(s)) subj=lastSubj;
     if(subj&&!tgt&&/[他她]/.test(s.slice(1))){ tgt=presentIds().find(o=>o!==subj)||ids.find(o=>o!==subj)||null; }
@@ -1256,10 +1415,10 @@ function quickBoard(scene,lineOpt){
       if(ins[0]==="drop"){ const wk=weaponKind(s); for(const id of ids) if(st[id].weapon==="hand"&&(!wk||actors[id].weapon===wk)&&id!==lastSubj){ st[id].weapon="none"; } }
       if(ins[0]==="candle"){ light.candle=false; light.dark=Math.max(light.dark,.7); }
       if(ins[0]==="boots"&&!/[入进]/.test(s)){}
-      insert(ins[0],s,ins[1]); continue;
+      insert(ins[0],s,ins[1]); return;
     }
     if(!subj||!act){
-      if(subj&&!act){ act="look"; } else { envBuf.push(s); continue; }
+      if(subj&&!act){ act="look"; } else if(S.narr){ return; } else { envBuf.push(s); return; }
     }
     flushEnv();
     const a=st[subj], b=tgt?st[tgt]:null; a.present=true; if(b) b.present=true;
@@ -1288,6 +1447,7 @@ function quickBoard(scene,lineOpt){
       if(/脱手|落/.test(s)&&b.weapon==="hand") b.weapon="none";
     }
     else if(act==="dodge"){ x1=a.x-(a.face||1)*140; }
+    else if(act==="sit"&&sofa){ x1=/正中|中央|中间/.test(s)?800:clamp(a.x,640,960); a.face=1; }
     else if(act==="look"){ a.head=/抬头|抬眼|望/.test(s)?-14:/低头/.test(s)?14:0; if(/回头|转身/.test(s)) a.face=-a.face; if(b) a.face=b.x>a.x?1:-1; }
     const endPose=(["enter","walk","run"].includes(act)&&/坐下|坐到|坐在/.test(s))?"sit":act==="look"?(a.pose==="crouch"||a.pose==="reach"?"crouchLook":a.pose):(act==="push"&&/抵|架/.test(s)&&a.weapon==="hand"?"threaten":(AFTER[act]||a.pose));
     const actPose=act==="look"?endPose:act==="enter"?"walk":act;
@@ -1311,11 +1471,23 @@ function quickBoard(scene,lineOpt){
     if(/喉/.test(s)&&/抵|架|贴/.test(s)) insert("throat",s);
     lastSubj=subj;
   }
+  for(const S of sentences){
+    const n0=shots.length;
+    if(S.narr) flushEnv();
+    handle(S);
+    if(S.narr){
+      if(shots.length===n0){ flushEnv(); if(shots.length===n0) narrShot(S.text); }
+      const sh=shots[n0], len=S.text.replace(/[^\u4e00-\u9fa5A-Za-z0-9]/g,"").length, en=/[A-Za-z]{3}/.test(S.text);
+      const voDur=clamp(.6+(en?S.text.split(/\s+/).length*.38:len*.21),1.4,9);
+      sh.audio=`旁白${S.paren?"（"+S.paren+"）":""}（画外）：「${S.text}」`+(sh.audio?" "+sh.audio:"");
+      sh.dur=+Math.max(sh.dur,voDur).toFixed(1);
+    }
+  }
   flushEnv();
   if(!shots.length) throw new Error("这一场没有可拆的动作或对白。");
   if(shots[0].size!=="全景"&&shots[0].view==="side"){ shots[0].size="全景"; shots[0].lens="24mm"; shots[0].cam.target=undefined; }
   return {
-    meta:{title:scene.title||"未命名场次",line,place:heading.replace(/^第[^场幕集节回]*[场幕集节回]\s*/,"").slice(0,24),time:night?"夜":"日",aspect:"16:9",fps:24,
+    meta:{title:scene.title||"未命名场次",line,aspect:$("aspect-opt").value,place:heading.replace(/^第[^场幕集节回]*[场幕集节回]\s*/,"").slice(0,24),time:night?"夜":"日",fps:24,
       summary:`由剧本快速拆镜生成，共 ${shots.length} 镜。人物：${names.join("、")||"无"}。可再用 Claude 拆镜得到更细的镜头设计，或在「分镜数据」里直接改。`},
     actors,set,plan,shots
   };
@@ -1324,9 +1496,9 @@ function quickBoard(scene,lineOpt){
 /* ---------- Claude 拆镜 ---------- */
 const SCHEMA_BRIEF=`{
  "meta": {"title": "场次名", "line": "B", "place": "地点", "time": "夏夜深夜", "aspect": "16:9", "fps": 24, "summary": "一句话概述本场"},
- "actors": { "a": {"name": "剧本中的名字", "body": "#5f707a", "legs": "#2a3034", "sash": "#c7362c", "skin": "#e6cfb1", "hair": "bun|crown|band|short", "beard": false, "robe": false, "weapon": "sword|blade|knife|staff 或省略", "scale": 1} },
+ "actors": { "a": {"name": "剧本中的名字", "body": "#5f707a", "legs": "#2a3034", "sash": "#c7362c", "skin": "#e6cfb1", "hair": "bun|crown|band|short|long", "beard": false, "robe": false, "weapon": "sword|blade|knife|staff 或省略", "scale": 1} },
  "set": [ {"type": "window", "x": 160, "w": 330, "y": 230, "h": 250}, {"type": "desk", "x": 600, "w": 460, "h": 150}, {"type": "candle", "id": "c1", "x": 980, "h": 150}, {"type": "pillar", "x": 1330}, {"type": "door", "id": "door", "x": 1450, "w": 190} ],
-   // set.type 只能是 window desk table candle jar pillar door lantern bed screen
+   // set.type 只能是 window desk table candle jar pillar door lantern bed screen sofa
  "plan": {"w": 1000, "h": 600, "props": [ {"label": "书案", "x": 360, "y": 230, "w": 260, "h": 80, "kind": "window|door|candle 或省略"} ]},
  "shots": [
   {"dur": 1.6, "view": "side|insert|plan", "lens": "35mm", "size": "大全景|全景|中全景|中景|中近景|近景|特写|大特写", "angle": "平视",
@@ -1345,6 +1517,9 @@ const SCHEMA_BRIEF=`{
  ]
 }`;
 function buildPrompt(scene,lineOpt){
+  const cast=project.cast||castInfo(scene.text);
+  const meName=project.me&&project.me!=="auto"?project.me:cast.lead;
+  const castList=(scene.names||cast.names||[]).filter(n=>scene.text.includes(n)).join("、");
   const lineRule=lineOpt==="auto"?`按剧本选择：A 皮影戏/影窗；B 现实线夜景；C 回忆/闪回（胶片暖金）；N 通用（日景、现代或其他题材）。`:`固定用 "${lineOpt}"。`;
   return `你是一位电影导演兼摄影指导。把下面这一场剧本拆成分镜，输出一份 JSON，交给"分镜动态预览台"用简化人偶播放。
 
@@ -1368,6 +1543,10 @@ ${SCHEMA_BRIEF}
 - view 为 insert 的镜头不写 acts；view 为 plan 的镜头用 plan.actors 写走位路径。
 - 每个 side 镜头都写 plan.actors 与 plan.cam，机位保持在两人连线的同一侧。
 - meta.line：${lineRule}
+- meta.aspect 用 "${$("aspect-opt").value}"${$("aspect-opt").value==="9:16"?"（竖屏短剧：以近景、中近景为主，人物放在画面中央，全景少而短，节奏快）":""}。
+- 剧本里以「△」开头的是画面动作；「旁白」是画外音：写进对应镜头的 audio（标"旁白（画外）"），并为它设计画面，通常是「我」或相关人物的反应镜头。${meName?`第一人称「我」指 ${meName}。`:""}
+- 人物的 name 必须与剧本里的名字完全一致${castList?`（${castList}）`:""}，页面靠名字匹配用户上传的角色形象；剧本只提到、本场没有出场的人物不要放进 actors。
+- 剧本若同时有中文和英文两版对白，audio 里用剧本中这一场实际使用的语言。
 - 不写任何影片名、导演或摄影师姓名。
 
 ## 剧本（${scene.title}）
@@ -1395,6 +1574,7 @@ async function genClaude(i){
     const data=await sample.json(buildPrompt(sc,$("line-opt").value),{signal:aiCtl.signal,modelTier:"default",
       onText:({text})=>{ const n=(text.match(/"dur"\s*:/g)||[]).length; genMsg(`「${sc.title}」：Claude 正在设计第 ${Math.max(1,n)} 镜…`,true); }});
     normalize(data);
+    data.meta=Object.assign({aspect:$("aspect-opt").value},data.meta||{});
     sc.board=data; sc.source="claude"; saveProject(); renderScenes();
     showScene(i); genMsg(`「${sc.title}」已由 Claude 拆成 ${data.shots.length} 镜。`,true);
     return true;
@@ -1418,8 +1598,8 @@ function renderScenes(){
   $("scene-list").innerHTML=project.scenes.map((s,i)=>{
     const n=s.board&&Array.isArray(s.board.shots)?s.board.shots.length:0;
     return `<li class="scene-row${i===project.cur?" active":""}"><div class="sc-title">${esc(s.title)}</div>
-      <div class="sc-meta">${s.text.length} 字 · ${n?`${esc(SRC[s.source]||"已生成")} · ${n} 镜`:"未生成"}</div>
-      <div class="sc-actions">${aiReady?`<button type="button" data-act="ai" data-i="${i}">Claude 拆镜</button>`:""}<button type="button" data-act="local" data-i="${i}">快速拆镜</button><button type="button" data-act="view" data-i="${i}" ${n?"":"disabled"}>预览</button></div></li>`;
+      <div class="sc-meta">${s.text.length} 字 · ${s.meta?"人物资料，用来识别人物与「我」":n?`${esc(SRC[s.source]||"已生成")} · ${n} 镜`:"未生成"}</div>
+      <div class="sc-actions">${s.meta?"":aiReady?`<button type="button" data-act="ai" data-i="${i}">Claude 拆镜</button>`:""}${s.meta?"":`<button type="button" data-act="local" data-i="${i}">快速拆镜</button><button type="button" data-act="view" data-i="${i}" ${n?"":"disabled"}>预览</button>`}</div></li>`;
   }).join("");
   const withBoards=project.scenes.map((s,i)=>[s,i]).filter(([s])=>s.board);
   const sel=$("scene-sel"); sel.hidden=withBoards.length<2;
@@ -1428,12 +1608,14 @@ function renderScenes(){
 }
 function showScene(i){
   const sc=project.scenes[i]; if(!sc||!sc.board) return;
-  try{ setPlaying(false); project.cur=i; load(sc.board); saveProject(); renderScenes(); }
+  try{ setPlaying(false); project.cur=i; load(sc.board); saveProject(); renderScenes(); renderAssets();
+    const asp=(sc.board.meta&&sc.board.meta.aspect)||"16:9"; if([...$("aspect-opt").options].some(o=>o.value===asp)) $("aspect-opt").value=asp; }
   catch(e){ genMsg(`「${sc.title}」的分镜数据有误：${e.message}`,false); }
 }
 function genLocal(i){
   const sc=project.scenes[i];
-  try{ sc.board=quickBoard(sc,$("line-opt").value); sc.source="local"; return true; }
+  if(sc.meta){ genMsg(`「${sc.title}」是人物资料，不生成分镜。`,false); return false; }
+  try{ sc.cast=project.cast; sc.me=project.me; sc.board=quickBoard(sc,$("line-opt").value); sc.source="local"; return true; }
   catch(e){ genMsg(`「${sc.title}」：${e.message}`,false); return false; }
 }
 $("scene-list").addEventListener("click",async ev=>{
@@ -1446,14 +1628,15 @@ $("scene-sel").onchange=e=>showScene(+e.target.value);
 $("btn-stop").onclick=()=>{ stopAll=true; if(aiCtl) aiCtl.abort(); };
 let stopAll=false;
 $("btn-all-local").onclick=()=>{
-  let ok=0; project.scenes.forEach((s,i)=>{ if(genLocal(i)) ok++; });
+  let ok=0; project.scenes.forEach((s,i)=>{ if(!s.meta&&genLocal(i)) ok++; });
   saveProject(); renderScenes(); const first=project.scenes.findIndex(s=>s.board); if(first>=0) showScene(first);
   genMsg(`已快速拆镜 ${ok} / ${project.scenes.length} 场。`,ok>0);
 };
 $("btn-all-ai").onclick=async()=>{
   stopAll=false; let ok=0;
-  for(let i=0;i<project.scenes.length;i++){ if(stopAll) break; if(await genClaude(i)) ok++; else if(!aiReady||stopAll) break; }
-  if(!stopAll) genMsg(`Claude 已完成 ${ok} / ${project.scenes.length} 场。`,ok>0);
+  const todo=project.scenes.map((s,i)=>i).filter(i=>!project.scenes[i].meta);
+  for(const i of todo){ if(stopAll) break; if(await genClaude(i)) ok++; else if(!aiReady||stopAll) break; }
+  if(!stopAll) genMsg(`Claude 已完成 ${ok} / ${todo.length} 场。`,ok>0);
 };
 
 /* ---------- 读剧本文件 ---------- */
@@ -1476,7 +1659,8 @@ $("script-file").onchange=async e=>{
   try{
     const buf=await f.arrayBuffer(), name=f.name.toLowerCase();
     if(name.endsWith(".json")){ const raw=JSON.parse(decodeText(buf)); normalize(raw); project.scenes.push({title:(raw.meta&&raw.meta.title)||f.name,text:"",board:raw,source:"edited"}); saveProject(); showScene(project.scenes.length-1); genMsg("已导入分镜数据。",true); return; }
-    const text=name.endsWith(".docx")?await docxText(buf):decodeText(buf);
+    if(name.endsWith(".pdf")) genMsg(`正在读取「${f.name}」…`,true);
+    const text=name.endsWith(".pdf")?await pdfText(buf):name.endsWith(".docx")?await docxText(buf):decodeText(buf);
     $("script-input").value=text; updateStat(); genMsg(`已读入「${f.name}」，点「拆分场次并生成预览」继续。`,true);
   }catch(err){ genMsg(err.message||"无法读取这个文件。",false); }
 };
@@ -1485,21 +1669,133 @@ $("script-input").addEventListener("input",updateStat);
 $("btn-split").onclick=()=>{
   const text=$("script-input").value; if(!text.trim()){ genMsg("先粘贴剧本，或打开一个剧本文件。",false); return; }
   const sc=splitScenes(text); if(!sc.length){ genMsg("没有读到剧本内容。",false); return; }
-  const allNames=findNames(text.split("\n").map(l=>l.trim()).filter(Boolean));
-  project={text,cur:0,scenes:sc.map(s=>({title:s.title,text:s.text,names:allNames,board:null,source:null}))};
-  let ok=0; project.scenes.forEach((s,i)=>{ if(genLocal(i)) ok++; });
+  const allLines=text.split("\n").map(l=>l.trim()).filter(Boolean);
+  const cast=castInfo(text);
+  const allNames=cast.names.concat(findNames(allLines)).filter((n,i,a)=>a.indexOf(n)===i);
+  const keepAssets=project&&project.assets||{};
+  project={text,cur:0,cast,me:"auto",assets:keepAssets,scenes:sc.map(s=>({title:s.title,text:s.text,names:allNames,meta:s.meta,board:null,source:null}))};
+  ASSETS=project.assets; fillMe();
+  let ok=0; project.scenes.forEach((s,i)=>{ if(!s.meta&&genLocal(i)) ok++; });
   saveProject(); renderScenes();
   const first=project.scenes.findIndex(s=>s.board); if(first>=0) showScene(first);
-  genMsg(`拆出 ${sc.length} 场，已快速生成 ${ok} 场预览。${aiReady?"想要更细的镜头设计，可以对单场点「Claude 拆镜」。":""}`,ok>0);
+  const metaN=sc.filter(s=>s.meta).length;
+  genMsg(`拆出 ${sc.length-metaN} 场${metaN?`（另有 ${metaN} 段人物资料，只用来识别人物）`:""}，已快速生成 ${ok} 场预览。${cast.lead?`「我」按 ${cast.lead} 处理。`:""}${aiReady?"想要更细的镜头设计，可以对单场点「Claude 拆镜」。":""}`,ok>0);
+  renderAssets();
   if(first>=0) document.querySelector(".stage-box").scrollIntoView({behavior:REDUCED?"auto":"smooth",block:"start"});
 };
 $("btn-goto-import").onclick=()=>{ $("importer").scrollIntoView({behavior:REDUCED?"auto":"smooth",block:"start"}); $("script-input").focus({preventScroll:true}); };
 
+/* ---------- 「我」与画幅 ---------- */
+function fillMe(){
+  const sel=$("me-opt"), names=(project.cast&&project.cast.names.length?project.cast.names:assetNames());
+  const lead=project.cast&&project.cast.lead;
+  sel.innerHTML=`<option value="auto">自动${lead?`（${esc(lead)}）`:""}</option>`+names.map(n=>`<option value="${esc(n)}" ${project.me===n?"selected":""}>${esc(n)}</option>`).join("");
+}
+$("me-opt").onchange=e=>{ project.me=e.target.value; saveProject(); genMsg("已更改「我」对应的人物。重新点「快速拆镜」或「Claude 拆镜」后生效。",true); };
+$("aspect-opt").onchange=e=>{
+  const v=e.target.value, sc=project.scenes[project.cur];
+  if(sc&&sc.board){ sc.board.meta=Object.assign({},sc.board.meta,{aspect:v}); saveProject(); showScene(project.cur); }
+  genMsg(`画幅改为 ${v}；当前场次已切换，之后生成的场次也会用这个画幅。`,true);
+};
+
+/* ---------- 角色资产 ---------- */
+function assetNames(){
+  const s=new Set(); ((project.cast&&project.cast.names)||[]).forEach(n=>s.add(n));
+  for(const sc of project.scenes){ if(sc.board&&sc.board.actors) Object.values(sc.board.actors).forEach(a=>a&&a.name&&s.add(a.name)); }
+  Object.keys(project.assets||{}).forEach(n=>s.add(n));
+  return [...s];
+}
+function renderAssets(){
+  const names=assetNames(), A=project.assets||{};
+  $("asset-list").innerHTML=names.map(n=>{ const a=A[n];
+    return `<li class="asset"><div class="thumb" ${a?`style="background-image:url('${a.img}')"`:""} aria-hidden="true">${a?"":esc(n.slice(0,1))}</div>
+      <div class="nm">${esc(n)}</div>
+      <div class="ctl">${a?`<select data-n="${esc(n)}" data-k="mode" aria-label="${esc(n)} 的显示方式"><option value="standee" ${a.mode==="standee"?"selected":""}>立绘</option><option value="head" ${a.mode==="head"?"selected":""}>头像</option></select>
+        <select data-n="${esc(n)}" data-k="facing" aria-label="${esc(n)} 的原图朝向"><option value="front" ${a.facing==="front"?"selected":""}>正面</option><option value="right" ${a.facing==="right"?"selected":""}>朝右</option><option value="left" ${a.facing==="left"?"selected":""}>朝左</option></select>
+        <button type="button" data-n="${esc(n)}" data-a="del">移除</button>`:`<button type="button" data-n="${esc(n)}" data-a="up">上传</button>`}</div></li>`; }).join("")
+    || `<li class="hint" style="grid-column:1/-1">导入剧本后，这里会列出人物；也可以直接批量上传，文件名写人物名，如「金妮.png」。</li>`;
+}
+async function toAsset(file){
+  const url=URL.createObjectURL(file); const img=new Image();
+  try{ await new Promise((res,rej)=>{ img.onload=res; img.onerror=()=>rej(new Error(`无法读取图片「${file.name}」。`)); img.src=url; }); }
+  finally{ setTimeout(()=>URL.revokeObjectURL(url),1000); }
+  const sc=Math.min(1,720/img.naturalHeight,720/img.naturalWidth), w=Math.max(1,Math.round(img.naturalWidth*sc)), h=Math.max(1,Math.round(img.naturalHeight*sc));
+  const c=document.createElement("canvas"); c.width=w; c.height=h; c.getContext("2d").drawImage(img,0,0,w,h);
+  let data=c.toDataURL("image/webp",.86); if(!data.startsWith("data:image/webp")) data=c.toDataURL("image/png");
+  return {img:data,ratio:h/w,mode:h/w>1.3?"standee":"head",facing:"front"};
+}
+function cleanBase(base){ return base.replace(/[_\-\s]*(定妆照?|立绘|全身|半身|头像|形象|设定|角色|final|v\d+|\d+)$/i,"").trim()||base; }
+function matchName(base,names){
+  const b=cleanBase(base); void base.replace(/[_\-\s]*(定妆照?|立绘|全身|半身|头像|形象|设定|角色|final|v\d+|\d+)$/i,"").trim();
+  const sorted=[...names].sort((x,y)=>y.length-x.length);
+  return sorted.find(n=>b===n)||sorted.find(n=>b.includes(n))||sorted.find(n=>n.includes(b)&&b.length>=2)||null;
+}
+function assetsChanged(){ ASSETS=project.assets; saveProject(); renderAssets(); draw(); }
+let assetTarget=null;
+$("btn-assets").onclick=()=>$("asset-files").click();
+$("asset-files").onchange=async e=>{
+  const files=[...e.target.files]; e.target.value=""; if(!files.length) return;
+  project.assets=project.assets||{}; const names=assetNames(), hit=[], miss=[];
+  for(const f of files){
+    try{ const base=f.name.replace(/\.[^.]+$/,""); const n=matchName(base,names)||cleanBase(base); project.assets[n]=await toAsset(f); (matchName(base,names)?hit:miss).push(n); }
+    catch(err){ genMsg(err.message,false); }
+  }
+  assetsChanged();
+  genMsg(`已载入 ${hit.length+miss.length} 个角色形象${hit.length?`：${hit.join("、")}`:""}。${miss.length?`另有 ${miss.join("、")} 没对上剧本里的名字，已按文件名保存，Claude 拆镜时会用到。`:""}`,true);
+};
+$("asset-list").addEventListener("click",e=>{
+  const b=e.target.closest("button[data-a]"); if(!b) return; const n=b.dataset.n;
+  if(b.dataset.a==="up"){ assetTarget=n; $("asset-one").click(); }
+  if(b.dataset.a==="del"){ delete project.assets[n]; assetsChanged(); }
+});
+$("asset-list").addEventListener("change",e=>{
+  const s=e.target.closest("select[data-k]"); if(!s) return; const a=project.assets[s.dataset.n]; if(!a) return;
+  a[s.dataset.k]=s.value; assetsChanged();
+});
+$("asset-one").onchange=async e=>{
+  const f=e.target.files[0]; e.target.value=""; if(!f||!assetTarget) return;
+  try{ project.assets=project.assets||{}; project.assets[assetTarget]=await toAsset(f); assetsChanged(); genMsg(`已载入「${assetTarget}」的角色形象。`,true); }
+  catch(err){ genMsg(err.message,false); }
+};
+
+/* ---------- PDF 剧本 ---------- */
+const PDFJS="https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/";
+let pdfReady=null;
+function loadScript(src){ return new Promise((res,rej)=>{ const s=document.createElement("script"); s.src=src; s.onload=res; s.onerror=()=>rej(new Error("load")); document.head.appendChild(s); }); }
+function unwrapLines(lines){
+  const out=[];
+  for(const raw of lines){ const l=raw.replace(/\s+$/,"");
+    const prev=out.length?out[out.length-1]:"";
+    const startsNew=!l.trim()||/^\s*(△|第\s*[^\s]{1,6}\s*[集场幕]|【|#|[^\s：:，。]{1,12}\s*(?:[（(][^）)]*[）)])?\s*[：:])/.test(l);
+    if(prev.trim()&&!startsNew&&!/[。！？!?」”…：:】）)]$/.test(prev.trim())){ out[out.length-1]=prev+(/[A-Za-z,.'"]$/.test(prev)&&/^\s*[A-Za-z]/.test(l)?" ":"")+l.trim(); }
+    else out.push(l.trim()?l.trim():"");
+  }
+  return out;
+}
+async function pdfText(buf){
+  if(!pdfReady) pdfReady=loadScript(PDFJS+"pdf.min.js").then(()=>loadScript(PDFJS+"pdf.worker.min.js"));
+  try{ await pdfReady; }catch(e){ pdfReady=null; throw new Error("读取 PDF 需要联网加载解析组件，请检查网络后再试，或把 PDF 里的文字复制后直接粘贴。"); }
+  const lib=window.pdfjsLib; if(!lib) throw new Error("PDF 解析组件没有加载成功，请把文字复制后直接粘贴。");
+  const doc=await lib.getDocument({data:new Uint8Array(buf),isEvalSupported:false}).promise;
+  const lines=[];
+  for(let i=1;i<=doc.numPages;i++){
+    const tc=await (await doc.getPage(i)).getTextContent(); let line="", lastY=null;
+    for(const it of tc.items){ if(typeof it.str!=="string") continue; const y=it.transform[5];
+      if(lastY!==null&&Math.abs(y-lastY)>2&&line){ lines.push(line); line=""; }
+      line+=it.str; lastY=y; if(it.hasEOL){ lines.push(line); line=""; lastY=null; } }
+    if(line) lines.push(line); lines.push("");
+  }
+  const text=unwrapLines(lines).join("\n").replace(/\n{3,}/g,"\n\n").trim();
+  if(!text) throw new Error("这个 PDF 里没有可复制的文字（可能是扫描件），请先用文字识别转成文字再粘贴。");
+  return text;
+}
+
 /* ---------- 启动 ---------- */
 try{ const p=JSON.parse(localStorage.getItem(PROJECT_KEY)||"null"); if(p&&Array.isArray(p.scenes)&&p.scenes.length) project=p; }catch(e){}
 if(!project) project=defaultProject();
+project.assets=project.assets||{}; ASSETS=project.assets;
 $("script-input").value=project.text||"";
-updateStat(); renderScenes();
+fillMe(); updateStat(); renderScenes(); renderAssets();
 const startIdx=project.scenes[project.cur]&&project.scenes[project.cur].board?project.cur:project.scenes.findIndex(s=>s.board);
 if(startIdx>=0) showScene(startIdx); else load(JSON.parse(SAMPLE));
 })();
