@@ -1,0 +1,9 @@
+{
+  "appId": "com.caigengyu.storyboard",
+  "appName": "分镜预览台",
+  "webDir": "www",
+  "android": {
+    "allowMixedContent": false,
+    "backgroundColor": "#0f1312"
+  }
+}

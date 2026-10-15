@@ -1,0 +1,25 @@
+# script2manga 默认配置
+
+# 默认手绘风格（对应 prompt/manga_style.md 中的二级标题名称）
+default_style: 日式漫画
+
+# 每个场景（scene）期望切分出的分镜格数；shot_splitter 会尽量贴近这个数字，
+# 但不会为了凑数破坏叙事节奏。
+target_shots_per_scene: 4
+
+# 每页漫画期望容纳的分镜格数；page_layout 会据此选择最接近的版式模板。
+panels_per_page: 6
+
+# 角色设定表 / 场景设定表持久化路径（用于跨分镜保持人物与场景外观一致）。
+# 首次运行由 parser 自动生成初稿，建议人工（或 Claude）补全外观描述后再继续。
+character_bible_path: output/character_bible.json
+scene_bible_path: output/scene_bible.json
+
+# prompt 模板路径（可自定义替换，留空则使用内置的 fallback 模板）
+storyboard_prompt_path: prompt/storyboard_prompt.md
+manga_style_path: prompt/manga_style.md
+
+# 渲染器输出：本 skill 只产出 prompt 文本与版式元数据，不直接调用出图 API。
+output:
+  prompts_path: output/panel_prompts.json
+  layout_path: output/page_layout.json

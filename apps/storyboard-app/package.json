@@ -1,0 +1,64 @@
+{
+  "name": "storyboard-previewer-app",
+  "version": "1.0.0",
+  "description": "分镜预览台：导入剧本，按场次拆镜，用人偶或角色资产预演走位、景别、运镜与灯光",
+  "author": "CAI-GENGYU",
+  "license": "UNLICENSED",
+  "private": true,
+  "main": "electron/main.cjs",
+  "scripts": {
+    "build:web": "node scripts/build-web.mjs",
+    "desktop": "npm run build:web && electron .",
+    "dist:win": "npm run build:web && electron-builder --win nsis --x64 --publish never",
+    "android:prepare": "npm run build:web && cap add android && cap sync android"
+  },
+  "devDependencies": {
+    "@anthropic-ai/sdk": "0.131.0",
+    "@capacitor/android": "8.5.2",
+    "@capacitor/cli": "8.5.2",
+    "@capacitor/core": "8.5.2",
+    "electron": "43.7.7",
+    "electron-builder": "26.17.0",
+    "esbuild": "0.28.2",
+    "jszip": "3.10.1",
+    "pdfjs-dist": "3.11.174"
+  },
+  "build": {
+    "appId": "com.caigengyu.storyboard",
+    "productName": "分镜预览台",
+    "artifactName": "StoryboardPreviewer-Setup-${version}.${ext}",
+    "directories": {
+      "output": "dist",
+      "buildResources": "build"
+    },
+    "files": [
+      "electron/**",
+      "www/**",
+      "package.json"
+    ],
+    "win": {
+      "target": [
+        {
+          "target": "nsis",
+          "arch": [
+            "x64"
+          ]
+        }
+      ],
+      "icon": "build/icon.png"
+    },
+    "nsis": {
+      "oneClick": false,
+      "perMachine": false,
+      "allowToChangeInstallationDirectory": true,
+      "createDesktopShortcut": true,
+      "createStartMenuShortcut": true,
+      "shortcutName": "分镜预览台",
+      "installerLanguages": [
+        "zh_CN"
+      ],
+      "language": "2052"
+    },
+    "publish": null
+  }
+}

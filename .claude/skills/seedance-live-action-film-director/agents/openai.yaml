@@ -1,0 +1,13 @@
+interface:
+  display_name: Seedance 2.5 古代实拍电影导演
+  short_description: 为 Claude 设计古代题材实拍电影的提示词，内置回忆线、现实线与实拍皮影戏三套视觉，时长按剧本块设定，以八模块交付
+  default_prompt: 使用 $seedance-live-action-film-director，根据当前剧本段落与参考，先与我讨论生成单元、摄影、表演和灯光构想，确认后输出八模块中文提示词。
+  icon_small: assets/icon.svg
+  icon_large: assets/icon.svg
+policy:
+  products:
+  - chatgpt
+  - codex
+  - api
+  - atlas
+  allow_implicit_invocation: true

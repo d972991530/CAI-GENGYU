@@ -2,12 +2,15 @@
 import React, { useState, useEffect, useRef, useMemo } from 'react';
 import { ProductionStage, ProjectState, WorkflowStep } from './types';
 import { WORKFLOW_STEPS } from './constants';
-import { 
-  analyzeScript, 
-  generateProductionTip, 
+import {
+  analyzeScript,
+  generateProductionTip,
   generateStoryboardDescription,
   generateKeyframeImage,
-  generateMotionPrevis
+  generateMotionPrevis,
+  breakdownScriptToComicPanels,
+  generateComicPanelImage,
+  ComicPanel
 } from './services/geminiService';
 import { 
   Film, 
@@ -36,7 +39,9 @@ import {
   SlidersHorizontal,
   Palette,
   Timer,
-  ZapOff
+  ZapOff,
+  BookOpen,
+  LayoutGrid
 } from 'lucide-react';
 import { AreaChart, Area, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer } from 'recharts';
 
@@ -74,7 +79,14 @@ const App: React.FC = () => {
   const [isGeneratingVideo, setIsGeneratingVideo] = useState(false);
   const [previewImg, setPreviewImg] = useState<string | null>(null);
   const [previewVid, setPreviewVid] = useState<string | null>(null);
-  
+
+  // 手绘漫画转化状态
+  const [comicStyle, setComicStyle] = useState('日式漫画 (Manga B&W)');
+  const [comicPanelCount, setComicPanelCount] = useState(6);
+  const [comicPanels, setComicPanels] = useState<{ panel: ComicPanel; image: string | null }[]>([]);
+  const [isGeneratingComic, setIsGeneratingComic] = useState(false);
+  const [comicProgress, setComicProgress] = useState<{ done: number; total: number } | null>(null);
+
   const fileInputRef = useRef<HTMLInputElement>(null);
 
   useEffect(() => {
@@ -172,7 +184,30 @@ const App: React.FC = () => {
     } finally { setIsGeneratingVideo(false); }
   };
 
-  const progress = useMemo(() => 
+  const onGenerateComic = async () => {
+    if (!project.scriptDraft) return;
+    setIsGeneratingComic(true);
+    setComicPanels([]);
+    addLog(`正在拆解剧本为漫画分镜... [风格: ${comicStyle}]`);
+    try {
+      const panels = await breakdownScriptToComicPanels(project.scriptDraft, comicPanelCount);
+      setComicProgress({ done: 0, total: panels.length });
+      addLog(`分镜拆解完成，共 ${panels.length} 格，开始逐格绘制...`);
+      for (const panel of panels) {
+        const image = await generateComicPanelImage(panel, comicStyle);
+        setComicPanels(prev => [...prev, { panel, image }]);
+        setComicProgress(prev => prev ? { done: prev.done + 1, total: prev.total } : null);
+      }
+      addLog("手绘漫画生成完毕。");
+    } catch (e) {
+      addLog("漫画生成失败，请检查连接。");
+    } finally {
+      setIsGeneratingComic(false);
+      setComicProgress(null);
+    }
+  };
+
+  const progress = useMemo(() =>
     Math.round((project.stepsCompleted.length / WORKFLOW_STEPS.length) * 100), 
   [project.stepsCompleted]);
 
@@ -357,6 +392,73 @@ const App: React.FC = () => {
                     <div className="lg:col-span-2 space-y-2">
                       <textarea className="w-full h-[220px] bg-black/40 border border-white/5 rounded-2xl p-6 text-xs font-mono text-slate-400 leading-relaxed outline-none workflow-scroll" value={storyboardOutput || ""} placeholder="等待渲染结果..." readOnly />
                     </div>
+                  </div>
+                </div>
+
+                {/* 手绘漫画转化 */}
+                <div className="glass-panel rounded-3xl overflow-hidden border-amber-500/20">
+                  <div className="p-6 border-b border-white/5 flex items-center justify-between bg-amber-600/5">
+                    <div className="flex items-center gap-3">
+                      <BookOpen className="w-5 h-5 text-amber-400" />
+                      <h3 className="font-bold">手绘漫画转化 (Script-to-Comic)</h3>
+                    </div>
+                    <div className="flex items-center gap-3">
+                      <select
+                        value={comicStyle}
+                        onChange={(e) => setComicStyle(e.target.value)}
+                        className="bg-black border border-white/10 rounded-lg p-2 text-[11px] outline-none focus:border-amber-500 transition-all text-slate-300"
+                      >
+                        <option>日式漫画 (Manga B&W)</option>
+                        <option>美式漫画 (American Comic Ink)</option>
+                        <option>欧式漫画 (European Bande Dessinée)</option>
+                        <option>水彩手绘 (Watercolor Sketch)</option>
+                        <option>铅笔素描 (Pencil Sketch)</option>
+                      </select>
+                      <select
+                        value={comicPanelCount}
+                        onChange={(e) => setComicPanelCount(parseInt(e.target.value))}
+                        className="bg-black border border-white/10 rounded-lg p-2 text-[11px] outline-none focus:border-amber-500 transition-all text-slate-300"
+                      >
+                        {[4, 6, 8].map(n => <option key={n} value={n}>{n} 格</option>)}
+                      </select>
+                      <button
+                        onClick={onGenerateComic}
+                        disabled={isGeneratingComic || !project.scriptDraft}
+                        className="px-6 py-2 bg-amber-600 hover:bg-amber-500 rounded-xl text-xs font-bold transition-all shadow-lg shadow-amber-600/20 flex items-center gap-2 disabled:opacity-50"
+                      >
+                        {isGeneratingComic ? <Loader2 className="w-3 h-3 animate-spin" /> : <LayoutGrid className="w-3 h-3" />}
+                        {isGeneratingComic && comicProgress ? `绘制中 ${comicProgress.done}/${comicProgress.total}` : '生成漫画'}
+                      </button>
+                    </div>
+                  </div>
+                  <div className="p-6">
+                    {comicPanels.length === 0 ? (
+                      <div className="h-40 flex flex-col items-center justify-center gap-3 opacity-30">
+                        <BookOpen className="w-10 h-10" />
+                        <p className="text-xs">在左侧粘贴剧本后，点击“生成漫画”将其转化为手绘风格分镜漫画</p>
+                      </div>
+                    ) : (
+                      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-5">
+                        {comicPanels.map(({ panel, image }) => (
+                          <div key={panel.panelNumber} className="rounded-2xl border border-white/5 bg-black/30 overflow-hidden">
+                            <div className="aspect-[4/3] bg-black/50 flex items-center justify-center">
+                              {image ? (
+                                <img src={image} alt={`Panel ${panel.panelNumber}`} className="w-full h-full object-cover" />
+                              ) : (
+                                <Loader2 className="w-6 h-6 animate-spin text-amber-500" />
+                              )}
+                            </div>
+                            <div className="p-3 space-y-1.5">
+                              <p className="text-[9px] font-bold text-amber-400 uppercase tracking-widest">Panel {panel.panelNumber}</p>
+                              {panel.dialogue?.map((d, i) => (
+                                <p key={i} className="text-[11px] text-slate-300 leading-snug"><span className="font-bold text-slate-100">{d.character}：</span>{d.line}</p>
+                              ))}
+                              {panel.caption && <p className="text-[10px] text-slate-500 italic leading-snug">{panel.caption}</p>}
+                            </div>
+                          </div>
+                        ))}
+                      </div>
+                    )}
                   </div>
                 </div>
 

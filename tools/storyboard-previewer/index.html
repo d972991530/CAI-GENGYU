@@ -1,0 +1,1756 @@
+<title>分镜动态预览台</title>
+<meta name="claude:viewport-fit-sides" content="cover">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Noto+Serif+SC:wght@600;900&family=Noto+Sans+SC:wght@400;500;700&family=JetBrains+Mono:wght@400;600&display=swap">
+<style>
+/* 布局：放映室式单列——片头信息 → 16:9 画面 → 走带控制与时间轴 → 当前镜头 + 俯视走位 → 分镜表 / 提示词 / 数据。
+   单一暗色：这是看片用的工具，刻意只做一套深色，颜色取自夜景风格里的灯火黄与钢青月光。 */
+:root{
+  color-scheme: dark;
+  --bg:#0f1312;          /* 墨绿黑，放映室底色 */
+  --panel:#161c1a;
+  --panel-2:#1d2421;
+  --line:#2a332f;
+  --fg:#e6e1d3;          /* 窗纸米白 */
+  --muted:#8f978f;
+  --lamp:#e3b34c;        /* 灯火黄：强调、播放头 */
+  --moon:#a7c3d4;        /* 钢青月光：运镜、次要强调 */
+  --blood:#d0443a;       /* 警示（越轴等） */
+  --jade:#4fae93;
+  --f-display:"Noto Serif SC","Songti SC","STSong",serif;
+  --f-body:"Noto Sans SC","PingFang SC","Microsoft YaHei",system-ui,sans-serif;
+  --f-mono:"JetBrains Mono",ui-monospace,"SFMono-Regular",Menlo,monospace;
+}
+*{box-sizing:border-box}
+html,body{background:var(--bg);color:var(--fg)}
+body{font-family:var(--f-body);font-size:14px;line-height:1.6}
+.wrap{max-width:1180px;margin:0 auto;padding-block:20px 56px;padding-left:max(16px,env(safe-area-inset-left,0px));padding-right:max(16px,env(safe-area-inset-right,0px));display:flex;flex-direction:column;gap:18px}
+header{display:flex;flex-direction:column;gap:6px}
+.eyebrow{display:flex;flex-wrap:wrap;gap:6px 14px;font-family:var(--f-mono);font-size:12px;letter-spacing:.08em;color:var(--muted)}
+.eyebrow b{color:var(--lamp);font-weight:600}
+h1{font-family:var(--f-display);font-weight:900;font-size:clamp(26px,4.4vw,42px);line-height:1.15;margin:0;text-wrap:balance;letter-spacing:.02em}
+.summary{margin:0;max-width:72ch;color:#cfc9ba}
+.summary .spec{font-family:var(--f-mono);color:var(--fg);font-weight:600;margin-right:.6em}
+
+.stage-box{position:relative;background:#000;border:1px solid var(--line);border-radius:6px;overflow:hidden}
+#stage{display:block;width:100%;height:auto;aspect-ratio:16/9;max-width:100%}
+.transport{display:flex;flex-wrap:wrap;align-items:center;gap:8px 12px;padding:10px 12px;background:var(--panel);border:1px solid var(--line);border-radius:6px}
+button,select{font:inherit;color:var(--fg);background:var(--panel-2);border:1px solid var(--line);border-radius:4px;padding:5px 12px;cursor:pointer}
+button:hover,select:hover{border-color:#43504a}
+button:focus-visible,select:focus-visible,textarea:focus-visible,.seg:focus-visible,tr:focus-visible{outline:2px solid var(--lamp);outline-offset:2px}
+button.primary{background:var(--lamp);color:#1a1405;border-color:var(--lamp);font-weight:700;min-width:64px}
+button[aria-pressed="false"]{color:var(--muted)}
+.clock{font-family:var(--f-mono);font-variant-numeric:tabular-nums;font-weight:600}
+.clock small{color:var(--muted);font-weight:400}
+.beat{flex:1 1 220px;min-width:0;color:#cfc9ba}
+.beat b{color:var(--fg)}
+.spacer{flex:1}
+.timeline{position:relative;background:var(--panel);border:1px solid var(--line);border-radius:6px;padding:10px 12px 6px}
+.track{position:relative;display:flex;height:40px;border-radius:3px;overflow:hidden;cursor:pointer;touch-action:none}
+.seg{position:relative;height:100%;border-right:1px solid var(--bg);background:var(--panel-2);display:flex;align-items:flex-end;justify-content:center;padding-bottom:4px;font-family:var(--f-mono);font-size:11px;color:var(--muted);min-width:0;overflow:hidden}
+.seg::before{content:"";position:absolute;left:0;right:0;top:0;height:3px;background:var(--linec,transparent)}
+.seg.key{background:#3a3218;color:var(--lamp)}
+.seg.slowmo{background:repeating-linear-gradient(135deg,#2b2a1e 0 6px,#38351f 6px 12px);color:var(--lamp)}
+.seg.dark{background:#0a0d0c}
+.seg.insert{background:#1f2a2e}
+.seg.active{color:var(--fg);box-shadow:inset 0 0 0 1px var(--lamp)}
+.playhead{position:absolute;top:0;bottom:0;width:2px;background:var(--lamp);pointer-events:none;box-shadow:0 0 6px var(--lamp)}
+.progress{position:absolute;left:0;top:0;height:3px;background:var(--lamp);pointer-events:none}
+.ticks{position:relative;height:18px;font-family:var(--f-mono);font-size:10px;color:var(--muted)}
+.ticks span{position:absolute;transform:translateX(-50%)}
+.legend{display:flex;flex-wrap:wrap;gap:4px 14px;font-size:12px;color:var(--muted);padding-top:2px}
+.legend i{display:inline-block;width:12px;height:10px;border-radius:2px;margin-right:5px;vertical-align:-1px}
+
+.grid2{display:grid;grid-template-columns:minmax(0,1.15fr) minmax(0,1fr);gap:18px}
+@media (max-width:820px){.grid2{grid-template-columns:minmax(0,1fr)}}
+.card{background:var(--panel);border:1px solid var(--line);border-radius:6px;padding:14px 16px;min-width:0}
+.card h2{font-family:var(--f-display);font-weight:600;font-size:18px;margin:0 0 8px;display:flex;align-items:baseline;gap:10px;flex-wrap:wrap}
+.card h2 .tag{font-family:var(--f-mono);font-size:11px;font-weight:400;color:var(--muted);letter-spacing:.06em}
+dl.kv{display:grid;grid-template-columns:5.5em minmax(0,1fr);gap:4px 12px;margin:0}
+dl.kv dt{color:var(--muted);font-size:12px;padding-top:2px}
+dl.kv dd{margin:0;min-width:0}
+.chip{display:inline-block;font-family:var(--f-mono);font-size:11px;padding:1px 7px;border-radius:999px;border:1px solid var(--line);margin-right:4px;color:var(--muted)}
+.chip.warn{border-color:var(--blood);color:#ffb3ab}
+.chip.ok{border-color:#2f5a4c;color:#9fd8c4}
+#plan{display:block;width:100%;height:auto;max-width:100%}
+.plan-note{font-size:12px;color:var(--muted);margin:6px 0 0}
+
+.tabs{display:flex;gap:4px;border-bottom:1px solid var(--line);flex-wrap:wrap}
+.tabs button{border:none;border-bottom:2px solid transparent;border-radius:0;background:none;padding:8px 14px;color:var(--muted)}
+.tabs button[aria-selected="true"]{color:var(--fg);border-bottom-color:var(--lamp)}
+.tabpanel{padding-top:14px}
+.table-wrap{overflow-x:auto;border:1px solid var(--line);border-radius:6px}
+table{border-collapse:collapse;width:100%;min-width:820px;font-size:13px}
+th,td{text-align:left;padding:8px 10px;border-bottom:1px solid var(--line);vertical-align:top}
+th{font-weight:500;color:var(--muted);font-size:12px;background:var(--panel);position:sticky;top:0}
+td.num{font-family:var(--f-mono);font-variant-numeric:tabular-nums;white-space:nowrap}
+tbody tr{cursor:pointer}
+tbody tr:hover{background:#1a211e}
+tbody tr.active{background:#2a2614}
+.out{position:relative}
+.out pre{white-space:pre-wrap;word-break:break-word;background:#0b0e0d;border:1px solid var(--line);border-radius:6px;padding:12px 14px;margin:0;font-family:var(--f-mono);font-size:12.5px;line-height:1.7;max-height:420px;overflow:auto}
+.out-head{display:flex;justify-content:space-between;align-items:center;gap:10px;margin:14px 0 6px;flex-wrap:wrap}
+.out-head h3{margin:0;font-size:14px;font-weight:700}
+textarea{width:100%;min-height:360px;background:#0b0e0d;color:var(--fg);border:1px solid var(--line);border-radius:6px;padding:12px;font-family:var(--f-mono);font-size:12.5px;line-height:1.55;resize:vertical}
+.row{display:flex;flex-wrap:wrap;gap:8px;align-items:center;margin-top:10px}
+.msg{font-size:13px;min-height:1.4em}
+.msg.err{color:#ffb3ab}.msg.ok{color:#9fd8c4}
+.hint{color:var(--muted);font-size:13px;max-width:80ch}
+.hint code{font-family:var(--f-mono);font-size:12px;color:var(--fg)}
+.head-row{display:flex;flex-direction:row;flex-wrap:wrap;gap:12px 20px;align-items:flex-end;justify-content:space-between}
+.head-row > div{min-width:0;flex:1 1 420px;display:flex;flex-direction:column;gap:6px}
+.importer h2{margin-bottom:4px}
+.imp-grid{display:grid;grid-template-columns:minmax(0,1fr) minmax(0,1fr);gap:16px;margin-top:10px}
+@media (max-width:820px){.imp-grid{grid-template-columns:minmax(0,1fr)}}
+.dropzone{display:flex;align-items:center;gap:14px;padding:14px 16px;margin-bottom:10px;border:1.5px dashed #4a5650;border-radius:6px;background:#121816;cursor:pointer;transition:border-color .15s,background .15s}
+.dropzone:hover,.dropzone.over{border-color:var(--lamp);background:#1a1f17}
+.dropzone:focus-visible{outline:2px solid var(--lamp);outline-offset:2px}
+.dz-icon{flex:none;width:38px;height:46px;border:2px solid var(--lamp);border-radius:4px;position:relative}
+.dz-icon::after{content:"";position:absolute;left:8px;right:8px;top:12px;height:2px;background:var(--lamp);box-shadow:0 7px 0 var(--lamp),0 14px 0 var(--lamp)}
+.dz-text{display:flex;flex-direction:column;gap:2px;min-width:0}
+.dz-text b{font-size:15px}
+.dz-text span{font-size:12.5px;color:var(--muted)}
+.dz-formats{display:flex;flex-wrap:wrap;gap:4px;margin-top:4px}
+#script-input{min-height:260px;font-family:var(--f-body);font-size:13.5px;line-height:1.7}
+.opts{display:flex;flex-wrap:wrap;gap:8px 16px;align-items:center;font-size:13px;color:var(--muted)}
+.opts label{display:flex;gap:6px;align-items:center}
+.scene-list{list-style:none;margin:10px 0 0;padding:0;display:flex;flex-direction:column;gap:6px;max-height:330px;overflow:auto}
+.scene-row{display:grid;grid-template-columns:minmax(0,1fr) auto;gap:4px 10px;align-items:center;padding:8px 10px;border:1px solid var(--line);border-radius:5px;background:var(--panel-2)}
+.scene-row.active{border-color:var(--lamp)}
+.sc-title{font-weight:700;min-width:0;overflow-wrap:anywhere}
+.sc-meta{grid-column:1;font-size:12px;color:var(--muted)}
+.sc-actions{grid-column:2;grid-row:1/span 2;display:flex;gap:6px;flex-wrap:wrap;justify-content:flex-end}
+.sc-actions button{padding:3px 10px;font-size:12.5px}
+button:disabled{opacity:.45;cursor:not-allowed}
+.ai-only[hidden]{display:none!important}
+.method{font-size:12.5px;color:var(--muted);margin:8px 0 0;max-width:70ch}
+.method b{color:var(--fg);font-weight:500}
+#scene-sel{max-width:240px}
+.stage-box{display:flex;justify-content:center}
+.stage-box.vertical{background:#050606}
+.stage-box.vertical #stage{width:auto;height:min(78vh,860px);max-width:100%}
+.assets{margin-top:14px;border-top:1px solid var(--line);padding-top:12px}
+.assets h3{margin:0 0 4px;font-size:14px;font-weight:700;display:flex;gap:10px;align-items:baseline;flex-wrap:wrap}
+.assets h3 span{font-weight:400;font-size:12px;color:var(--muted)}
+.asset-list{list-style:none;margin:8px 0 0;padding:0;display:grid;grid-template-columns:repeat(auto-fill,minmax(150px,1fr));gap:8px}
+.asset{display:grid;grid-template-columns:44px minmax(0,1fr);gap:4px 8px;align-items:center;padding:6px;border:1px solid var(--line);border-radius:5px;background:var(--panel-2)}
+.asset .thumb{grid-row:1/span 2;width:44px;height:58px;border-radius:3px;background:#0b0e0d center/contain no-repeat;border:1px solid var(--line);display:flex;align-items:center;justify-content:center;font-size:18px;color:var(--muted);font-family:var(--f-display)}
+.asset .nm{font-weight:700;font-size:13px;min-width:0;overflow-wrap:anywhere}
+.asset .ctl{display:flex;gap:4px;flex-wrap:wrap}
+.asset .ctl button,.asset .ctl select{padding:1px 6px;font-size:11.5px}
+@media (prefers-reduced-motion:reduce){.playhead{box-shadow:none}}
+</style>
+
+<div class="wrap">
+  <header class="head-row">
+    <div>
+      <div class="eyebrow" id="eyebrow"></div>
+      <h1 id="title">分镜动态预览</h1>
+      <p class="summary" id="summary"></p>
+    </div>
+    <button class="primary" id="btn-goto-import" type="button">导入剧本</button>
+  </header>
+
+  <div class="stage-box">
+    <svg id="stage" viewBox="0 0 1600 900" role="img" aria-label="分镜动态预览画面"></svg>
+  </div>
+
+  <div class="transport">
+    <button class="primary" id="btn-play" type="button">播放</button>
+    <button id="btn-restart" type="button">回到开头</button>
+    <button id="btn-prev" type="button" aria-label="上一镜">◀ 上一镜</button>
+    <button id="btn-next" type="button" aria-label="下一镜">下一镜 ▶</button>
+    <span class="clock" id="clock">00.0 <small>/ 00.0 s</small></span>
+    <span class="beat" id="beat"></span>
+    <label><select id="scene-sel" aria-label="切换场次"></select></label>
+    <label><select id="speed" aria-label="播放速度"><option value="0.25">0.25×</option><option value="0.5">0.5×</option><option value="1" selected>1×</option></select></label>
+    <button id="btn-loop" type="button" aria-pressed="false">循环</button>
+    <button id="btn-overlay" type="button" aria-pressed="true">标注</button>
+  </div>
+
+  <div class="timeline">
+    <div class="track" id="track" role="slider" tabindex="0" aria-label="时间轴" aria-valuemin="0"></div>
+    <div class="ticks" id="ticks"></div>
+    <div class="legend">
+      <span><i style="background:#3a3218"></i>关键镜</span>
+      <span><i style="background:repeating-linear-gradient(135deg,#2b2a1e 0 3px,#38351f 3px 6px)"></i>升格</span>
+      <span><i style="background:#1f2a2e"></i>插入特写</span>
+      <span><i style="background:#0a0d0c;border:1px solid #2a332f"></i>暗场</span>
+      <span>顶部色条：画面风格</span>
+    </div>
+  </div>
+
+  <section class="card importer" id="importer" aria-labelledby="imp-h">
+    <h2 id="imp-h">剧本 → 分镜 <span class="tag">上传 PDF / Word / Markdown / TXT，或直接粘贴</span></h2>
+    <div class="imp-grid">
+      <div>
+        <div class="dropzone" id="dropzone" role="button" tabindex="0" aria-describedby="dz-desc">
+          <div class="dz-icon" aria-hidden="true"></div>
+          <div class="dz-text">
+            <b>上传剧本文件</b>
+            <span id="dz-desc">点这里选择文件，或把文件拖到这里；可以一次选多个文件（如多集），按文件名顺序合并。</span>
+            <div class="dz-formats"><span class="chip">PDF</span><span class="chip">Word（.docx）</span><span class="chip">Markdown（.md）</span><span class="chip">TXT</span><span class="chip">Fountain</span></div>
+          </div>
+        </div>
+        <textarea id="script-input" spellcheck="false" aria-label="剧本文本"></textarea>
+        <div class="row">
+          <button class="primary" id="btn-split" type="button">拆分场次并生成预览</button>
+          <input type="file" id="script-file" multiple hidden
+            accept=".pdf,.docx,.doc,.md,.markdown,.txt,.fountain,.json,application/pdf,application/vnd.openxmlformats-officedocument.wordprocessingml.document,application/msword,text/markdown,text/x-markdown,text/plain,application/json">
+          <span class="hint" id="script-stat"></span>
+        </div>
+      </div>
+      <div>
+        <div class="opts">
+          <label>画面风格
+            <select id="line-opt">
+              <option value="auto" selected>自动判断</option>
+              <option value="B">B 夜景（暖灯与冷月光）</option>
+              <option value="C">C 暖调胶片（深黑与暖金）</option>
+              <option value="A">A 剪影（皮影 / 影窗）</option>
+              <option value="N">N 中性日景（现代 / 其他题材）</option>
+            </select>
+          </label>
+          <label>画幅
+            <select id="aspect-opt">
+              <option value="16:9" selected>16:9 横屏</option>
+              <option value="9:16">9:16 竖屏短剧</option>
+              <option value="2.39:1">2.39:1 宽银幕</option>
+            </select>
+          </label>
+          <label>「我」是
+            <select id="me-opt"><option value="auto">自动判断</option></select>
+          </label>
+        </div>
+        <p class="method"><b>快速拆镜</b>在本页按规则完成，几秒内出预览，适合先看走位和节奏。<span class="ai-only" id="ai-note" hidden><b>Claude 拆镜</b>按导演技能的六条分镜原则逐镜设计景别、运镜和视线链，更接近成片，每场约需半分钟到两分钟，并会用到你自己的 Claude 用量。</span><span id="ai-off">在 claude.ai 里打开本页时，还可以用 Claude 逐镜设计。</span></p>
+        <ul class="scene-list" id="scene-list"></ul>
+        <div class="row">
+          <button id="btn-all-local" type="button">全部场次快速拆镜</button>
+          <button class="ai-only" id="btn-all-ai" type="button" hidden>全部场次用 Claude 拆镜</button>
+          <button id="btn-stop" type="button" hidden>停止</button>
+        </div>
+        <p class="msg" id="gen-msg" role="status"></p>
+        <div class="assets">
+          <h3>角色资产 <span>上传定妆照或立绘，预览里的人偶会换成你的角色</span></h3>
+          <div class="row" style="margin-top:4px">
+            <button id="btn-assets" type="button">批量上传（按文件名匹配角色）</button>
+            <input type="file" id="asset-files" accept="image/png,image/jpeg,image/webp" multiple hidden>
+            <input type="file" id="asset-one" accept="image/png,image/jpeg,image/webp" hidden>
+          </div>
+          <ul class="asset-list" id="asset-list"></ul>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <div class="grid2">
+    <section class="card" aria-live="polite">
+      <h2 id="shot-title">镜头</h2>
+      <dl class="kv" id="shot-kv"></dl>
+    </section>
+    <section class="card">
+      <h2>俯视走位 <span class="tag">机位 · 视角 · 轴线</span></h2>
+      <svg id="plan" viewBox="-40 -40 1080 680" role="img" aria-label="当前镜头的俯视走位图"></svg>
+      <p class="plan-note" id="plan-note"></p>
+    </section>
+  </div>
+
+  <section>
+    <div class="tabs" role="tablist">
+      <button role="tab" id="tab-list" aria-selected="true" aria-controls="panel-list" type="button">分镜表</button>
+      <button role="tab" id="tab-prompt" aria-selected="false" aria-controls="panel-prompt" type="button">提示词导出</button>
+      <button role="tab" id="tab-data" aria-selected="false" aria-controls="panel-data" type="button">分镜数据</button>
+    </div>
+    <div class="tabpanel" id="panel-list" role="tabpanel" aria-labelledby="tab-list">
+      <div class="table-wrap"><table>
+        <thead><tr><th>镜号</th><th>时码</th><th>镜头</th><th>运镜</th><th>画面信息</th><th>留下的问题</th><th>声音</th></tr></thead>
+        <tbody id="tbody"></tbody>
+      </table></div>
+    </div>
+    <div class="tabpanel" id="panel-prompt" role="tabpanel" aria-labelledby="tab-prompt" hidden>
+      <p class="hint">按 Seedance 导演技能的格式，从当前分镜数据生成讨论用的信息清单表，和【CAMERA】模块里的逐镜正文。逐镜正文是骨架，正式交付前仍由导演技能补足摄影总则、表演细节与镜间衔接。</p>
+      <div class="out">
+        <div class="out-head"><h3>信息清单表（讨论阶段）</h3><button type="button" data-copy="out-table">复制</button></div>
+        <pre id="out-table"></pre>
+      </div>
+      <div class="out">
+        <div class="out-head"><h3>【CAMERA】逐镜</h3><button type="button" data-copy="out-camera">复制</button></div>
+        <pre id="out-camera"></pre>
+      </div>
+    </div>
+    <div class="tabpanel" id="panel-data" role="tabpanel" aria-labelledby="tab-data" hidden>
+      <p class="hint">整部预览由下面这段 JSON 驱动。改完点「应用」即可重新预演；也可以让 Claude 用导演技能把确认过的分镜写成这份数据。字段说明见仓库里的 <code>tools/storyboard-previewer/SCHEMA.md</code>。</p>
+      <textarea id="json" spellcheck="false" aria-label="分镜 JSON 数据"></textarea>
+      <div class="row">
+        <button class="primary" id="btn-apply" type="button">应用</button>
+        <button id="btn-copyjson" type="button">复制 JSON</button>
+        <label class="btn-like"><button id="btn-import" type="button">导入 .json 文件</button><input type="file" id="file" accept="application/json,.json" hidden></label>
+        <button id="btn-sample" type="button">填入空白模板</button>
+        <button id="btn-draft" type="button" hidden>恢复上次草稿</button>
+      </div>
+      <p class="msg" id="msg" role="status"></p>
+    </div>
+  </section>
+</div>
+
+<script type="application/json" id="storyboard-data">
+{"meta":{},"actors":{},"set":[],"plan":{"props":[]},"shots":[]}
+</script>
+
+<script src="https://cdnjs.cloudflare.com/ajax/libs/jszip/3.10.1/jszip.min.js"></script>
+<script>
+(function(){
+"use strict";
+const W=1600,H=900,FLOOR=760;
+let VW=1600,VH=900;           // 画框尺寸：横屏 1600×900，竖屏 900×1600
+let ASSETS={};               // 角色资产：名字 → {img, ratio, mode, facing}
+const $=id=>document.getElementById(id);
+const lerp=(a,b,t)=>a+(b-a)*t, clamp=(v,a,b)=>Math.max(a,Math.min(b,v));
+const ease=t=>t<.5?2*t*t:1-Math.pow(-2*t+2,2)/2;
+const rad=d=>d*Math.PI/180;
+const esc=s=>String(s==null?"":s).replace(/[&<>"]/g,c=>({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;"}[c]));
+const pad2=n=>String(n).padStart(2,"0");
+const fmt=s=>(s<10?"0":"")+s.toFixed(1);
+const REDUCED=window.matchMedia&&matchMedia("(prefers-reduced-motion: reduce)").matches;
+
+/* ---------- 视觉线配色：取自导演技能的三条线 ---------- */
+const PAL={
+  A:{name:"剪影",wall:"#efd9a8",wall2:"#e3c58b",floor:"#c99d5a",floorLine:"#b08447",warm:"#fff1cf",cool:"#2f7d5b",accent:"#b8322a",dark:"#2a170b",ink:"#24140a",paper:"#f2e2bf",strip:"#e3a548"},
+  B:{name:"夜景",wall:"#2a302d",wall2:"#232826",floor:"#1b201e",floorLine:"#2d3531",warm:"#e3b34c",cool:"#a7c3d4",accent:"#c7362c",dark:"#090c0b",ink:"#101412",paper:"#d9d2bf",strip:"#a7c3d4"},
+  C:{name:"暖调胶片",wall:"#1d1712",wall2:"#17120e",floor:"#120e0b",floorLine:"#271e17",warm:"#e3a548",cool:"#3c9a83",accent:"#b5402f",dark:"#050403",ink:"#0c0907",paper:"#e8d6b0",strip:"#4fae93"},
+  N:{name:"中性日景",wall:"#3a3e40",wall2:"#323638",floor:"#26292b",floorLine:"#373b3d",warm:"#ecc77e",cool:"#a4bfd2",accent:"#cc4a3e",dark:"#0d0f10",ink:"#141617",paper:"#e4dfd3",strip:"#cfc9bb"}
+};
+function styleName(code){ const n=DATA&&DATA.meta&&DATA.meta.styleNames; return (n&&n[code])||(PAL[code]?PAL[code].name:code); }
+const SIZES={"大全景":0.78,"全景":1,"中全景":1.3,"中景":1.7,"中近景":2.15,"近景":2.6,"特写":3.5,"大特写":4.4};
+const MOVE_CN={static:"固定",handheld:"手持定点",push:"推",pull:"拉",pan:"摇",track:"移/跟",tilt:"俯仰",crane:"升降"};
+const MOVE_EN={static:"LOCKED",handheld:"HANDHELD",push:"PUSH IN",pull:"PULL OUT",pan:"PAN",track:"TRACK",tilt:"TILT",crane:"CRANE"};
+
+/* ---------- 人偶姿态（肢体角度：0 = 垂直向下，90 = 朝面向方向水平，弯曲为正） ---------- */
+const BASE={lean:0,head:0,a1:[12,10],a2:[-10,12],l1:[5,0],l2:[-5,0],rot:0,lift:0};
+const POSES={
+  stand:{},
+  walk:{lean:4,a1:[18,14],a2:[-18,14],l1:[16,8],l2:[-14,4],cycle:1},
+  run:{lean:14,a1:[40,60],a2:[-30,60],l1:[30,30],l2:[-30,20],cycle:2},
+  guard:{lean:6,head:4,a1:[72,42],a2:[30,72],l1:[22,22],l2:[-24,8]},
+  crouch:{lean:34,head:12,a1:[58,40],a2:[36,60],l1:[96,140],l2:[30,120]},
+  reach:{lean:38,head:16,a1:[84,24],a2:[50,40],l1:[96,140],l2:[30,120]},
+  crouchLook:{lean:22,head:-16,a1:[60,30],a2:[36,60],l1:[96,140],l2:[30,120]},
+  thrust:{lean:22,head:4,a1:[92,4],a2:[-34,40],l1:[46,36],l2:[-42,0]},
+  chop:{lean:26,head:10,a1:[64,-8],a2:[10,50],l1:[40,32],l2:[-36,0]},
+  raise:{lean:-6,head:-6,a1:[166,24],a2:[40,60],l1:[18,12],l2:[-20,4]},
+  dodge:{lean:-24,head:-8,a1:[40,70],a2:[-40,40],l1:[-6,30],l2:[-34,24]},
+  stagger:{lean:-16,head:-14,a1:[-34,20],a2:[-60,20],l1:[14,10],l2:[-28,6]},
+  pinned:{lean:-8,head:-16,a1:[24,96],a2:[18,104],l1:[10,6],l2:[-6,4]},
+  push:{lean:22,a1:[86,10],a2:[80,16],l1:[36,28],l2:[-40,0]},
+  threaten:{lean:12,head:2,a1:[88,4],a2:[72,36],l1:[24,18],l2:[-26,4]},
+  look:{head:-14},
+  kick:{lean:-18,a1:[40,40],a2:[-40,30],l1:[92,0],l2:[-6,0]},
+  kneel:{lean:6,head:8,a1:[10,10],a2:[-6,10],l1:[90,90],l2:[-6,92]},
+  sit:{lean:4,head:4,a1:[40,50],a2:[20,60],l1:[88,88],l2:[84,84]},
+  fall:{lean:-16,head:-14,a1:[-60,20],a2:[-90,20],l1:[20,10],l2:[-20,6],rot:-55},
+  down:{a1:[-150,10],a2:[-170,10],l1:[4,0],l2:[-4,0],rot:-90}
+};
+function poseObj(name,extra){
+  const p=Object.assign({},BASE,POSES[name]||{}, (typeof name==="object"&&name)||{});
+  if(extra&&typeof extra.head==="number") p.head=extra.head;
+  return p;
+}
+function mixPose(a,b,e){
+  const o={};
+  for(const k of ["lean","head","rot","lift"]) o[k]=lerp(a[k]||0,b[k]||0,e);
+  for(const k of ["a1","a2","l1","l2"]) o[k]=[lerp(a[k][0],b[k][0],e),lerp(a[k][1],b[k][1],e)];
+  o.cycle=e<.5?a.cycle:b.cycle;
+  return o;
+}
+
+/* ---------- 数据归一化 ---------- */
+let DATA=null, SHOTS=[], TOTAL=0, LINE="B";
+function normalize(raw){
+  if(!raw||typeof raw!=="object") throw new Error("顶层必须是一个对象。");
+  if(!Array.isArray(raw.shots)||!raw.shots.length) throw new Error("缺少 shots 数组，或数组为空。");
+  const meta=Object.assign({title:"未命名分镜",line:"B",aspect:"16:9"},raw.meta||{});
+  if(!PAL[meta.line]) meta.line="B";
+  let t=0, light={candle:true,moon:false,dark:0.25}, props={}, planPos={}, lastCam=null;
+  const shots=raw.shots.map((s,i)=>{
+    const dur=Number(s.dur);
+    if(!(dur>0)) throw new Error(`第 ${i+1} 镜的 dur（时长，秒）必须是正数。`);
+    const o=Object.assign({},s);
+    o.i=i; o.start=t; o.end=t+dur; o.dur=dur; t+=dur;
+    o.view=["side","insert","plan"].includes(s.view)?s.view:"side";
+    o.line=PAL[s.line]?s.line:meta.line;
+    o.cam=Object.assign({move:"handheld",hh:1},s.cam||{});
+    if(!MOVE_EN[o.cam.move]) o.cam.move="handheld";
+    o.tags=Array.isArray(s.tags)?s.tags:[];
+    light=Object.assign({},light,s.light||{}); o.L=light;
+    if(s.props) for(const k in s.props) props[k]=Object.assign({},props[k]||{},s.props[k]);
+    o.P=JSON.parse(JSON.stringify(props));
+    o.insert=Object.assign({kind:"text"},s.insert||{});
+    o.acts=s.acts||{};
+    o.fx=Array.isArray(s.fx)?s.fx:[];
+    // 俯视位置：沿用上一镜的终点
+    const pa=Object.assign({},planPos);
+    const sp=(s.plan&&s.plan.actors)||{};
+    for(const k in sp){ if(Array.isArray(sp[k])&&sp[k].length) pa[k]=sp[k]; }
+    o.planActors=pa;
+    for(const k in pa){ const arr=pa[k]; planPos[k]=[arr[arr.length-1]]; }
+    o.planCam=(s.plan&&Array.isArray(s.plan.cam))?s.plan.cam:null;
+    if(o.planCam) lastCam=o.planCam;
+    return o;
+  });
+  return {meta,actors:raw.actors||{},set:Array.isArray(raw.set)?raw.set:[],plan:Object.assign({w:1000,h:600,props:[]},raw.plan||{}),shots,total:t};
+}
+
+/* ---------- 关键帧采样 ---------- */
+function sampleActor(kfs,p,T){
+  if(!kfs||!kfs.length) return null;
+  const ks=kfs.map((k,i)=>Object.assign({t:kfs.length>1?i/(kfs.length-1):0},k));
+  let a=ks[0],b=ks[0],e=0;
+  if(p<=ks[0].t){a=b=ks[0];}
+  else if(p>=ks[ks.length-1].t){a=b=ks[ks.length-1];}
+  else for(let i=0;i<ks.length-1;i++){ if(p>=ks[i].t&&p<=ks[i+1].t){a=ks[i];b=ks[i+1];e=ease((p-a.t)/Math.max(1e-6,b.t-a.t));break;} }
+  const pa=poseObj(a.pose||"stand",a), pb=poseObj(b.pose||"stand",b);
+  const pose=mixPose(pa,pb,e);
+  if(pose.cycle){
+    const w=T*(pose.cycle>1?11:7), s=Math.sin(w), amp=pose.cycle>1?30:20;
+    pose.l1=[pose.l1[0]+s*amp,pose.l1[1]+Math.max(0,-s)*30];
+    pose.l2=[pose.l2[0]-s*amp,pose.l2[1]+Math.max(0,s)*30];
+    pose.a1=[pose.a1[0]-s*amp*.8,pose.a1[1]];
+    pose.a2=[pose.a2[0]+s*amp*.8,pose.a2[1]];
+    pose.lift=(pose.lift||0)+Math.abs(Math.cos(w))*(pose.cycle>1?10:4);
+  }
+  return {x:lerp(a.x??800,b.x??a.x??800,e),face:(e<.5?a.face:b.face)||1,weapon:e<.5?a.weapon:b.weapon,pose};
+}
+
+/* ---------- 人偶绘制 ---------- */
+function puppet(def,st,silhouette,uid){
+  const s=def.scale||1, f=st.face>=0?1:-1, P=st.pose;
+  const T=150*s,UA=72*s,FA=68*s,TH=100*s,SH=98*s,HR=32*s;
+  const dn=(a,L)=>[Math.sin(rad(a))*L*f,Math.cos(rad(a))*L];
+  const add=(p,q)=>[p[0]+q[0],p[1]+q[1]];
+  const hip=[0,0];
+  const neck=[Math.sin(rad(P.lean))*T*f,-Math.cos(rad(P.lean))*T];
+  const sho=[neck[0]*.9,neck[1]*.9];
+  const hl=P.lean+P.head;
+  const head=add(neck,[Math.sin(rad(P.lean))*(HR+8)*f,-Math.cos(rad(P.lean))*(HR+8)]);
+  const e1=add(sho,dn(P.a1[0],UA)), h1=add(e1,dn(P.a1[0]+P.a1[1],FA));
+  const e2=add(sho,dn(P.a2[0],UA)), h2=add(e2,dn(P.a2[0]+P.a2[1],FA));
+  const k1=add(hip,dn(P.l1[0],TH)), f1=add(k1,dn(P.l1[0]-P.l1[1],SH));
+  const k2=add(hip,dn(P.l2[0],TH)), f2=add(k2,dn(P.l2[0]-P.l2[1],SH));
+  let pts={hip,neck,sho,head,e1,h1,e2,h2,k1,f1,k2,f2};
+  if(P.rot){ const r=rad(P.rot*f),c=Math.cos(r),sn=Math.sin(r);
+    for(const k in pts){const [x,y]=pts[k];pts[k]=[x*c-y*sn,x*sn+y*c];} }
+  let maxY=-1e9; for(const k in pts){ const y=pts[k][1]+(k==="head"?HR:0); if(y>maxY)maxY=y; }
+  const oy=FLOOR-maxY-(P.lift||0), ox=st.x;
+  for(const k in pts){pts[k]=[pts[k][0]+ox,pts[k][1]+oy];}
+  const p=pts, sw=24*s, ol="#0b0d0c";
+  const dark=silhouette?"#2a170b":null;
+  const col=k=>dark||def[k];
+  const L=(a,b,c,w)=>`<line x1="${a[0].toFixed(1)}" y1="${a[1].toFixed(1)}" x2="${b[0].toFixed(1)}" y2="${b[1].toFixed(1)}" stroke="${c}" stroke-width="${w}" stroke-linecap="round"/>`;
+  const limb=(a,b,c,w)=>(silhouette?"":L(a,b,ol,w+6))+L(a,b,c,w);
+  let g="";
+  // 刀鞘在身后
+  const wpn=def.weapon, wstate=st.weapon||(wpn?"sheath":"none");
+  const wlen={sword:175,blade:150,knife:70,staff:260}[wpn]||0;
+  if(wpn&&wstate==="sheath"){
+    const a=add(p.hip,[-f*24*s,-14*s]), b=add(p.hip,[-f*120*s,70*s]);
+    g+=L(a,b,silhouette?dark:"#1a120c",12*s)+L(a,add(a,[(b[0]-a[0])*.18,(b[1]-a[1])*.18]),silhouette?dark:"#b48a3a",14*s);
+  }
+  // 后侧肢体
+  const back=silhouette?dark:shade(def.legs||"#333",-.25), backArm=silhouette?dark:shade(def.body||"#777",-.28);
+  g+=limb(p.hip,p.k2,back,sw)+limb(p.k2,p.f2,back,sw);
+  g+=limb(p.sho,p.e2,backArm,sw*.9)+limb(p.e2,p.h2,backArm,sw*.85);
+  g+=`<circle cx="${p.h2[0]}" cy="${p.h2[1]}" r="${10*s}" fill="${silhouette?dark:shade(def.skin||"#ddd",-.25)}"/>`;
+  // 前腿
+  g+=limb(p.hip,p.k1,col("legs"),sw)+limb(p.k1,p.f1,col("legs"),sw);
+  // 躯干与衣摆
+  const tw=58*s;
+  g+=limb(p.hip,[lerp(p.hip[0],p.neck[0],.96),lerp(p.hip[1],p.neck[1],.96)],col("body"),tw);
+  if(def.robe){
+    const lo=Math.min(p.k1[0],p.k2[0],p.hip[0]-30*s)-14*s, hi=Math.max(p.k1[0],p.k2[0],p.hip[0]+30*s)+14*s, hy=Math.max(p.k1[1],p.k2[1])+18*s;
+    g+=`<polygon points="${p.hip[0]-30*s},${p.hip[1]-6} ${p.hip[0]+30*s},${p.hip[1]-6} ${hi},${hy} ${lo},${hy}" fill="${col("body")}" stroke="${silhouette?"none":ol}" stroke-width="3" stroke-linejoin="round"/>`;
+  }
+  // 腰带
+  const ux=(p.neck[0]-p.hip[0])/T, uy=(p.neck[1]-p.hip[1])/T, wx=p.hip[0]+ux*14*s, wy=p.hip[1]+uy*14*s;
+  g+=L([wx-uy*32*s,wy+ux*32*s],[wx+uy*32*s,wy-ux*32*s],silhouette?PAL.A.accent:(def.sash||"#c33"),14*s);
+  // 头
+  const hx=p.head[0],hy2=p.head[1];
+  const asset=!silhouette?assetFor(def.name):null;
+  const hairC=silhouette?dark:(def.hairColor||"#151515");
+  g+=`<g transform="rotate(${(P.head*f).toFixed(1)} ${hx} ${hy2})">`;
+  if(asset&&asset.mode==="head"){
+    const r=HR*1.35, cid=`hc_${String(uid||"x").replace(/[^\w-]/g,"")}`;
+    let iw=2*r, ih=2*r, ix=hx-r, iy=hy2-r, par="xMidYMid slice";
+    if(asset.ratio>1.3){ iw=2*r*2.3; ih=iw*asset.ratio; ix=hx-iw/2; iy=hy2-r-iw*.05; par="xMidYMin meet"; }
+    g+=`<clipPath id="${cid}"><circle cx="${hx}" cy="${hy2}" r="${r}"/></clipPath><circle cx="${hx}" cy="${hy2}" r="${r}" fill="#222"/><image href="${asset.img}" x="${ix}" y="${iy}" width="${iw}" height="${ih}" preserveAspectRatio="${par}" clip-path="url(#${cid})"/><circle cx="${hx}" cy="${hy2}" r="${r}" fill="none" stroke="${ol}" stroke-width="4"/></g>`;
+  }else{
+  if(def.hair==="long") g+=`<ellipse cx="${hx-f*HR*.3}" cy="${hy2+HR*.75}" rx="${HR*1.08}" ry="${HR*1.75}" fill="${hairC}"/>`;
+  g+=`<circle cx="${hx}" cy="${hy2}" r="${HR}" fill="${silhouette?dark:(def.skin||"#e2c9a8")}" stroke="${silhouette?"none":ol}" stroke-width="4"/>`;
+  g+=`<path d="M ${hx-HR} ${hy2-2} A ${HR} ${HR} 0 0 1 ${hx+HR} ${hy2-2} Q ${hx} ${hy2-HR*.55} ${hx-HR} ${hy2-2} Z" fill="${hairC}" transform="rotate(${-f*18} ${hx} ${hy2})"/>`;
+  if(def.hair==="bun") g+=`<circle cx="${hx-f*HR*.55}" cy="${hy2-HR*1.05}" r="${HR*.42}" fill="${hairC}"/>`;
+  if(def.hair==="crown") g+=`<rect x="${hx-9*s}" y="${hy2-HR-18*s}" width="${18*s}" height="${16*s}" fill="${silhouette?dark:"#d9b23e"}"/>`;
+  if(def.hair==="band") g+=`<rect x="${hx-HR}" y="${hy2-HR*.55}" width="${HR*2}" height="${8*s}" fill="${silhouette?dark:(def.sash||"#c33")}" transform="rotate(${-f*10} ${hx} ${hy2})"/>`;
+  if(def.beard) g+=`<path d="M ${hx+f*HR*.1} ${hy2+HR*.35} Q ${hx+f*HR*.8} ${hy2+HR*1.3} ${hx+f*HR*.95} ${hy2+HR*.25} Z" fill="${silhouette?dark:"#efe9dc"}"/>`;
+  if(!silhouette) g+=`<circle cx="${hx+f*HR*.55}" cy="${hy2-3*s}" r="${4*s}" fill="#141414"/>`;
+  g+=`</g>`;
+  }
+  // 前臂与兵器
+  let wsvg="";
+  if(wpn&&wstate==="hand"){
+    const dx=p.h1[0]-p.e1[0], dy=p.h1[1]-p.e1[1], d=Math.hypot(dx,dy)||1, u=[dx/d,dy/d];
+    const tip=[p.h1[0]+u[0]*wlen*s,p.h1[1]+u[1]*wlen*s];
+    const blade=silhouette?dark:"#d8dde0";
+    wsvg=(silhouette?"":L(p.h1,tip,ol,(wpn==="blade"?13:9)*s))+L(p.h1,tip,blade,(wpn==="blade"?9:5)*s)
+      +L([p.h1[0]-u[0]*16*s,p.h1[1]-u[1]*16*s],[p.h1[0]+u[0]*12*s,p.h1[1]+u[1]*12*s],silhouette?dark:"#3b2a1c",11*s);
+    g+=wsvg;
+  }
+  g+=limb(p.sho,p.e1,col("body"),sw*.95)+limb(p.e1,p.h1,col("body"),sw*.9);
+  g+=`<circle cx="${p.h1[0]}" cy="${p.h1[1]}" r="${11*s}" fill="${silhouette?dark:(def.skin||"#e2c9a8")}" stroke="${silhouette?"none":ol}" stroke-width="3"/>`;
+  // 剪影风格：签子
+  if(silhouette){
+    g+=`<line x1="${p.neck[0]}" y1="${p.neck[1]}" x2="${p.neck[0]+20}" y2="${H+40}" stroke="${dark}" stroke-width="3" opacity=".55"/>`;
+    g+=`<line x1="${p.h1[0]}" y1="${p.h1[1]}" x2="${p.h1[0]+40}" y2="${H+40}" stroke="${dark}" stroke-width="2.5" opacity=".45"/>`;
+  }
+  if(asset&&asset.mode==="standee") g=standeeSVG(p,P,asset,s,HR,f)+wsvg;
+  return {svg:g,pts:p};
+}
+function assetFor(name){
+  if(!name) return null; if(ASSETS[name]&&ASSETS[name].img) return ASSETS[name];
+  const short=String(name).split("·")[0];
+  for(const k in ASSETS){ if(ASSETS[k]&&ASSETS[k].img&&(k.split("·")[0]===short)) return ASSETS[k]; }
+  return null;
+}
+/* 立绘模式：角色资产整张贴在人偶位置，姿态用倾斜、压缩和翻转近似 */
+function standeeSVG(p,P,a,s,HR,f){
+  const standH=448*s, top=p.head[1]-HR, lift=P.lift||0;
+  const lying=Math.abs(P.rot||0)>45;
+  const sy=lying?1:clamp((FLOOR-lift-top)/standH,.45,1.05);
+  const rot=(P.rot||0)*f+(lying?0:P.lean*.3*f);
+  const h=standH*1.02, w=h/(a.ratio||2.6);
+  const flip=(a.facing==="right"&&f<0)||(a.facing==="left"&&f>0)?-1:1;
+  const x=lying?p.hip[0]-f*h*.1:p.hip[0], y=FLOOR-lift;
+  return `<ellipse cx="${x}" cy="${FLOOR+4}" rx="${Math.max(60,w*.32)}" ry="12" fill="#000" opacity=".35"/><g transform="translate(${x.toFixed(1)} ${y.toFixed(1)}) rotate(${rot.toFixed(1)}) scale(${flip} ${sy.toFixed(3)})"><image href="${a.img}" x="${(-w/2).toFixed(1)}" y="${(-h).toFixed(1)}" width="${w.toFixed(1)}" height="${h.toFixed(1)}" preserveAspectRatio="xMidYMax meet"/></g>`;
+}
+function shade(hex,amt){
+  const m=/^#?([0-9a-f]{6})$/i.exec(hex||""); if(!m) return hex;
+  const n=parseInt(m[1],16); let r=n>>16,g=(n>>8)&255,b=n&255;
+  const f=v=>clamp(Math.round(amt<0?v*(1+amt):v+(255-v)*amt),0,255);
+  return "#"+[f(r),f(g),f(b)].map(v=>v.toString(16).padStart(2,"0")).join("");
+}
+
+/* ---------- 布景（侧视） ---------- */
+function setSVG(shot,pal,T){
+  const A=shot.line==="A", L=shot.L; let g="";
+  if(A){
+    g+=`<rect x="-1200" y="-600" width="4000" height="2200" fill="${pal.wall2}"/>`;
+    g+=`<rect x="-1200" y="${FLOOR+20}" width="4000" height="800" fill="${pal.floor}"/>`;
+  }else{
+    g+=`<rect x="-1200" y="-600" width="4000" height="${FLOOR+600}" fill="${pal.wall}"/>`;
+    for(let x=-1200;x<2800;x+=130) g+=`<line x1="${x}" y1="-600" x2="${x}" y2="${FLOOR}" stroke="${pal.wall2}" stroke-width="10"/>`;
+    g+=`<rect x="-1200" y="${FLOOR}" width="4000" height="900" fill="${pal.floor}"/>`;
+    for(let i=1;i<7;i++){const y=FLOOR+i*i*7; g+=`<line x1="-1200" y1="${y}" x2="2800" y2="${y}" stroke="${pal.floorLine}" stroke-width="2"/>`;}
+    g+=`<rect x="-1200" y="${FLOOR-14}" width="4000" height="14" fill="${pal.wall2}"/>`;
+  }
+  for(const it of DATA.set){
+    const st=Object.assign({},it,(it.id&&shot.P[it.id])||{});
+    const x=st.x||0;
+    if(st.type==="window"){
+      const w=st.w||300,h=st.h||240,y=st.y||240, lit=L.moon;
+      g+=`<rect x="${x-10}" y="${y-10}" width="${w+20}" height="${h+20}" fill="${A?pal.dark:"#151a18"}"/>`;
+      g+=`<rect x="${x}" y="${y}" width="${w}" height="${h}" fill="${A?pal.warm:(lit?"#6d8494":"#252c2a")}"/>`;
+      for(let i=1;i<8;i++) g+=`<line x1="${x+w*i/8}" y1="${y}" x2="${x+w*i/8}" y2="${y+h}" stroke="${A?pal.dark:"#151a18"}" stroke-width="6"/>`;
+      for(let i=1;i<6;i++) g+=`<line x1="${x}" y1="${y+h*i/6}" x2="${x+w}" y2="${y+h*i/6}" stroke="${A?pal.dark:"#151a18"}" stroke-width="6"/>`;
+    }else if(st.type==="desk"||st.type==="table"){
+      const w=st.w||400,h=st.h||150, c=A?pal.dark:"#4a3524";
+      g+=`<rect x="${x}" y="${FLOOR-h}" width="${w}" height="22" fill="${c}" stroke="#0b0d0c" stroke-width="3"/>`;
+      g+=`<rect x="${x+20}" y="${FLOOR-h+22}" width="22" height="${h-22}" fill="${shade(c,-.3)}"/><rect x="${x+w-42}" y="${FLOOR-h+22}" width="22" height="${h-22}" fill="${shade(c,-.3)}"/>`;
+      if(!A) g+=`<rect x="${x+w*.55}" y="${FLOOR-h-6}" width="90" height="6" fill="${pal.paper}" opacity=".85" transform="rotate(-4 ${x+w*.55} ${FLOOR-h})"/>`;
+    }else if(st.type==="candle"){
+      const by=FLOOR-(st.h||150), lit=st.lit!==undefined?st.lit:L.candle;
+      if(st.down) continue;
+      g+=`<rect x="${x-16}" y="${by-8}" width="32" height="8" fill="#8a6a2e"/><rect x="${x-7}" y="${by-58}" width="14" height="50" fill="${pal.paper}"/>`;
+      if(lit){ const fl=1+Math.sin(T*23)*.08+Math.sin(T*37)*.05;
+        g+=`<ellipse cx="${x}" cy="${by-72}" rx="${7*fl}" ry="${15*fl}" fill="#ffd77a"/><ellipse cx="${x}" cy="${by-68}" rx="3" ry="7" fill="#fff6dc"/>`; }
+    }else if(st.type==="jar"){
+      const c=A?pal.dark:"#56604f";
+      g+=`<path d="M ${x-40} ${FLOOR} Q ${x-62} ${FLOOR-70} ${x-30} ${FLOOR-110} L ${x-22} ${FLOOR-128} L ${x+22} ${FLOOR-128} L ${x+30} ${FLOOR-110} Q ${x+62} ${FLOOR-70} ${x+40} ${FLOOR} Z" fill="${c}" stroke="#0b0d0c" stroke-width="3"/>`;
+    }else if(st.type==="pillar"){
+      g+=`<rect x="${x-34}" y="-600" width="68" height="${FLOOR+600}" fill="${A?pal.dark:"#3d2a20"}"/><rect x="${x-34}" y="-600" width="16" height="${FLOOR+600}" fill="#000" opacity=".25"/>`;
+    }else if(st.type==="door"){
+      const w=st.w||180, c=A?pal.dark:"#3a2a1f";
+      g+=`<rect x="${x-12}" y="${FLOOR-470}" width="${w+24}" height="470" fill="#0b0d0c"/>`;
+      if(st.open){ g+=`<rect x="${x}" y="${FLOOR-460}" width="${w}" height="460" fill="${A?pal.warm:"#4a3a22"}"/><rect x="${x}" y="${FLOOR-460}" width="${w}" height="460" fill="${pal.warm}" opacity=".18"/>`;
+        g+=`<polygon points="${x},${FLOOR-460} ${x+w*.22},${FLOOR-420} ${x+w*.22},${FLOOR-30} ${x},${FLOOR}" fill="${c}"/>`; }
+      else{ g+=`<rect x="${x}" y="${FLOOR-460}" width="${w}" height="460" fill="${c}"/>`;
+        for(let i=1;i<4;i++) g+=`<line x1="${x+w*i/4}" y1="${FLOOR-460}" x2="${x+w*i/4}" y2="${FLOOR}" stroke="#241a13" stroke-width="4"/>`; }
+    }else if(st.type==="lantern"){
+      const y=st.y||300; g+=`<line x1="${x}" y1="-600" x2="${x}" y2="${y-40}" stroke="#111" stroke-width="3"/><ellipse cx="${x}" cy="${y}" rx="36" ry="44" fill="${pal.accent}"/>`;
+    }else if(st.type==="bed"){
+      const w=st.w||420; g+=`<rect x="${x}" y="${FLOOR-120}" width="${w}" height="120" fill="${A?pal.dark:"#3e2c22"}"/><rect x="${x}" y="${FLOOR-330}" width="20" height="330" fill="#2a1d15"/><rect x="${x+w-20}" y="${FLOOR-330}" width="20" height="330" fill="#2a1d15"/><path d="M ${x} ${FLOOR-330} H ${x+w} V ${FLOOR-250} Q ${x+w/2} ${FLOOR-200} ${x} ${FLOOR-250} Z" fill="#6b5a4a" opacity=".7"/>`;
+    }else if(st.type==="sofa"){
+      const w=st.w||520, c=A?pal.dark:"#4a2f2a";
+      g+=`<rect x="${x}" y="${FLOOR-270}" width="${w}" height="170" rx="26" fill="${shade(c,-.25)}" stroke="#0b0d0c" stroke-width="3"/><rect x="${x-20}" y="${FLOOR-120}" width="${w+40}" height="120" rx="18" fill="${c}" stroke="#0b0d0c" stroke-width="3"/><rect x="${x-40}" y="${FLOOR-180}" width="60" height="180" rx="20" fill="${c}"/><rect x="${x+w-20}" y="${FLOOR-180}" width="60" height="180" rx="20" fill="${c}"/>`;
+    }else if(st.type==="screen"){
+      const w=st.w||300; g+=`<rect x="${x}" y="${FLOOR-300}" width="${w}" height="300" fill="${A?pal.dark:pal.paper}" opacity="${A?1:.35}" stroke="#2a1d15" stroke-width="8"/>`;
+    }
+  }
+  return g;
+}
+function lightSVG(shot,pal,T){
+  if(shot.line==="A"){
+    return `<rect x="-1200" y="-600" width="4000" height="2200" fill="url(#vign)"/>`;
+  }
+  const L=shot.L; let g="";
+  g+=`<rect x="-1200" y="-600" width="4000" height="2200" fill="#000" opacity="${clamp(L.dark,0,.92)}"/>`;
+  if(L.moon) for(const it of DATA.set){ if(it.type!=="window") continue;
+    const x=it.x,w=it.w||300,y=it.y||240,h=it.h||240, d=(L.moonDir||1)*260;
+    g+=`<polygon points="${x},${y} ${x+w},${y} ${x+w+d},${FLOOR+40} ${x+d},${FLOOR+40}" fill="${pal.cool}" opacity=".13" style="mix-blend-mode:screen"/>`;
+    g+=`<rect x="${x}" y="${y}" width="${w}" height="${h}" fill="${pal.cool}" opacity=".22" style="mix-blend-mode:screen"/>`;
+  }
+  for(const it of DATA.set){
+    const st=Object.assign({},it,(it.id&&shot.P[it.id])||{});
+    if(st.type==="candle"&&!st.down&&(st.lit!==undefined?st.lit:L.candle)){
+      const fl=1+Math.sin(T*17)*.04; g+=`<circle cx="${st.x}" cy="${FLOOR-(st.h||150)-70}" r="${520*fl}" fill="url(#candleGlow)" style="mix-blend-mode:screen"/>`;
+    }
+    if(st.type==="lantern") g+=`<circle cx="${st.x}" cy="${st.y||300}" r="360" fill="url(#candleGlow)" style="mix-blend-mode:screen"/>`;
+    if(st.type==="door"&&st.open) g+=`<polygon points="${st.x},${FLOOR-460} ${st.x+(st.w||180)},${FLOOR-460} ${st.x+(st.w||180)},${FLOOR} ${st.x-260},${FLOOR+60}" fill="${pal.warm}" opacity=".12" style="mix-blend-mode:screen"/>`;
+  }
+  return g;
+}
+
+/* ---------- 特效 ---------- */
+function fxSVG(shot,local,pts,pal){
+  let g="";
+  for(const f of shot.fx){
+    const t0=(f.t||0)*shot.dur, age=local-t0; if(age<0||age>.45) continue;
+    let x=f.x,y=f.y;
+    if(f.at){ const [id,part]=String(f.at).split("."); const p=pts[id]; const key={hand:"h1",head:"head",hip:"hip",foot:"f1"}[part]||"h1"; if(p){x=p[key][0];y=p[key][1];} }
+    if(x==null) continue;
+    const k=age/.45, o=1-k;
+    if(f.kind==="impact"){ let pts2=""; for(let i=0;i<16;i++){const r=i%2?38:110*(.6+k*.6);const a=i/16*Math.PI*2;pts2+=`${x+Math.cos(a)*r},${y+Math.sin(a)*r} `;}
+      g+=`<polygon points="${pts2}" fill="#fff6dc" opacity="${o}"/><circle cx="${x}" cy="${y}" r="${60+k*160}" fill="none" stroke="#fff6dc" stroke-width="4" opacity="${o*.7}"/>`; }
+    else if(f.kind==="spark"){ for(let i=0;i<9;i++){const a=i*.7+1,r1=20+k*60,r2=r1+40;g+=`<line x1="${x+Math.cos(a)*r1}" y1="${y+Math.sin(a)*r1}" x2="${x+Math.cos(a)*r2}" y2="${y+Math.sin(a)*r2}" stroke="${pal.warm}" stroke-width="4" opacity="${o}"/>`;} }
+    else if(f.kind==="blood"){ for(let i=0;i<7;i++){const a=-1.2+i*.35;g+=`<circle cx="${x+Math.cos(a)*(30+k*120)}" cy="${y+Math.sin(a)*(30+k*120)+k*k*80}" r="${9-i*.6}" fill="${pal.accent}" opacity="${Math.min(1,o*1.6)}"/>`;} }
+    else if(f.kind==="dust"){ for(let i=0;i<10;i++){const a=i/10*Math.PI*2;g+=`<circle cx="${x+Math.cos(a)*(20+k*90)}" cy="${y+Math.sin(a)*(10+k*40)+k*60}" r="${10+k*14}" fill="#c9c0aa" opacity="${o*.35}"/>`;} }
+    else if(f.kind==="flash"){ g+=`<rect x="-1200" y="-600" width="4000" height="2200" fill="#fff" opacity="${o*.8}"/>`; }
+  }
+  return g;
+}
+
+/* ---------- 插入特写 ---------- */
+function insertSVG(shot,p,T,pal){
+  const I=shot.insert, k=I.kind, e=ease(clamp(p,0,1)); let g="";
+  const bg=`<rect x="0" y="0" width="${W}" height="${H}" fill="${pal.dark}"/>`;
+  if(k==="eye"){
+    const open=I.narrow?lerp(1,.45,e):1, look=(I.look||0)*140*e;
+    g+=bg+`<rect x="0" y="0" width="${W}" height="${H}" fill="${shade("#6b4a36",-.35)}"/>`;
+    g+=`<clipPath id="eyeclip"><path d="M 380 460 Q 800 ${460-240*open} 1220 460 Q 800 ${460+190*open} 380 460 Z"/></clipPath>`;
+    g+=`<path d="M 380 460 Q 800 ${460-240*open} 1220 460 Q 800 ${460+190*open} 380 460 Z" fill="#d8cfbf"/>`;
+    g+=`<g clip-path="url(#eyeclip)"><circle cx="${800+look}" cy="450" r="140" fill="#3a281b"/><circle cx="${800+look}" cy="450" r="62" fill="#090605"/><circle cx="${840+look}" cy="410" r="20" fill="#fff" opacity=".85"/></g>`;
+    g+=`<path d="M 380 460 Q 800 ${460-240*open} 1220 460" fill="none" stroke="#120c08" stroke-width="16"/>`;
+    g+=`<path d="M 420 ${250-60*(1-open)} Q 820 ${150-60*(1-open)} 1200 ${260-40*(1-open)}" fill="none" stroke="#120c08" stroke-width="34" stroke-linecap="round"/>`;
+    if(shot.L.moon) g+=`<rect x="0" y="380" width="${W}" height="120" fill="${pal.cool}" opacity=".16"/>`;
+  }else if(k==="boots"){
+    const s=ease(clamp(p/.6,0,1));
+    g+=bg+`<rect x="0" y="0" width="${W}" height="600" fill="${pal.wall}"/>`;
+    for(let x=0;x<W;x+=200) g+=`<line x1="${x}" y1="0" x2="${x}" y2="600" stroke="${pal.wall2}" stroke-width="12"/>`;
+    g+=`<rect x="0" y="640" width="${W}" height="260" fill="${pal.floor}"/>`;
+    g+=`<rect x="0" y="600" width="${W}" height="40" fill="${pal.warm}" opacity=".9"/><polygon points="0,640 ${W},640 ${W},760 0,760" fill="${pal.warm}" opacity=".12"/>`;
+    for(const [ox,lag] of [[640,0],[880,.12]]){ const x=lerp(1800,ox,ease(clamp((p-lag)/.6,0,1))); g+=`<rect x="${x}" y="598" width="150" height="44" fill="${pal.dark}"/><polygon points="${x},640 ${x+150},640 ${x+190},770 ${x-40},770" fill="${pal.dark}" opacity=".55"/>`; }
+    void s;
+  }else if(k==="draw"){
+    const hx=lerp(1080,1500,e);
+    g+=bg+`<rect x="0" y="0" width="${W}" height="${H}" fill="url(#vignDark)"/>`;
+    g+=`<rect x="${hx-560}" y="438" width="560" height="30" fill="#d9dee2"/><rect x="${hx-560}" y="438" width="560" height="6" fill="#fff" opacity=".7"/>`;
+    if(p>.5){ const gx=lerp(hx-560,hx,clamp((p-.5)/.4,0,1)); g+=`<rect x="${gx-30}" y="430" width="60" height="46" fill="#fff" opacity=".8" transform="skewX(-30)"/>`; }
+    g+=`<rect x="440" y="418" width="660" height="70" rx="10" fill="#2a1d14" stroke="#0b0d0c" stroke-width="4"/><rect x="1060" y="414" width="44" height="78" fill="#b48a3a"/>`;
+    g+=`<rect x="${hx}" y="424" width="40" height="58" fill="#b48a3a"/><rect x="${hx+40}" y="434" width="190" height="38" rx="8" fill="#3b2a1c"/>`;
+    g+=`<ellipse cx="${hx+130}" cy="440" rx="110" ry="58" fill="#c79f7d" stroke="#0b0d0c" stroke-width="4"/>`;
+  }else if(k==="candle"){
+    const out=I.out??.55, lit=p<out, fade=lit?1:clamp(1-(p-out)/.12,0,1), tip=I.tip?lerp(0,72,ease(clamp(p/out,0,1))):0;
+    g+=bg+`<circle cx="800" cy="420" r="${700}" fill="url(#candleGlow)" opacity="${.9*fade+.05}"/>`;
+    g+=`<g transform="rotate(${tip} 800 820)"><rect x="740" y="800" width="120" height="30" fill="#8a6a2e"/><rect x="765" y="470" width="70" height="330" fill="${pal.paper}"/><line x1="800" y1="470" x2="800" y2="440" stroke="#111" stroke-width="5"/>`;
+    if(fade>0){ const fl=(1+Math.sin(T*25)*.1)*fade; g+=`<ellipse cx="800" cy="${405}" rx="${26*fl}" ry="${52*fl}" fill="#ffd77a"/><ellipse cx="800" cy="418" rx="${10*fl}" ry="${22*fl}" fill="#fff6dc"/>`; }
+    if(!lit){ let d=`M 800 440`; for(let i=1;i<12;i++){ d+=` Q ${800+Math.sin(i+T*3)*40} ${440-i*28-14} ${800+Math.sin(i*1.4+T*2)*30} ${440-i*28}`; } g+=`<path d="${d}" fill="none" stroke="#d9d6cf" stroke-width="10" stroke-linecap="round" opacity="${clamp((p-out)*3,0,.6)}"/>`; }
+    g+=`</g>`;
+  }else if(k==="drop"){
+    g+=bg+`<rect x="0" y="560" width="${W}" height="340" fill="${pal.floor}"/>`;
+    for(let i=0;i<6;i++){ const y=560+i*i*11; g+=`<line x1="0" y1="${y}" x2="${W}" y2="${y}" stroke="${pal.floorLine}" stroke-width="4"/>`; }
+    for(let i=-8;i<10;i++) g+=`<line x1="${800+i*90}" y1="560" x2="${800+i*260}" y2="900" stroke="${pal.floorLine}" stroke-width="4"/>`;
+    if(shot.L.moon) g+=`<polygon points="300,560 900,560 1300,900 500,900" fill="${pal.cool}" opacity=".12"/>`;
+    const hit=.35; let y,rot;
+    if(p<hit){ const q=p/hit; y=lerp(-260,690,q*q); rot=lerp(-40,6,q); } else { const q=(p-hit)/(1-hit); y=690-Math.abs(Math.sin(q*Math.PI*2))*90*(1-q)*(1-q); rot=lerp(6,2,q); }
+    g+=`<g transform="translate(800 ${y}) rotate(${rot})"><rect x="-330" y="-14" width="480" height="28" fill="#d8dde0" stroke="#0b0d0c" stroke-width="3"/><rect x="150" y="-26" width="26" height="52" fill="#b48a3a"/><rect x="176" y="-16" width="150" height="32" rx="6" fill="#3b2a1c"/></g>`;
+    if(p>hit&&p<hit+.18){ const o=1-(p-hit)/.18; for(let i=0;i<10;i++){ const a=Math.PI+i*.32; g+=`<line x1="${560+Math.cos(a)*20}" y1="${700+Math.sin(a)*20}" x2="${560+Math.cos(a)*90}" y2="${700+Math.sin(a)*90}" stroke="${pal.warm}" stroke-width="5" opacity="${o}"/>`; } }
+  }else if(k==="hand"){
+    g+=bg+`<rect x="0" y="0" width="${W}" height="${H}" fill="url(#vignDark)"/><rect x="300" y="430" width="1000" height="50" rx="10" fill="#3b2a1c"/>`;
+    for(let i=0;i<4;i++){ const a=lerp(-70,0,e); g+=`<g transform="rotate(${a} ${640+i*70} 380)"><rect x="${612+i*70}" y="360" width="56" height="${150}" rx="26" fill="#c79f7d" stroke="#0b0d0c" stroke-width="4"/></g>`; }
+    g+=`<ellipse cx="760" cy="350" rx="230" ry="80" fill="#c79f7d" stroke="#0b0d0c" stroke-width="4"/>`;
+  }else if(k==="throat"){
+    const sw=p>.4&&p<.65?Math.sin((p-.4)/.25*Math.PI)*40:0;
+    g+=bg+`<path d="M 520 0 L 1080 0 Q 1060 300 1110 900 L 480 900 Q 540 300 520 0 Z" fill="#a7826a"/>`;
+    g+=`<path d="M 520 0 L 1080 0 Q 1060 300 1110 900 L 480 900 Q 540 300 520 0 Z" fill="#000" opacity=".45"/>`;
+    if(shot.L.moon) g+=`<path d="M 800 0 L 1080 0 Q 1060 300 1110 900 L 820 900 Z" fill="${pal.cool}" opacity=".2"/>`;
+    g+=`<ellipse cx="800" cy="${470-sw}" rx="60" ry="40" fill="#8f6d58"/>`;
+    g+=`<rect x="-20" y="520" width="1640" height="44" fill="#d8dde0" stroke="#0b0d0c" stroke-width="4"/><rect x="-20" y="520" width="1640" height="8" fill="#fff" opacity=".7"/>`;
+    const dy=lerp(160,505,e); g+=`<ellipse cx="${1000}" cy="${dy}" rx="11" ry="16" fill="#e8f0f4" opacity=".85"/>`;
+  }else{
+    g+=bg+`<rect x="0" y="0" width="${W}" height="${H}" fill="url(#vignDark)"/><text x="800" y="470" text-anchor="middle" font-family="var(--f-display)" font-size="64" fill="${pal.paper}">${esc(I.label||shot.info||"插入镜头")}</text>`;
+  }
+  if(shot.L.dark>.5&&k!=="candle") g+=`<rect x="0" y="0" width="${W}" height="${H}" fill="#000" opacity="${(shot.L.dark-.5)*.8}"/>`;
+  return g;
+}
+
+/* ---------- 俯视走位（画面内的高机位镜头 & 右侧走位图共用） ---------- */
+function planBody(shot,p,opts){
+  const pl=DATA.plan, sx=opts.sx, ox=opts.ox, oy=opts.oy, pal=PAL[shot.line];
+  const X=x=>ox+x*sx, Y=y=>oy+y*sx;
+  let g=`<rect x="${X(0)}" y="${Y(0)}" width="${pl.w*sx}" height="${pl.h*sx}" fill="${opts.floor||pal.floor}" stroke="${opts.wall||"#5a3a30"}" stroke-width="${opts.thick||10}"/>`;
+  for(let i=1;i<10;i++) g+=`<line x1="${X(0)}" y1="${Y(pl.h*i/10)}" x2="${X(pl.w)}" y2="${Y(pl.h*i/10)}" stroke="${pal.floorLine}" stroke-width="${2*sx}"/>`;
+  if(shot.L.moon&&shot.line!=="A"){ for(let i=0;i<5;i++){ const x0=90+i*80; g+=`<polygon points="${X(x0)},${Y(0)} ${X(x0+45)},${Y(0)} ${X(x0+45+300)},${Y(pl.h)} ${X(x0+300)},${Y(pl.h)}" fill="${pal.cool}" opacity=".16"/>`; } }
+  for(const pr of pl.props||[]){
+    const c=pr.kind==="window"?pal.cool:pr.kind==="door"?"#7a5a3c":pr.kind==="candle"?(shot.L.candle?pal.warm:"#555"):"#5a4030";
+    g+=`<rect x="${X(pr.x)}" y="${Y(pr.y)}" width="${pr.w*sx}" height="${pr.h*sx}" fill="${c}" opacity=".9" stroke="#0b0d0c" stroke-width="${2*sx}"/>`;
+    if(pr.label) g+=`<text x="${X(pr.x+pr.w/2)}" y="${Y(pr.y+pr.h)+22*sx}" text-anchor="middle" font-size="${18*sx}" fill="${opts.text||"#cfc9ba"}" font-family="var(--f-body)">${esc(pr.label)}</text>`;
+  }
+  const pos={};
+  for(const id in shot.planActors){
+    const arr=shot.planActors[id]; if(!arr||!arr.length) continue;
+    const seg=(arr.length-1)*clamp(p,0,1), i=Math.min(arr.length-2,Math.floor(seg)), f=arr.length>1?ease(seg-i):0;
+    const a=arr[Math.max(0,i)], b=arr[Math.min(arr.length-1,i+1)];
+    const cx=lerp(a[0],b[0],f), cy=lerp(a[1],b[1],f); pos[id]=[cx,cy];
+    const def=DATA.actors[id]||{}, col=def.body||"#999";
+    if(arr.length>1){ let d=`M ${X(arr[0][0])} ${Y(arr[0][1])}`; for(let j=1;j<arr.length;j++) d+=` L ${X(arr[j][0])} ${Y(arr[j][1])}`;
+      g+=`<path d="${d}" fill="none" stroke="${col}" stroke-width="${4*sx}" stroke-dasharray="${12*sx} ${10*sx}" opacity=".8"/>`;
+      const l=arr[arr.length-1], m=arr[arr.length-2], an=Math.atan2(l[1]-m[1],l[0]-m[0]);
+      g+=`<polygon points="${X(l[0])},${Y(l[1])} ${X(l[0])-Math.cos(an-.45)*22*sx},${Y(l[1])-Math.sin(an-.45)*22*sx} ${X(l[0])-Math.cos(an+.45)*22*sx},${Y(l[1])-Math.sin(an+.45)*22*sx}" fill="${col}"/>`; }
+    g+=`<circle cx="${X(cx)}" cy="${Y(cy)}" r="${24*sx}" fill="${col}" stroke="#0b0d0c" stroke-width="${3*sx}"/><circle cx="${X(cx)}" cy="${Y(cy)}" r="${10*sx}" fill="${def.sash||"#ddd"}"/>`;
+    g+=`<text x="${X(cx)}" y="${Y(cy)-32*sx}" text-anchor="middle" font-size="${18*sx}" font-weight="700" fill="${opts.text||"#e6e1d3"}" font-family="var(--f-body)">${esc(def.name||id)}</text>`;
+  }
+  return {g,pos,X,Y};
+}
+
+/* ---------- 摄影机 ---------- */
+function cameraFor(shot,p,T,states){
+  const c=shot.cam, z0=SIZES[shot.size]||1.7;
+  const tgt=Array.isArray(c.target)?c.target:(c.target?[c.target]:[]);
+  const at=st=>{ let xs=[],hy=[],hp=[]; for(const id of tgt){ const s=st[id]; if(s){xs.push(s.pts.head[0]);hy.push(s.pts.head[1]);hp.push(s.pts.hip[1]);} } return xs.length?{x:(Math.min(...xs)+Math.max(...xs))/2,head:Math.min(...hy),hip:Math.max(...hp),spread:Math.max(...xs)-Math.min(...xs)}:null; };
+  const live=at(states), ref=(c.move==="track")?live:(states.__mid?at(states.__mid):live)||live;
+  const vert=VH>VW, vz=vert?1.2:1;
+  let z=z0*vz, cx=800, cy=vert?FLOOR-330:450;
+  if(ref){
+    cx=ref.x;
+    if(tgt.length>1) z=Math.min(z,VW/(ref.spread+(vert?260:520)));
+    const zz=z/vz;
+    cy=zz<=1.05?(vert?FLOOR-330:450):zz<2?(ref.head+ref.hip)/2+20:zz<3?ref.head+80:ref.head+10;
+  }
+  if(c.x!=null) cx=c.x; if(c.y!=null) cy=c.y;
+  const e=ease(p), dir=c.dir||1, amt=c.amount||240;
+  if(c.move==="push") z*=lerp(.82,1.14,e);
+  if(c.move==="pull") z*=lerp(1.14,.72,e);
+  if(c.move==="pan") cx+=lerp(-amt,amt,e)*dir;
+  if(c.move==="tilt") cy+=lerp(amt*.6,-amt*.6,e)*dir;
+  if(c.move==="crane"){ cy+=lerp(amt*.5,-amt*.5,e)*dir; z*=lerp(1.08,.9,e); }
+  const lvl=c.move==="static"?0:clamp(c.hh??1,0,3);
+  let amp=[0,4,9,16][Math.round(lvl)]; if(c.settle!=null&&p>c.settle) amp*=.3;
+  if(REDUCED) amp=0;
+  const jx=amp*(Math.sin(T*1.3)+.5*Math.sin(T*2.7+1)), jy=amp*(Math.sin(T*1.1+2)+.5*Math.sin(T*3.1)), jr=amp*.03*Math.sin(T*.9);
+  return {z,cx,cy,jx,jy,jr:jr+(c.dutch||0)};
+}
+function moveOverlay(shot,p){
+  const c=shot.cam, m=c.move; if(m==="static"||m==="handheld") return "";
+  const col="#e9edf0", dir=c.dir||1; let g="";
+  const arrow=(x1,y1,x2,y2)=>{ const a=Math.atan2(y2-y1,x2-x1); return `<line x1="${x1}" y1="${y1}" x2="${x2}" y2="${y2}" stroke="${col}" stroke-width="7"/><polygon points="${x2},${y2} ${x2-Math.cos(a-.5)*30},${y2-Math.sin(a-.5)*30} ${x2-Math.cos(a+.5)*30},${y2-Math.sin(a+.5)*30}" fill="${col}"/>`; };
+  const ty=VH>VW?150:120;
+  if(m==="track"||m==="pan"){ const a=VW*.74,b=VW*.35,c=VW*.26,d=VW*.65; g+=dir<0?arrow(a,ty,b,ty):arrow(c,ty,d,ty); g+=`<text x="${dir<0?b:c}" y="${ty+52}" font-size="32" font-family="var(--f-mono)" font-weight="600" fill="${col}">${MOVE_EN[m]}</text>`; }
+  else if(m==="tilt"||m==="crane"){ const y1=VH*.25,y2=VH*.73; g+=dir<0?arrow(80,y1,80,y2):arrow(80,y2,80,y1); g+=`<text x="50" y="${y2+60}" font-size="32" font-family="var(--f-mono)" font-weight="600" fill="${col}">${MOVE_EN[m]}</text>`; }
+  else { const s=m==="push"?lerp(0,40,p):lerp(40,0,p);
+    for(const [x,y,sx,sy] of [[80,100,1,1],[VW-80,100,-1,1],[80,VH-80,1,-1],[VW-80,VH-80,-1,-1]]){ const ox=x+sx*s, oy=y+sy*s; g+=`<path d="M ${ox} ${oy+sy*70} V ${oy} H ${ox+sx*70}" fill="none" stroke="${col}" stroke-width="7"/>`; }
+    g+=`<text x="${VW/2}" y="${ty+10}" text-anchor="middle" font-size="32" font-family="var(--f-mono)" font-weight="600" fill="${col}">${MOVE_EN[m]}</text>`; }
+  return `<g opacity=".85">${g}</g>`;
+}
+
+/* ---------- 每帧绘制 ---------- */
+const stage=$("stage");
+let showOverlay=true;
+const DEFS=`<defs>
+<radialGradient id="candleGlow"><stop offset="0" stop-color="#ffcf6e" stop-opacity=".55"/><stop offset=".35" stop-color="#e3a548" stop-opacity=".22"/><stop offset="1" stop-color="#e3a548" stop-opacity="0"/></radialGradient>
+<radialGradient id="vign" cx=".5" cy=".45" r=".75"><stop offset="0" stop-color="#fff6dc" stop-opacity=".55"/><stop offset=".6" stop-color="#e3c58b" stop-opacity="0"/><stop offset="1" stop-color="#5a3412" stop-opacity=".55"/></radialGradient>
+<radialGradient id="vignDark" cx=".5" cy=".5" r=".7"><stop offset="0" stop-color="#3a3326" stop-opacity=".9"/><stop offset="1" stop-color="#000" stop-opacity="0"/></radialGradient>
+</defs>`;
+function shotAt(t){ for(const s of SHOTS) if(t<s.end) return s; return SHOTS[SHOTS.length-1]; }
+function actorStates(shot,p,T,silhouette){
+  const out={};
+  for(const id in shot.acts){ const def=DATA.actors[id]; if(!def) continue; const st=sampleActor(shot.acts[id],p,T); if(st) out[id]=puppet(def,st,silhouette,id); }
+  return out;
+}
+function fit16x9(inner,pal,isPlan){
+  if(VH<=VW) return inner;
+  const s=isPlan?VW/1300:VW/860, tx=VW/2-800*s, ty=VH/2-450*s;
+  return `<rect x="0" y="0" width="${VW}" height="${VH}" fill="${pal.dark}"/><g transform="translate(${tx} ${ty}) scale(${s})">${inner}</g>`;
+}
+function render(t){
+  const shot=shotAt(t), local=t-shot.start, p=clamp(local/shot.dur,0,1), pal=PAL[shot.line], T=t;
+  let body="";
+  if(shot.view==="side"){
+    const sil=shot.line==="A";
+    const states=actorStates(shot,p,T,sil);
+    states.__mid=actorStates(shot,.5,shot.start+shot.dur/2,sil);
+    const cam=cameraFor(shot,p,T,states); delete states.__mid;
+    let world=setSVG(shot,pal,T);
+    // 运动轨迹提示
+    if(showOverlay) for(const id in shot.acts){ const k=shot.acts[id]; if(k.length<2) continue; const x0=k[0].x,x1=k[k.length-1].x; if(x0==null||x1==null||Math.abs(x1-x0)<60) continue; const y=FLOOR-26, col=(DATA.actors[id]||{}).sash||"#fff";
+      world+=`<path d="M ${x0} ${y} Q ${(x0+x1)/2} ${y-70} ${x1} ${y}" fill="none" stroke="${col}" stroke-width="6" stroke-dasharray="20 14" opacity=".75"/><polygon points="${x1},${y} ${x1-Math.sign(x1-x0)*30},${y-18} ${x1-Math.sign(x1-x0)*24},${y+14}" fill="${col}" opacity=".85"/>`; }
+    for(const id in states) world+=states[id].svg;
+    world+=lightSVG(shot,pal,T);
+    const pts={}; for(const id in states) pts[id]=states[id].pts;
+    world+=fxSVG(shot,local,pts,pal);
+    body=`<g transform="translate(${VW/2+cam.jx} ${VH/2+cam.jy}) rotate(${cam.jr}) scale(${cam.z}) translate(${-cam.cx} ${-cam.cy})">${world}</g>`;
+  }else if(shot.view==="insert"){
+    const cam=cameraFor(shot,p,T,{});
+    body=fit16x9(`<g transform="translate(${cam.jx} ${cam.jy}) rotate(${cam.jr} 800 450)">${insertSVG(shot,p,T,pal)}</g>`,pal);
+  }else{
+    const cam=cameraFor(shot,p,T,{});
+    const pb=planBody(shot,p,{sx:1.25,ox:175,oy:80,thick:14});
+    body=fit16x9(`<rect x="0" y="0" width="${W}" height="${H}" fill="${pal.dark}"/><g transform="translate(${cam.jx} ${cam.jy}) rotate(${(VH>VW?0:-8)+cam.jr} 800 450)">${pb.g}</g>`,pal,true);
+    if(shot.L.dark>.4) body+=`<rect x="0" y="0" width="${VW}" height="${VH}" fill="#000" opacity="${(shot.L.dark-.4)*.6}"/>`;
+  }
+  let hud="";
+  const asp=DATA.meta.aspect;
+  if(asp&&asp!=="16:9"){ const r=parseFloat(asp.split(":")[0])/parseFloat(asp.split(":")[1]||1); if(r>16/9){ const vh=VW/r, bar=(VH-vh)/2; hud+=`<rect x="0" y="0" width="${VW}" height="${bar}" fill="#000"/><rect x="0" y="${VH-bar}" width="${VW}" height="${bar}" fill="#000"/>`; } }
+  if(showOverlay){
+    hud+=moveOverlay(shot,p);
+    const label=`SHOT ${pad2(shot.i+1)}  ${shot.lens||""} · ${shot.size||""} · ${shot.angle||""}${shot.line!==DATA.meta.line?" · "+styleName(shot.line):""}`;
+    hud+=`<rect x="24" y="22" width="${Math.min(VW-48,label.length*19+40)}" height="46" rx="4" fill="#000" opacity=".45"/><text x="44" y="54" font-size="24" font-family="var(--f-mono)" font-weight="600" fill="#e9edf0" letter-spacing="1">${esc(label)}</text>`;
+    if(shot.tags.includes("slowmo")) hud+=`<rect x="${VW-200}" y="${VH>VW?80:22}" width="176" height="46" rx="4" fill="#e3b34c"/><text x="${VW-112}" y="${VH>VW?112:54}" text-anchor="middle" font-size="24" font-family="var(--f-body)" font-weight="700" fill="#1a1405">升格 慢动作</text>`;
+  }
+  stage.innerHTML=DEFS+body+hud;
+  return shot;
+}
+
+/* ---------- 俯视走位图（右侧卡片） ---------- */
+const planEl=$("plan");
+function renderPlan(shot,p){
+  const pb=planBody(shot,p,{sx:1,ox:0,oy:0,floor:"#141a18",wall:"#4a3a30",thick:8,text:"#cfc9ba"});
+  let g=pb.g, note="";
+  const ids=Object.keys(pb.pos);
+  if(ids.length>=2){ const a=pb.pos[ids[0]], b=pb.pos[ids[1]], dx=b[0]-a[0], dy=b[1]-a[1], L=Math.hypot(dx,dy)||1, ux=dx/L, uy=dy/L;
+    g+=`<line x1="${a[0]-ux*900}" y1="${a[1]-uy*900}" x2="${b[0]+ux*900}" y2="${b[1]+uy*900}" stroke="#e3b34c" stroke-width="2" stroke-dasharray="8 8" opacity=".55"/>`;
+    g+=`<text x="${(a[0]+b[0])/2+uy*20}" y="${(a[1]+b[1])/2-ux*20-14}" font-size="16" fill="#e3b34c" font-family="var(--f-body)" text-anchor="middle">轴线</text>`; }
+  if(shot.planCam&&shot.view!=="plan"){
+    const [cx,cy,dir]=shot.planCam, f=parseFloat(shot.lens)||35, half=Math.atan(18/f), R=300, a=rad(dir-90);
+    g+=`<path d="M ${cx} ${cy} L ${cx+Math.cos(a-half)*R} ${cy+Math.sin(a-half)*R} A ${R} ${R} 0 0 1 ${cx+Math.cos(a+half)*R} ${cy+Math.sin(a+half)*R} Z" fill="#a7c3d4" opacity=".14" stroke="#a7c3d4" stroke-opacity=".5"/>`;
+    g+=`<g transform="translate(${cx} ${cy}) rotate(${dir})"><rect x="-20" y="-14" width="40" height="34" rx="4" fill="#a7c3d4"/><polygon points="-12,-14 12,-14 18,-30 -18,-30" fill="#a7c3d4"/></g>`;
+    g+=`<text x="${cx}" y="${cy+48}" text-anchor="middle" font-size="15" fill="#a7c3d4" font-family="var(--f-mono)">CAM ${esc(shot.lens||"")}</text>`;
+  }
+  planEl.innerHTML=g;
+  if(shot.view==="plan") note="本镜就是高机位俯视镜头。";
+  else if(!shot.planCam) note="本镜没有标注机位。";
+  else note=`机位朝向 ${shot.planCam[2]}°，${shot.lens||""}约 ${Math.round(2*Math.atan(18/(parseFloat(shot.lens)||35))*180/Math.PI)}° 水平视角。`;
+  const cross=axisCheck(shot); if(cross) note+=" "+cross;
+  $("plan-note").textContent=note;
+}
+function axisCheck(shot){
+  if(!shot.planCam||shot.view!=="side") return "";
+  const ids=Object.keys(shot.planActors).slice(0,2); if(ids.length<2) return "";
+  let prev=null; for(let i=shot.i-1;i>=0;i--){ const s=SHOTS[i]; if(s.view==="side"&&s.planCam){prev=s;break;} }
+  if(!prev) return "";
+  const side=(s)=>{ const a=s.planActors[ids[0]], b=s.planActors[ids[1]]; if(!a||!b) return 0; const A=a[a.length-1], B=b[b.length-1], C=s.planCam; return Math.sign((B[0]-A[0])*(C[1]-A[1])-(B[1]-A[1])*(C[0]-A[0])); };
+  const s1=side(prev), s2=side(shot); if(!s1||!s2) return "";
+  return s1!==s2?`⚠ 与上一个实景镜头（shot ${prev.i+1}）相比机位越过了轴线。`:"";
+}
+
+/* ---------- 镜头信息卡 ---------- */
+function renderShotCard(shot){
+  $("shot-title").innerHTML=`shot${shot.i+1} <span class="tag">${fmt(shot.start)}—${fmt(shot.end)} s · ${shot.dur.toFixed(1)} 秒</span>`;
+  const c=shot.cam, chips=[];
+  chips.push(`<span class="chip">${esc(styleName(shot.line))}</span>`);
+  if(shot.tags.includes("key")) chips.push(`<span class="chip ok">关键镜</span>`);
+  if(shot.tags.includes("slowmo")) chips.push(`<span class="chip ok">升格</span>`);
+  const ax=axisCheck(shot); if(ax) chips.push(`<span class="chip warn">越轴</span>`);
+  const hh=c.move==="static"?"固定机位":["手持定点 · 几乎静止","轻微手持","贴身肩扛","近身跟拍"][clamp(Math.round(c.hh??1),0,3)];
+  const rows=[
+    ["镜头",`${esc(shot.lens||"—")} · ${esc(shot.size||"—")} · ${esc(shot.angle||"—")}`],
+    ["运镜",`${esc(MOVE_CN[c.move])}${c.dir&&(c.move==="track"||c.move==="pan")?(c.dir<0?"（向画左）":"（向画右）"):""} · ${hh}${c.settle!=null?` · ${Math.round(c.settle*100)}% 处落定`:""}`],
+    ["画面信息",esc(shot.info||"—")],
+    ["留下的问题",esc(shot.q||"—")],
+    ["动作",esc(shot.action||"—")],
+    ["声音",esc(shot.audio||"—")],
+    ["标记",chips.join("")]
+  ];
+  $("shot-kv").innerHTML=rows.map(([k,v])=>`<dt>${k}</dt><dd>${v}</dd>`).join("");
+}
+
+/* ---------- 时间轴 ---------- */
+const track=$("track");
+function buildTimeline(){
+  let h="";
+  for(const s of SHOTS){
+    const cls=["seg"]; if(s.tags.includes("key")) cls.push("key"); if(s.tags.includes("slowmo")) cls.push("slowmo"); if(s.view==="insert") cls.push("insert"); if(s.L.dark>=.6&&!s.tags.length) cls.push("dark");
+    h+=`<div class="${cls.join(" ")}" data-i="${s.i}" style="width:${s.dur/TOTAL*100}%;--linec:${PAL[s.line].strip}" title="shot${s.i+1} ${esc(s.beat||"")}">${s.i+1}</div>`;
+  }
+  track.innerHTML=h+`<div class="progress" id="progress"></div><div class="playhead" id="playhead"></div>`;
+  track.setAttribute("aria-valuemax",TOTAL.toFixed(1));
+  const step=TOTAL>60?10:TOTAL>20?5:2; let tk="";
+  for(let s=0;s<=TOTAL+1e-6;s+=step) tk+=`<span style="left:${s/TOTAL*100}%">${s}s</span>`;
+  $("ticks").innerHTML=tk;
+}
+function seekFromEvent(ev){ const r=track.getBoundingClientRect(); setTime(clamp((ev.clientX-r.left)/r.width,0,1)*TOTAL); }
+track.addEventListener("pointerdown",ev=>{ track.setPointerCapture(ev.pointerId); seekFromEvent(ev); const mv=e=>seekFromEvent(e); const up=()=>{track.removeEventListener("pointermove",mv);track.removeEventListener("pointerup",up);}; track.addEventListener("pointermove",mv); track.addEventListener("pointerup",up); });
+track.addEventListener("keydown",ev=>{ if(ev.key==="ArrowRight"){setTime(time+.5);ev.preventDefault();} if(ev.key==="ArrowLeft"){setTime(time-.5);ev.preventDefault();} });
+
+/* ---------- 表格与导出 ---------- */
+function buildTable(){
+  $("tbody").innerHTML=SHOTS.map(s=>`<tr data-i="${s.i}" tabindex="0"><td class="num">${s.i+1}</td><td class="num">${fmt(s.start)}—${fmt(s.end)}<br><span style="color:var(--muted)">${s.dur.toFixed(1)}s</span></td><td>${esc(s.lens||"")}<br>${esc(s.size||"")} · ${esc(s.angle||"")}</td><td>${esc(MOVE_CN[s.cam.move])}</td><td>${esc(s.info||"")}</td><td>${esc(s.q||"")}</td><td>${esc(s.audio||"")}</td></tr>`).join("");
+  const sec=v=>(+v.toFixed(1)).toString();
+  const head="| 镜号 | 时长 | 画面 | 信息 | 景别与信息类型 | 留下的问题 |\n| --- | --- | --- | --- | --- | --- |\n";
+  const kind=s=>({"大全景":"局势","全景":"局势","中全景":"交互","中景":"交互","中近景":"判断","近景":"判断","特写":"因果物","大特写":"转折"})[s.size]||"—";
+  $("out-table").textContent=head+SHOTS.map(s=>`| ${s.i+1} | ${sec(s.dur)}秒 | ${(s.action||"").replace(/\|/g,"／")} | ${s.info||""} | ${s.size||""}·${kind(s)} | ${s.q||""} |`).join("\n");
+  $("out-camera").textContent="【CAMERA】"+SHOTS.map(s=>{
+    const c=s.cam, mv=c.move==="static"?"固定机位":c.move==="handheld"?["手持定点，几乎静止","轻微手持，画面带呼吸般的细微起伏","贴身肩扛跟随","近身手持跟拍"][clamp(Math.round(c.hh??1),0,3)]:`手持${MOVE_CN[c.move]}`;
+    const settle=c.settle!=null&&c.move!=="static"?`，约在本镜${Math.round(c.settle*100)}%处稳住`:"";
+    const ln=s.line!==DATA.meta.line?`，${styleName(s.line)}`:"";
+    return `shot${s.i+1}（${sec(s.start)}—${sec(s.end)}秒${ln}）：${s.lens||""}${s.size||""}，${s.angle||""}，${mv}${settle}。${s.action||s.info||""}`;
+  }).join("");
+}
+document.addEventListener("click",ev=>{
+  const b=ev.target.closest("[data-copy]"); if(!b) return;
+  const txt=$(b.dataset.copy).textContent; copyText(txt,b);
+});
+function copyText(txt,btn){
+  const done=()=>{const o=btn.textContent;btn.textContent="已复制";setTimeout(()=>btn.textContent=o,1400);};
+  const fallback=()=>{ const r=document.createRange(); const el=btn.closest(".out")?.querySelector("pre")||$("json"); if(el.tagName==="TEXTAREA"){el.select();}else{r.selectNodeContents(el);const s=getSelection();s.removeAllRanges();s.addRange(r);} btn.textContent="已选中，按 Ctrl+C"; setTimeout(()=>btn.textContent="复制",2000); };
+  try{ navigator.clipboard.writeText(txt).then(done,fallback); }catch(e){ fallback(); }
+}
+$("tbody").addEventListener("click",ev=>{ const tr=ev.target.closest("tr"); if(tr) gotoShot(+tr.dataset.i); });
+$("tbody").addEventListener("keydown",ev=>{ if(ev.key==="Enter"){const tr=ev.target.closest("tr"); if(tr) gotoShot(+tr.dataset.i);} });
+
+/* ---------- 播放 ---------- */
+let time=0, playing=false, last=0, speed=1, loop=false, curShot=-1;
+function setTime(t){ time=clamp(t,0,Math.max(0,TOTAL-1e-4)); draw(); }
+function gotoShot(i){ if(!SHOTS.length) return; i=clamp(i,0,SHOTS.length-1); setTime(SHOTS[i].start+1e-3); }
+function draw(){
+  if(!SHOTS.length){ renderEmpty(); return; }
+  const shot=render(time), p=clamp((time-shot.start)/shot.dur,0,1);
+  renderPlan(shot,p);
+  $("clock").innerHTML=`${fmt(time)} <small>/ ${fmt(TOTAL)} s</small>`;
+  $("beat").innerHTML=`<b>${esc(shot.beat||shot.info||"")}</b>${shot.cam.move!=="static"?" · "+esc(MOVE_CN[shot.cam.move]):""}`;
+  const pct=time/TOTAL*100; $("playhead").style.left=pct+"%"; $("progress").style.width=pct+"%";
+  track.setAttribute("aria-valuenow",time.toFixed(1));
+  if(shot.i!==curShot){ curShot=shot.i; renderShotCard(shot);
+    track.querySelectorAll(".seg").forEach(el=>el.classList.toggle("active",+el.dataset.i===shot.i));
+    document.querySelectorAll("#tbody tr").forEach(el=>el.classList.toggle("active",+el.dataset.i===shot.i)); }
+}
+function tick(now){
+  if(!playing) return;
+  const dt=Math.min(.1,(now-last)/1000); last=now;
+  time+=dt*speed;
+  if(time>=TOTAL){ if(loop) time=0; else { time=TOTAL-1e-4; setPlaying(false); } }
+  draw(); if(playing) requestAnimationFrame(tick);
+}
+function setPlaying(v){ if(v&&!SHOTS.length) return; playing=v; $("btn-play").textContent=v?"暂停":"播放"; if(v){ if(time>=TOTAL-.01) time=0; last=performance.now(); requestAnimationFrame(tick);} }
+$("btn-play").onclick=()=>setPlaying(!playing);
+$("btn-restart").onclick=()=>{ setTime(0); };
+$("btn-prev").onclick=()=>{ if(!SHOTS.length) return; const s=shotAt(time); gotoShot(time-s.start>.4?s.i:s.i-1); };
+$("btn-next").onclick=()=>{ if(SHOTS.length) gotoShot(shotAt(time).i+1); };
+$("speed").onchange=e=>{ speed=+e.target.value; };
+$("btn-loop").onclick=e=>{ loop=!loop; e.currentTarget.setAttribute("aria-pressed",loop); };
+$("btn-overlay").onclick=e=>{ showOverlay=!showOverlay; e.currentTarget.setAttribute("aria-pressed",showOverlay); draw(); };
+document.addEventListener("keydown",ev=>{
+  if(ev.target.closest("textarea,input,select")) return;
+  if(ev.key===" "){ ev.preventDefault(); setPlaying(!playing); }
+  else if(ev.key==="ArrowRight"&&ev.target!==track){ $("btn-next").click(); }
+  else if(ev.key==="ArrowLeft"&&ev.target!==track){ $("btn-prev").click(); }
+  else if(ev.key==="Home"){ setTime(0); }
+});
+
+/* ---------- 标签页 ---------- */
+const tabs=[["tab-list","panel-list"],["tab-prompt","panel-prompt"],["tab-data","panel-data"]];
+tabs.forEach(([t,p])=>$(t).addEventListener("click",()=>{ tabs.forEach(([t2,p2])=>{ $(t2).setAttribute("aria-selected",t2===t); $(p2).hidden=p2!==p; }); }));
+
+/* ---------- 空白状态：还没有分镜时只显示「题干」 ---------- */
+function setTransport(on){ ["btn-play","btn-restart","btn-prev","btn-next","btn-loop","btn-overlay","speed"].forEach(id=>{ $(id).disabled=!on; }); }
+function showEmpty(){
+  setPlaying(false); DATA=null; SHOTS=[]; TOTAL=0; curShot=-1; setTransport(false);
+  const asp=$("aspect-opt").value, vert=asp==="9:16"; VW=vert?900:1600; VH=vert?1600:900;
+  stage.setAttribute("viewBox",`0 0 ${VW} ${VH}`); stage.style.aspectRatio=`${VW}/${VH}`;
+  document.querySelector(".stage-box").classList.toggle("vertical",vert);
+  $("eyebrow").innerHTML="";
+  $("title").textContent="分镜预览台"; document.title="分镜预览台";
+  $("summary").innerHTML=`<span class="spec">还没有分镜</span>粘贴或打开剧本，按场次自动拆镜，再用人偶或你自己的角色形象预演走位、景别、运镜与灯光。`;
+  track.innerHTML=`<div class="seg" style="width:100%;justify-content:center;align-items:center;padding:0">导入剧本后，这里按时长排出每一镜</div>`;
+  $("ticks").innerHTML=""; track.setAttribute("aria-valuemax","0");
+  $("clock").innerHTML=`00.0 <small>/ 00.0 s</small>`; $("beat").textContent="";
+  $("shot-title").innerHTML=`镜头 <span class="tag">导入后显示当前镜头</span>`;
+  $("shot-kv").innerHTML=[["1","在下方「剧本 → 分镜」粘贴剧本，或打开 PDF / Word / TXT 文件"],["2","选择画面风格和画幅，点「拆分场次并生成预览」"],["3","上传角色的定妆照或立绘，人偶会换成你的角色"],["4","播放、逐镜检查，在「分镜数据」里微调，在「提示词导出」里复制"]].map(([k,v])=>`<dt>第 ${k} 步</dt><dd>${v}</dd>`).join("");
+  planEl.innerHTML=`<rect x="0" y="0" width="1000" height="600" fill="#141a18" stroke="#4a3a30" stroke-width="8" stroke-dasharray="18 12"/><text x="500" y="310" text-anchor="middle" font-size="26" fill="#8f978f" font-family="var(--f-body)">人物走位、机位与轴线会画在这里</text>`;
+  $("plan-note").textContent="";
+  $("tbody").innerHTML=`<tr><td colspan="7" style="color:var(--muted);cursor:default">导入剧本后，这里列出每一镜的时码、镜头、运镜、画面信息、留下的问题和声音。</td></tr>`;
+  $("out-table").textContent="导入剧本并生成分镜后，这里会出现信息清单表。";
+  $("out-camera").textContent="导入剧本并生成分镜后，这里会出现逐镜正文。";
+  renderEmpty();
+}
+function renderEmpty(){
+  const c="#3a4540", t="#8f978f", cx=VW/2, cy=VH/2;
+  let g=`<rect x="0" y="0" width="${VW}" height="${VH}" fill="#0b0e0d"/>`;
+  for(let i=1;i<3;i++){ g+=`<line x1="${VW*i/3}" y1="0" x2="${VW*i/3}" y2="${VH}" stroke="${c}" stroke-width="2" stroke-dasharray="10 14"/><line x1="0" y1="${VH*i/3}" x2="${VW}" y2="${VH*i/3}" stroke="${c}" stroke-width="2" stroke-dasharray="10 14"/>`; }
+  for(const [x,y,sx,sy] of [[60,60,1,1],[VW-60,60,-1,1],[60,VH-60,1,-1],[VW-60,VH-60,-1,-1]]) g+=`<path d="M ${x} ${y+sy*80} V ${y} H ${x+sx*80}" fill="none" stroke="#e3b34c" stroke-width="6"/>`;
+  g+=`<text x="${cx}" y="${cy-20}" text-anchor="middle" font-size="${VH>VW?52:60}" font-weight="700" fill="#e6e1d3" font-family="var(--f-display)">还没有分镜</text>`;
+  g+=`<text x="${cx}" y="${cy+50}" text-anchor="middle" font-size="${VH>VW?30:32}" fill="${t}" font-family="var(--f-body)">在下方粘贴或打开剧本，生成后在这里播放</text>`;
+  g+=`<text x="${cx}" y="${cy+110}" text-anchor="middle" font-size="24" fill="#5d6862" font-family="var(--f-mono)">画幅 ${VH>VW?"9:16":$("aspect-opt").value}</text>`;
+  stage.innerHTML=g;
+}
+
+/* ---------- 数据编辑 ---------- */
+const DRAFT_KEY="storyboard-previewer-draft";
+function load(raw,{save}={}){
+  const d=normalize(raw);
+  DATA=d; SHOTS=d.shots; TOTAL=d.total; LINE=d.meta.line; curShot=-1;
+  setTransport(true);
+  const ar=String(d.meta.aspect||"16:9").split(/[:：]/).map(Number), ratio=ar[0]/(ar[1]||1);
+  if(ratio<1){ VW=900; VH=1600; } else { VW=1600; VH=900; }
+  stage.setAttribute("viewBox",`0 0 ${VW} ${VH}`); stage.style.aspectRatio=`${VW}/${VH}`;
+  document.querySelector(".stage-box").classList.toggle("vertical",VH>VW);
+  const m=d.meta;
+  $("eyebrow").innerHTML=[`<b>${esc(styleName(m.line))}</b>`,m.place,m.time].filter(Boolean).map(x=>`<span>${x.startsWith("<b>")?x:esc(x)}</span>`).join("");
+  $("title").textContent=m.title; document.title=m.title+" · 分镜动态预览";
+  $("summary").innerHTML=`<span class="spec">${fmt(TOTAL).replace(/^0/,"")} 秒 · ${SHOTS.length} 镜 · ${esc(m.aspect||"16:9")} · ${esc(m.fps||24)}fps</span>${esc(m.summary||"")}`;
+  buildTimeline(); buildTable(); setTime(0);
+  $("json").value=JSON.stringify(raw,null,2);
+  if(save){ try{localStorage.setItem(DRAFT_KEY,JSON.stringify(raw));}catch(e){} }
+}
+function msg(t,ok){ const m=$("msg"); m.textContent=t; m.className="msg "+(ok?"ok":"err"); }
+$("btn-apply").onclick=()=>{
+  let raw; try{ raw=JSON.parse($("json").value); }catch(e){ msg("JSON 格式有误："+e.message+"。检查逗号、引号和括号是否成对。",false); return; }
+  try{ setPlaying(false); load(raw,{save:true}); onBoardApplied(raw); msg(`已应用：${SHOTS.length} 镜，共 ${TOTAL.toFixed(1)} 秒。`,true); }catch(e){ msg(e.message,false); }
+};
+$("btn-copyjson").onclick=e=>copyText($("json").value,e.currentTarget);
+$("btn-import").onclick=()=>$("file").click();
+$("file").onchange=e=>{ const f=e.target.files[0]; if(!f) return; const r=new FileReader(); r.onload=()=>{ $("json").value=r.result; $("btn-apply").click(); }; r.readAsText(f); e.target.value=""; };
+const BLANK_TEMPLATE={
+  meta:{title:"（片名 / 场次名）",line:"N",place:"（地点）",time:"（日 / 夜）",aspect:"16:9",fps:24,summary:"（一句话概述本场）"},
+  actors:{a:{name:"（人物 1）",body:"#5f707a",legs:"#2a3034",sash:"#c7362c",skin:"#e6cfb1",hair:"short"},
+          b:{name:"（人物 2）",body:"#82603f",legs:"#3a2c20",sash:"#d1a640",skin:"#d8b48f",hair:"long"}},
+  set:[{type:"window",x:160,w:330,y:230,h:250},{type:"door",id:"door",x:1450,w:190}],
+  plan:{w:1000,h:600,props:[{label:"（道具）",x:400,y:250,w:200,h:80}]},
+  shots:[{dur:2,view:"side",lens:"24mm",size:"全景",angle:"平视",cam:{move:"handheld",hh:1},
+    acts:{a:[{t:0,x:500,pose:"stand",face:1}],b:[{t:0,x:1000,pose:"stand",face:-1}]},
+    plan:{actors:{a:[[300,320]],b:[[600,320]]},cam:[450,560,0]},
+    beat:"（短标签）",info:"（这一镜交代的信息）",q:"（留下的问题）",action:"（动作描述）",audio:"（声音 / 对白）"}]
+};
+$("btn-sample").onclick=()=>{ $("json").value=JSON.stringify(BLANK_TEMPLATE,null,2); msg("已填入空白模板：把括号里的内容换成你的，再点「应用」。",true); };
+$("btn-draft").onclick=()=>{ try{ const d=localStorage.getItem(DRAFT_KEY); if(d){ $("json").value=JSON.stringify(JSON.parse(d),null,2); $("btn-apply").click(); } }catch(e){ msg("草稿读取失败。",false); } };
+try{ if(localStorage.getItem(DRAFT_KEY)) $("btn-draft").hidden=false; }catch(e){}
+
+/* =====================================================================
+   剧本导入：拆分场次 → 快速拆镜（本地规则）/ Claude 拆镜 → 预览
+   ===================================================================== */
+const SCRIPT_HINT=`支持这样的格式（各段都可省略）：
+
+第1场　地点　日/夜　内/外
+人物：人物A、人物B
+
+△：画面动作写在这里。
+人物A：（情绪）台词。
+旁白：画外音。
+
+也可以直接打开剧本文件。`;
+
+const PROJECT_KEY="storyboard-previewer-project";
+let project=null;
+function defaultProject(){ return {text:"",cur:0,scenes:[],assets:{}}; }
+let warnedQuota=false;
+function saveProject(){
+  try{ localStorage.setItem(PROJECT_KEY,JSON.stringify(project)); return true; }
+  catch(e){ if(!warnedQuota){ warnedQuota=true; genMsg("浏览器本地存储已满（多半是角色图片太多太大），这次的修改只保留到关闭页面为止。",false); } return false; }
+}
+function onBoardApplied(raw){ const sc=project&&project.scenes[project.cur]; if(sc){ sc.board=raw; sc.source=sc.source==="claude"?"claude":"edited"; saveProject(); renderScenes(); } }
+
+/* ---------- 场次切分 ---------- */
+const NUM="0-9０-９一二三四五六七八九十百零〇两";
+function isHeading(line){
+  const t=line.trim(); if(!t||t.length>48) return false;
+  if(new RegExp(`^第\\s*[${NUM}]+\\s*[场幕集节回]`).test(t)) return true;
+  if(/^(INT|EXT|I\/E)[.\s]/i.test(t)) return true;
+  if(/^#{1,3}\s/.test(t)) return true;
+  if(/^【[^】]{1,40}】$/.test(t)) return true;
+  if(new RegExp(`^(场景?|SCENE)\\s*[${NUM}]+`,"i").test(t)) return true;
+  if(/^[0-9０-９]+([-－.．][0-9０-９]+)?[\s、.．]/.test(t)&&/(日|夜|晨|昏|内|外|INT|EXT)/i.test(t)) return true;
+  return false;
+}
+const TIMEJUMP=new RegExp(`^(?:旁白\\s*[：:]\\s*|△\\s*[：:]?\\s*)?((?:第二天|次日|翌日|当晚|深夜|清晨|与此同时|多年[后前]|[${NUM}]+(?:年|个月|天|周|小时)[后前])[^，,。]{0,6})`);
+function stripMark(l){ return l.replace(/^\s*(?:旁白|△)\s*[：:]?\s*/,""); }
+function isMetaText(text){
+  const lines=text.split("\n");
+  const dlg=lines.filter(l=>/^\s*△/.test(l)||(DIALOG_RE.test(l)&&!META_WORDS.has((DIALOG_RE.exec(l)||[])[1])&&!/^(姓名|性别|身份|外貌|性格|结局|体型|人物背景|日常穿搭|身份职业|核心执念|标志性|故事中的|外貌气质|性格特质)/.test(l.trim()))).length;
+  return /姓名\s*[：:]|人物小传|故事梗概|人物介绍|角色设定/.test(text)&&dlg<3;
+}
+function splitScenes(text){
+  const lines=text.replace(/\r\n?/g,"\n").split("\n"); const out=[]; let cur=null;
+  for(const l of lines){
+    if(isHeading(l)){ cur={title:l.trim().replace(/^#+\s*/,"").replace(/^【|】$/g,""),base:null,lines:[]}; cur.base=cur.title; out.push(cur); continue; }
+    const tj=TIMEJUMP.exec(l.trim());
+    if(tj&&cur&&cur.lines.filter(x=>x.trim()).length>=2){ cur={title:`${cur.base||cur.title||"段落"} · ${tj[1].slice(0,8)}`,base:cur.base||cur.title,lines:[l]}; out.push(cur); continue; }
+    if(!cur){ cur={title:"",base:"",lines:[]}; out.push(cur); }
+    cur.lines.push(l);
+  }
+  const sc=out.map(s=>({title:s.title,text:(s.title&&!/ · /.test(s.title)?s.title+"\n":"")+s.lines.join("\n").trim()})).filter(s=>s.text.replace(s.title,"").trim());
+  const seen={};
+  sc.forEach((s,i)=>{
+    if(!s.title){ const first=s.text.split("\n").find(x=>x.trim())||""; s.title=i===0&&sc.length>1?"开场":(first.trim().slice(0,16)||`第${i+1}段`); }
+    s.meta=isMetaText(s.text);
+    if(s.meta) s.title="资料 · "+(s.title==="开场"?"人物与梗概":s.title);
+    seen[s.title]=(seen[s.title]||0)+1; if(seen[s.title]>1) s.title+=`（${seen[s.title]}）`;
+  });
+  return sc;
+}
+
+/* ---------- 快速拆镜（本地规则） ---------- */
+const DIALOG_RE=/^\s*([一-龥A-Za-z·]{1,8})\s*(?:[（(]([^）)]*)[）)])?\s*[：:]\s*(.+)$/;
+const META_WORDS=new Set(["场景","时间","地点","人物","角色","出场人物","旁白","画外音","字幕","镜头","注","备注","内景","外景","OS","VO","画外","说明","道具"]);
+const ENV_HEAD=/^(月光|阳光|日光|灯光|烛光|火光|门外|窗外|院中|院子|远处|黑暗|突然|这时|此时|然后|随后|接着|他们|她们|我们|大家|众人|一个|一只|一把|一阵|有人|所有|屋里|屋内|房间|桌上|地上|天色|夜色|雨水|风吹|镜头|画面|只见|于是|最后|终于|同时|两人|二人|对方)/;
+const COSTUMES=[
+  {body:"#5f707a",legs:"#2a3034",sash:"#c7362c",skin:"#e6cfb1",hair:"bun"},
+  {body:"#82603f",legs:"#3a2c20",sash:"#d1a640",skin:"#d8b48f",hair:"band",beard:true,robe:true,scale:1.06},
+  {body:"#6e4a6b",legs:"#2e2230",sash:"#e0c070",skin:"#e8d0b4",hair:"crown",robe:true},
+  {body:"#4f6b4a",legs:"#253022",sash:"#e6e0cf",skin:"#dcc0a0",hair:"bun"}
+];
+const MODERN_F=[{body:"#8c2f3d",legs:"#2a1c22",sash:"#e0c08a",skin:"#f0d8c4",hair:"long"},{body:"#3e5c7a",legs:"#1f2a36",sash:"#e8e2d6",skin:"#ecd3bd",hair:"long"},{body:"#6b5a7e",legs:"#2a2333",sash:"#d9c27a",skin:"#e9cfb8",hair:"long"}];
+const MODERN_M=[{body:"#22262d",legs:"#16191e",sash:"#8a2632",skin:"#e0c2a4",hair:"short",scale:1.06},{body:"#3b3f46",legs:"#1e2126",sash:"#c9b48a",skin:"#dcbb9c",hair:"short",scale:1.04},{body:"#4d5a52",legs:"#252b27",sash:"#d8d2c4",skin:"#e2c6a8",hair:"short"},{body:"#5b4636",legs:"#2a211a",sash:"#cfc4b0",skin:"#d9b896",hair:"short"},{body:"#2e3a4a",legs:"#1a2029",sash:"#b8c4d0",skin:"#e4c7aa",hair:"short"}];
+function guessGender(n,cast){ if(cast&&cast.gender&&cast.gender[n]) return cast.gender[n]; if(/男|先生|哥|爷|公子|父|叔|兄|弟|郎|王|侯/.test(n)) return "男"; if(/女|姐|妹|娘|夫人|小姐|母|婆|姑|妃|嫂/.test(n)) return "女"; return null; }
+function costumeFor(i,n,line,cast){
+  const g=guessGender(n,cast);
+  if(line==="N"){ const fem=g==="女"||(g==null&&i%2===0); const list=fem?MODERN_F:MODERN_M; return Object.assign({},list[i%list.length]); }
+  const c=Object.assign({},COSTUMES[i%COSTUMES.length]);
+  if(g==="女"){ c.hair="bun"; delete c.beard; } else if(g==="男"&&c.hair==="bun"){ c.hair="band"; }
+  return c;
+}
+/* 人物小传里的「姓名：」「性别：」与【主角】标记 */
+function castInfo(text){
+  const lines=text.split("\n"); const names=[], gender={}; let lead=null, cur=[];
+  for(let i=0;i<lines.length;i++){ const l=lines[i].trim();
+    const pn=/^姓名\s*[：:]\s*(.+)$/.exec(l);
+    if(pn){ cur=pn[1].replace(/[（(][^）)]*[）)]/g,"").split(/[、，,\s]+/).map(x=>x.trim()).filter(x=>x&&x.length<=8);
+      cur=cur.flatMap(n=>/·/.test(n)?[n.split("·")[0],n]:[n]);
+      cur.forEach(n=>{ if(!names.includes(n)&&!names.some(o=>o.includes("·")&&o.split("·")[0]===n)) names.push(n); });
+      if(!lead&&/主角|女主|男主/.test(lines.slice(Math.max(0,i-4),i+1).join(""))) lead=cur[0]; continue; }
+    const g=/^性别\s*[：:]\s*(男|女)/.exec(l); if(g) cur.forEach(n=>gender[n]=g[1]);
+  }
+  for(let i=names.length-1;i>=0;i--){ const n=names[i]; if(/·/.test(n)&&names.includes(n.split("·")[0])) names.splice(i,1); }
+  if(!lead){ const cnt=new Map(); for(const l of lines){ const m=DIALOG_RE.exec(l); if(m&&!META_WORDS.has(m[1])) cnt.set(m[1],(cnt.get(m[1])||0)+1); } lead=[...cnt.entries()].sort((a,b)=>b[1]-a[1]).map(e=>e[0])[0]||names[0]||null; }
+  return {names,gender,lead};
+}
+function findNames(lines){
+  const score=new Map(), add=(n,v)=>{ n=n.trim(); if(!n||META_WORDS.has(n)||n.length>8) return; score.set(n,(score.get(n)||0)+v); };
+  for(const l of lines){
+    const pn=/^\s*姓名\s*[：:]\s*(.+)$/.exec(l);
+    if(pn){ pn[1].replace(/[（(][^）)]*[）)]/g,"").split(/[、，,\s]+/).forEach(n=>add(n,6)); continue; }
+    const pm=/^\s*(?:人物|角色|出场人物)\s*[：:]\s*(.+)$/.exec(l);
+    if(pm){ pm[1].split(/[、，,；;\s]+/).forEach(n=>add(n.replace(/[（(].*$/,""),4)); continue; }
+    const m=DIALOG_RE.exec(l); if(m) add(m[1],3);
+  }
+  const cand=new Map();
+  for(const l of lines){ if(DIALOG_RE.test(l)) continue;
+    for(const s of l.split(/[。！？!?；;，,]/)){ const m=/^\s*([一-龥]{2,4}?)(?=[一把将从在向朝对用拿走跑站坐看望抬低转推拉冲举拔刺砍劈踢踹跪倒躲闪笑哭说喊叫蹲伏翻握攥贴绕停回闯进上退扑挥拦扶抱追抓甩搅低牵靠躺趴爬吃喝写读叹点摇伸放递接])/.exec(s);
+      if(m&&!ENV_HEAD.test(m[1])) cand.set(m[1],(cand.get(m[1])||0)+1); } }
+  for(const [k,v] of cand) if(v>=2) add(k,v);
+  let names=[...score.entries()].sort((a,b)=>b[1]-a[1]).map(e=>e[0]);
+  names=names.filter(n=>!names.some(o=>o!==n&&o.includes(n)&&score.get(o)>=score.get(n)));
+  return names.slice(0,8);
+}
+const ACTIONS=[
+  ["enter",/(闯|冲)(了)?进|走进|推门而入|进来|来到|出现在/],
+  ["chop",/劈|砍|斩/],["thrust",/刺|捅|戳|扎/],["kick",/踢|踹/],["push",/推|撞|顶/],
+  ["raise",/举/],["dodge",/躲|闪|避开|侧身/],["kneel",/跪/],["fall",/倒地|倒下|摔倒|栽倒|扑倒/],["lie",/躺/],["sit",/坐|斜靠|靠在沙发|倚在/],
+  ["stagger",/踉跄|后退|退后|连退/],["crouch",/蹲|伏/],["run",/冲|跑|奔|追/],
+  ["walk",/走|靠近|上前|离开|绕|穿过|移到/],["look",/回头|抬头|抬眼|望|看|盯|张望|听|环顾|注视/],["reach",/翻|拿|取|捡|摸/]
+];
+const ACTION_SIZE={sit:"中景",lie:"中景",chop:"中景",thrust:"中景",kick:"中景",push:"中景",enter:"中景",run:"中景",walk:"中全景",dodge:"中景",fall:"中景",stagger:"中景",raise:"中景",kneel:"中景",crouch:"中景",look:"近景",reach:"近景"};
+const ACTION_DUR={sit:1.6,lie:1.8,chop:.9,thrust:.8,kick:.9,push:1.6,enter:1.2,run:1.3,walk:1.6,dodge:1,fall:1.6,stagger:1.2,raise:1,kneel:1.6,crouch:1.6,look:1.4,reach:1.8};
+const AFTER={sit:"sit",lie:"down",chop:"guard",thrust:"guard",kick:"guard",push:"push",raise:"raise",dodge:"guard",kneel:"kneel",fall:"down",stagger:"stagger",crouch:"crouch",run:"stand",walk:"stand",enter:"stand",look:null,reach:"reach"};
+const LENS={"大全景":"18mm","全景":"24mm","中全景":"28mm","中景":"35mm","中近景":"50mm","近景":"85mm","特写":"50mm","大特写":"100mm 微距"};
+function weaponKind(s){ return /剑/.test(s)?"sword":/匕首|短刀/.test(s)?"knife":/刀/.test(s)?"blade":/棍|杖|枪/.test(s)?"staff":null; }
+
+function quickBoard(scene,lineOpt){
+  const raw=scene.text, lines=raw.split("\n").map(l=>l.trim()).filter(Boolean);
+  const heading=scene.title||"";
+  const body=lines.filter(l=>l!==heading);
+  const cast=scene.cast||castInfo(raw);
+  const leadName=scene.me&&scene.me!=="auto"?scene.me:cast.lead;
+  const ME=/我(?!们)/;
+  // 只让本场真正出场的人上台：说话的、作为动作主语的，以及「我」
+  const pool=(scene.names||[]).concat(cast.names,findNames(body)).filter((n,i,a)=>n&&a.indexOf(n)===i);
+  const score=new Map(), first=new Map(); let li=0;
+  const bump=(n,v)=>{ score.set(n,(score.get(n)||0)+v); if(!first.has(n)) first.set(n,li); };
+  for(const l0 of body){ li++;
+    if(/^\s*(?:人物|角色|出场人物|时间|地点|姓名|性别)\s*[：:]/.test(l0)) continue;
+    const isAct=/^\s*△/.test(l0), l=isAct?stripMark(l0):l0, m=isAct?null:DIALOG_RE.exec(l);
+    if(m&&!/^(旁白|画外音?|OS|VO)$/i.test(m[1])&&!META_WORDS.has(m[1])){ bump(m[1],3); continue; }
+    const s=m?m[3]:l;
+    for(const n of pool){ const i=s.indexOf(n); if(i>=0&&i<8) bump(n,2); }
+    if(leadName&&ME.test(s)) bump(leadName,1);
+  }
+  let names=[...score.keys()].sort((a,b)=>score.get(b)-score.get(a)).slice(0,6).sort((a,b)=>first.get(a)-first.get(b));
+  if(!names.length&&/[他她]/.test(raw)) names=["人物甲"];
+  const night=/夜|晚|深更|三更|子时|烛|月/.test(heading+raw.slice(0,200));
+  let line=lineOpt;
+  if(line==="auto") line=/皮影|影窗|影戏/.test(raw)?"A":/回忆|闪回|往事|多年前|小时候/.test(heading+raw.slice(0,120))?"C":night?"B":"N";
+  // 布景
+  const set=[], has=re=>re.test(raw);
+  const sofa=has(/沙发|包厢|卡座/);
+  if(has(/窗/)||!has(/门|柱|案|桌|床|榻|沙发|包厢/)) set.push({type:"window",x:160,w:330,y:230,h:250});
+  if(sofa) set.push({type:"sofa",x:560,w:480});
+  const desk=!sofa&&has(/案|桌|台/); if(desk) set.push({type:"desk",x:600,w:460,h:150});
+  if(sofa&&has(/桌|酒|杯/)) set.push({type:"desk",x:1130,w:240,h:110});
+  if(has(line==="N"?/烛|蜡烛|油灯/:/烛|蜡烛|油灯|灯/)) set.push({type:"candle",id:"c1",x:desk?980:880,h:desk?150:210});
+  if(has(/床|榻/)) set.push({type:"bed",x:desk?120:520,w:380});
+  if(has(/坛|罐|缸/)) set.push({type:"jar",x:1150});
+  const pillar=has(/柱|墙/); if(pillar) set.push({type:"pillar",x:1330});
+  if(has(/灯笼/)) set.push({type:"lantern",x:760,y:250});
+  if(has(/屏风/)) set.push({type:"screen",x:300,w:260});
+  const door=has(/门/)||!set.length; if(door) set.push({type:"door",id:"door",x:1450,w:190});
+  const plan={w:1000,h:600,props:[]};
+  for(const it of set){
+    if(it.type==="window") plan.props.push({label:"窗",x:90,y:0,w:260,h:18,kind:"window"});
+    if(it.type==="desk") plan.props.push(sofa?{label:"酒桌",x:660,y:300,w:150,h:60}:{label:line==="N"?"桌":"书案",x:360,y:230,w:260,h:80});
+    if(it.type==="sofa") plan.props.push({label:"沙发",x:330,y:40,w:300,h:90});
+    if(it.type==="candle") plan.props.push({label:"烛",x:it.x*.6,y:250,w:22,h:22,kind:"candle"});
+    if(it.type==="pillar") plan.props.push({label:"柱",x:780,y:400,w:44,h:44});
+    if(it.type==="bed") plan.props.push({label:"床",x:it.x*.6,y:40,w:230,h:120});
+    if(it.type==="door") plan.props.push({label:"门",x:982,y:230,w:18,h:150,kind:"door"});
+  }
+  // 人物
+  const ids=names.map((n,i)=>"p"+(i+1)), byName={}, actors={}, st={};
+  const startX=[520,1000,760,300,1240,140];
+  names.forEach((n,i)=>{ const id=ids[i]; byName[n]=id;
+    const firstLine=body.find(l=>l.includes(n)&&!/^\s*(?:人物|角色|出场人物)\s*[：:]/.test(l)&&!DIALOG_RE.test(l))||"";
+    const entering=ACTIONS[0][1].test(firstLine)&&!DIALOG_RE.test(firstLine);
+    const wk=weaponKind(body.filter(l=>l.startsWith(n)||l.includes(n+"拔")||l.includes(n+"举")).join(""));
+    actors[id]=Object.assign({name:n},costumeFor(i,n,line,cast),wk?{weapon:wk}:{});
+    st[id]={x:entering?(door?1600:1720):startX[i],face:i%2?-1:1,pose:"stand",head:0,weapon:wk?"sheath":undefined,present:!entering};
+  });
+  const presentIds=()=>ids.filter(id=>st[id].present);
+  const light={candle:has(/烛|灯/)&&night,moon:night&&has(/月/),dark:night?.35:.06};
+  let lastSubj=ids[0]||null;
+  const shots=[]; let envBuf=[];
+  const kf=(id,extra)=>{ const s=st[id]; const k={x:Math.round(s.x),pose:s.pose,face:s.face}; if(s.head) k.head=s.head; if(s.weapon) k.weapon=s.weapon; return Object.assign(k,extra||{}); };
+  const planOf=()=>{ const a={}; for(const id of presentIds()) a[id]=[[Math.round(clamp(st[id].x,60,1560)*.6),300]]; return a; };
+  const camAt=(focusX)=>{ const px=clamp(focusX*.6,60,940); const cx=clamp(px-60,40,960); return [Math.round(cx),560,Math.round(Math.atan2(px-cx,260)*180/Math.PI)]; };
+  const staticActs=(except)=>{ const a={}; for(const id of presentIds()) if(!except||!except.includes(id)) a[id]=[kf(id)]; return a; };
+  const trim=s=>s.length>30?s.slice(0,29)+"…":s;
+  function push(shot){ shots.push(Object.assign({light:Object.assign({},light)},shot)); }
+  function flushEnv(){
+    if(!envBuf.length) return; const txt=envBuf.join("。");
+    push({dur:clamp(1.6+txt.length*.05,2,4),view:"side",lens:"24mm",size:"全景",angle:"平视",cam:{move:"handheld",hh:1,settle:.5},
+      acts:staticActs(),plan:{actors:planOf(),cam:camAt(800)},beat:trim(txt).slice(0,10),info:trim(txt),q:"",action:txt+"。",audio:/声|响/.test(txt)?txt:""});
+    envBuf=[];
+  }
+  function insert(kind,s,extra){
+    const sizes={eye:"大特写",candle:"大特写",throat:"大特写"};
+    const size=sizes[kind]||"特写";
+    push(Object.assign({dur:{draw:.8,candle:1.1,drop:1.4,boots:1.2,eye:1.4,throat:1.3,hand:.9}[kind]||1,view:"insert",lens:LENS[size],size,angle:kind==="boots"||kind==="drop"?"贴地":"平视",
+      cam:{move:"handheld",hh:1},insert:Object.assign({kind},extra||{}),beat:trim(s).slice(0,10),info:trim(s),q:"",action:s+"。",audio:/声|响|脚步/.test(s)?s:""}));
+  }
+  const sentences=[];
+  for(const l0 of body){
+    if(/^\s*(?:人物|角色|出场人物|时间|地点|姓名|性别)\s*[：:]/.test(l0)) continue;
+    const isAct=/^\s*△/.test(l0), l=isAct?stripMark(l0):l0;
+    const m=isAct?null:DIALOG_RE.exec(l);
+    if(m){ const pm=/^\s*[（(]([^）)]*)[）)]\s*(.*)$/.exec(m[3]); if(pm&&pm[2]){ m[2]=(m[2]?m[2]+"，":"")+pm[1]; m[3]=pm[2]; } }
+    if(m&&/^(旁白|画外音?|OS|VO)$/i.test(m[1])){ const t=m[3].replace(/[。；;]+$/,"").trim(); if(t) sentences.push({narr:true,paren:m[2]||"",text:t}); continue; }
+    if(m&&!META_WORDS.has(m[1])&&(byName[m[1]]||!/[，。,]/.test(m[1]))){ sentences.push({dialog:true,who:m[1],paren:m[2]||"",text:m[3]}); continue; }
+    for(const s of l.split(/(?<=[。！？!?；;…])/)){ const t=s.replace(/[。；;]+$/,"").trim(); if(t) sentences.push({text:t}); }
+  }
+  const leadId=leadName&&byName[leadName]||null;
+  function narrShot(s){
+    const id=leadId&&st[leadId].present?leadId:null;
+    if(id) push({dur:2,view:"side",lens:"85mm",size:"近景",angle:"平视",cam:{move:"handheld",hh:1,target:id,settle:.4},
+      acts:Object.assign(staticActs([id]),{[id]:[kf(id),kf(id,{t:1,head:(st[id].head||0)+6})]}),plan:{actors:planOf(),cam:camAt(st[id].x)},
+      beat:trim(s).slice(0,10),info:trim(s),q:"",action:s+"。",audio:""});
+    else push({dur:2,view:"side",lens:"24mm",size:"全景",angle:"平视",cam:{move:"handheld",hh:1,settle:.5},
+      acts:staticActs(),plan:{actors:planOf(),cam:camAt(800)},beat:trim(s).slice(0,10),info:trim(s),q:"",action:s+"。",audio:""});
+  }
+  function handle(S){
+    if(S.dialog){
+      flushEnv();
+      const id=byName[S.who];
+      if(!id){ const prev=shots[shots.length-1]; if(prev) prev.audio=(prev.audio?prev.audio+" ":"")+`${S.who}（画外）：「${S.text}」`; return; }
+      st[id].present=true;
+      const other=presentIds().find(o=>o!==id); if(other) st[id].face=st[other].x>st[id].x?1:-1;
+      const len=S.text.replace(/[^一-龥A-Za-z0-9]/g,"").length;
+      push({dur:clamp(.8+len*.24,1.4,8),view:"side",lens:"85mm",size:"近景",angle:"平视",cam:{move:"handheld",hh:1,target:id,settle:.35},
+        acts:Object.assign(staticActs([id]),{[id]:[kf(id),kf(id,{t:1,head:(st[id].head||0)-4})]}),plan:{actors:planOf(),cam:camAt(st[id].x)},
+        beat:`${S.who}说话`,info:`${S.who}：${trim(S.text)}`,q:"",action:`${S.who}${S.paren?"（"+S.paren+"）":""}开口。`,audio:`${S.who}${S.paren?"（"+S.paren+"）":""}：「${S.text}」`});
+      lastSubj=id; return;
+    }
+    const s=S.text;
+    if(/月光|月色/.test(s)) light.moon=true;
+    if(/天亮|晨光|日出|白天/.test(s)){ light.dark=.08; light.moon=false; }
+    // 插入特写
+    let ins=null;
+    if(/拔(出)?[刀剑匕]|[刀剑]出鞘/.test(s)) ins=["draw"];
+    else if(/[烛灯蜡火].{0,4}(灭|熄)|熄灭/.test(s)) ins=["candle",{out:.5,tip:/倒/.test(s)}];
+    else if(/(掉|落|摔)(在)?地|脱手/.test(s)) ins=["drop"];
+    else if(/脚步|靴/.test(s)) ins=["boots"];
+    else if(/四目相对|眼神|目光|眼眸|瞳孔/.test(s)) ins=["eye",{narrow:/冷|审视|眯/.test(s),look:/左|一侧/.test(s)?-1:0}];
+    else if(/攥|握紧|握住|指节/.test(s)) ins=["hand"];
+    else if(/烟灰|酒液|杯底|门卡|掌心|手机|照片|戒指|信封/.test(s)&&!/[走跑冲推]/.test(s)) ins=["text",{label:s.length>14?s.slice(0,13)+"…":s}];
+    // 主语与对象
+    const foundRaw=names.map(n=>({n,i:s.indexOf(n)})).filter(o=>o.i>=0);
+    if(leadId){ const mi=s.search(ME); if(mi>=0&&!foundRaw.some(o=>o.n===leadName)) foundRaw.push({n:leadName,i:mi}); }
+    const found=foundRaw.sort((a,b)=>a.i-b.i).map(o=>byName[o.n]);
+    let subj=found[0]||null, tgt=found[1]||null;
+    if(!subj&&/^[他她]/.test(s)) subj=lastSubj;
+    if(subj&&!tgt&&/[他她]/.test(s.slice(1))){ tgt=presentIds().find(o=>o!==subj)||ids.find(o=>o!==subj)||null; }
+    const personAfter=re=>{ const m=new RegExp("(?:"+re+")(?:开|倒|了)?(.{0,4})").exec(s); return !!m&&(/^[他她]/.test(m[1])||names.some(n=>m[1].startsWith(n))); };
+    const pushesPerson=/[把将][他她]|[把将].{0,4}(推|撞|顶)(开|倒|到|向)/.test(s)&&!/[把将].{0,3}(信|门|杯|碗|盒|书|纸|东西)/.test(s)||personAfter("推|撞|顶");
+    let act=null; for(const [k,re] of ACTIONS){ if(k==="push"&&!pushesPerson) continue; if(re.test(s)){ act=k; break; } }
+    if(act==="enter"&&!subj) act=null;
+    if(ins&&(!act||ins[0]==="draw")){
+      flushEnv();
+      if(ins[0]==="draw"){ const id=subj||ids.find(i=>actors[i].weapon); if(id){ st[id].weapon="hand"; } }
+      if(ins[0]==="drop"){ const wk=weaponKind(s); for(const id of ids) if(st[id].weapon==="hand"&&(!wk||actors[id].weapon===wk)&&id!==lastSubj){ st[id].weapon="none"; } }
+      if(ins[0]==="candle"){ light.candle=false; light.dark=Math.max(light.dark,.7); }
+      if(ins[0]==="boots"&&!/[入进]/.test(s)){}
+      insert(ins[0],s,ins[1]); return;
+    }
+    if(!subj||!act){
+      if(subj&&!act){ act="look"; } else if(S.narr){ return; } else { envBuf.push(s); return; }
+    }
+    flushEnv();
+    const a=st[subj], b=tgt?st[tgt]:null; a.present=true; if(b) b.present=true;
+    const wk=weaponKind(s); if(wk&&!actors[subj].weapon){ actors[subj].weapon=wk; }
+    if(/[刀剑]/.test(s)&&actors[subj].weapon&&["chop","thrust","raise"].includes(act)) a.weapon="hand";
+    if(/一剑|一刀|挥[刀剑]/.test(s)&&actors[subj].weapon) a.weapon="hand";
+    const startA=kf(subj), startB=b?kf(tgt):null;
+    let x1=a.x, bx=b?b.x:null, bPose=b?b.pose:null, fx=[], dir=0, move="handheld", hh=1, settle=.5;
+    if(b) a.face=b.x>a.x?1:-1;
+    const toward=(dist)=>{ const sgn=b.x>=a.x?1:-1; return b.x-sgn*dist; };
+    if(act==="enter"){ x1=b?toward(260):clamp(door?1300:1150,200,1400); move="track"; dir=x1<a.x?-1:1; hh=2; a.face=dir; }
+    else if(act==="run"||act==="walk"){
+      if(b) x1=toward(190); else if(/离开|出去|跑出/.test(s)) x1=a.x>800?1750:-150; else if(/窗/.test(s)) x1=300; else if(/门/.test(s)) x1=1380; else x1=a.x+(a.face||1)*260;
+      x1=clamp(x1,-200,1800); dir=x1<a.x?-1:1; a.face=dir; move="track"; hh=act==="run"?2:1;
+    }
+    else if(["chop","thrust","kick","push"].includes(act)&&b){
+      x1=toward(act==="push"?130:act==="kick"?200:220); hh=2; settle=.65;
+      const hitPart=/手腕|手/.test(s)?"hand":"hip";
+      fx.push({t:.45,kind:"impact",at:`${tgt}.${hitPart}`});
+      if(/血|伤|中/.test(s)) fx.push({t:.47,kind:"blood",at:`${tgt}.${hitPart}`}); else fx.push({t:.46,kind:"spark",at:`${tgt}.${hitPart}`});
+      const away=b.x>=a.x?1:-1;
+      if(/躲|闪|避|侧身/.test(s)){ bx=b.x+away*150; bPose="dodge"; fx=fx.filter(f=>f.kind!=="blood"); fx[0].at=undefined; fx[0].x=Math.round(b.x); fx[0].y=FLOOR-200; if(fx[1]){fx[1].at=undefined;fx[1].x=fx[0].x;fx[1].y=fx[0].y;} }
+      else if(act==="push"&&/柱|墙/.test(s)&&pillar){ bx=1330-away*40; x1=bx-away*120; bPose="pinned"; fx.push({t:.55,kind:"dust",x:bx,y:420}); }
+      else if(/倒/.test(s)){ bx=b.x+away*160; bPose="fall"; }
+      else { bx=b.x+away*(act==="push"?220:70); bPose="stagger"; }
+      if(/脱手|落/.test(s)&&b.weapon==="hand") b.weapon="none";
+    }
+    else if(act==="dodge"){ x1=a.x-(a.face||1)*140; }
+    else if(act==="sit"&&sofa){ x1=/正中|中央|中间/.test(s)?800:clamp(a.x,640,960); a.face=1; }
+    else if(act==="look"){ a.head=/抬头|抬眼|望/.test(s)?-14:/低头/.test(s)?14:0; if(/回头|转身/.test(s)) a.face=-a.face; if(b) a.face=b.x>a.x?1:-1; }
+    const endPose=(["enter","walk","run"].includes(act)&&/坐下|坐到|坐在/.test(s))?"sit":act==="look"?(a.pose==="crouch"||a.pose==="reach"?"crouchLook":a.pose):(act==="push"&&/抵|架/.test(s)&&a.weapon==="hand"?"threaten":(AFTER[act]||a.pose));
+    const actPose=act==="look"?endPose:act==="enter"?"walk":act;
+    const actsA=["chop","thrust","kick","push"].includes(act)
+      ? [startA,kf(subj,{t:.2,pose:act==="chop"?"raise":"guard"}),Object.assign(kf(subj,{t:.45,pose:actPose}),{x:Math.round(x1)}),Object.assign(kf(subj,{t:1,pose:endPose}),{x:Math.round(x1)})]
+      : (act==="run"||act==="walk"||act==="enter")
+        ? [startA,Object.assign(kf(subj,{t:.85,pose:actPose}),{x:Math.round(x1)}),Object.assign(kf(subj,{t:1,pose:endPose}),{x:Math.round(x1)})]
+        : [startA,Object.assign(kf(subj,{t:.5,pose:actPose}),{x:Math.round(x1)}),Object.assign(kf(subj,{t:1,pose:endPose}),{x:Math.round(x1)})];
+    a.x=x1; a.pose=endPose;
+    const acts=Object.assign(staticActs([subj,tgt]),{[subj]:actsA});
+    if(b){ const pre=Object.assign({},startB,{t:.42}); b.x=bx; b.pose=bPose; acts[tgt]=[startB,pre,kf(tgt,{t:.75}),kf(tgt,{t:1})]; }
+    if(a.x<-100||a.x>1700) a.present=false;
+    const size=b&&ACTION_SIZE[act]==="近景"?"中近景":ACTION_SIZE[act]||"中景";
+    let dur=ACTION_DUR[act]||1.4; if(/倒|落|震|惊|愣|呆/.test(s)) dur+=.6; dur=+(dur+Math.min(1.2,s.length*.02)).toFixed(1);
+    const props=act==="enter"&&door&&/门/.test(s)?{door:{open:true}}:undefined;
+    const cam={move,hh,target:b?[subj,tgt]:subj,settle}; if(dir) cam.dir=dir;
+    push({dur,view:"side",lens:LENS[size],size,angle:"平视",cam,acts,fx,props,
+      plan:{actors:planOf(),cam:camAt((a.x+(b?b.x:a.x))/2)},
+      beat:trim(s).slice(0,10),info:trim(s),q:"",action:s+"。",audio:/声|响|喊|叫/.test(s)?s:""});
+    if(ins){ if(ins[0]==="candle"){ light.candle=false; light.dark=Math.max(light.dark,.7);} insert(ins[0],s,ins[1]); }
+    if(/喉/.test(s)&&/抵|架|贴/.test(s)) insert("throat",s);
+    lastSubj=subj;
+  }
+  for(const S of sentences){
+    const n0=shots.length;
+    if(S.narr) flushEnv();
+    handle(S);
+    if(S.narr){
+      if(shots.length===n0){ flushEnv(); if(shots.length===n0) narrShot(S.text); }
+      const sh=shots[n0], len=S.text.replace(/[^\u4e00-\u9fa5A-Za-z0-9]/g,"").length, en=/[A-Za-z]{3}/.test(S.text);
+      const voDur=clamp(.6+(en?S.text.split(/\s+/).length*.38:len*.21),1.4,9);
+      sh.audio=`旁白${S.paren?"（"+S.paren+"）":""}（画外）：「${S.text}」`+(sh.audio?" "+sh.audio:"");
+      sh.dur=+Math.max(sh.dur,voDur).toFixed(1);
+    }
+  }
+  flushEnv();
+  if(!shots.length) throw new Error("这一场没有可拆的动作或对白。");
+  if(shots[0].size!=="全景"&&shots[0].view==="side"){ shots[0].size="全景"; shots[0].lens="24mm"; shots[0].cam.target=undefined; }
+  return {
+    meta:{title:scene.title||"未命名场次",line,aspect:$("aspect-opt").value,place:heading.replace(/^第[^场幕集节回]*[场幕集节回]\s*/,"").slice(0,24),time:night?"夜":"日",fps:24,
+      summary:`由剧本快速拆镜生成，共 ${shots.length} 镜。人物：${names.join("、")||"无"}。可再用 Claude 拆镜得到更细的镜头设计，或在「分镜数据」里直接改。`},
+    actors,set,plan,shots
+  };
+}
+
+/* ---------- Claude 拆镜 ---------- */
+const SCHEMA_BRIEF=`{
+ "meta": {"title": "场次名", "line": "B", "place": "地点", "time": "夏夜深夜", "aspect": "16:9", "fps": 24, "summary": "一句话概述本场"},
+ "actors": { "a": {"name": "剧本中的名字", "body": "#5f707a", "legs": "#2a3034", "sash": "#c7362c", "skin": "#e6cfb1", "hair": "bun|crown|band|short|long", "beard": false, "robe": false, "weapon": "sword|blade|knife|staff 或省略", "scale": 1} },
+ "set": [ {"type": "window", "x": 160, "w": 330, "y": 230, "h": 250}, {"type": "desk", "x": 600, "w": 460, "h": 150}, {"type": "candle", "id": "c1", "x": 980, "h": 150}, {"type": "pillar", "x": 1330}, {"type": "door", "id": "door", "x": 1450, "w": 190} ],
+   // set.type 只能是 window desk table candle jar pillar door lantern bed screen sofa
+ "plan": {"w": 1000, "h": 600, "props": [ {"label": "书案", "x": 360, "y": 230, "w": 260, "h": 80, "kind": "window|door|candle 或省略"} ]},
+ "shots": [
+  {"dur": 1.6, "view": "side|insert|plan", "lens": "35mm", "size": "大全景|全景|中全景|中景|中近景|近景|特写|大特写", "angle": "平视",
+   "tags": ["key", "slowmo"],
+   "cam": {"move": "handheld|push|pull|pan|track|tilt|crane|static", "hh": 2, "settle": 0.6, "target": ["a", "b"], "dir": -1},
+   "light": {"candle": true, "moon": true, "dark": 0.3},          // 省略则沿用上一镜；dark 0–0.9
+   "props": {"door": {"open": true}},                             // 布景状态，向后沿用；candle 可写 {"lit": false}
+   "acts": {"a": [{"t": 0, "x": 1000, "pose": "crouch", "face": 1}, {"t": 0.5, "x": 860, "pose": "dodge", "face": 1, "weapon": "hand", "head": -10}]},
+     // pose 只能是 stand walk run guard crouch reach crouchLook thrust chop raise dodge stagger pinned push threaten look kick kneel fall down
+     // weapon: hand 持在手 / sheath 入鞘 / none 脱手；head 负数为抬头
+   "fx": [{"t": 0.45, "kind": "impact|spark|blood|dust|flash", "at": "b.hand"}],   // 或用 "x","y" 给世界坐标
+   "insert": {"kind": "eye|boots|draw|candle|drop|hand|throat|text", "label": "text 类型时显示的文字", "out": 0.5, "tip": true, "look": 1, "narrow": true},
+   "plan": {"actors": {"a": [[600, 330], [520, 340]]}, "cam": [640, 560, -7]},     // 俯视坐标；cam 第三项是朝向，0 朝平面图上方，90 朝右
+   "beat": "≤8字短标签", "info": "本镜唯一的信息（主语＋动词）", "q": "本镜留下的问题",
+   "action": "本镜动作正文：先写摄影再写主体动作，写清微表情变化与镜间衔接", "audio": "环境声、动作声；对白写成 名字：「台词」"}
+ ]
+}`;
+function buildPrompt(scene,lineOpt){
+  const cast=project.cast||castInfo(scene.text);
+  const meName=project.me&&project.me!=="auto"?project.me:cast.lead;
+  const castList=(scene.names||cast.names||[]).filter(n=>scene.text.includes(n)).join("、");
+  const lineRule=lineOpt==="auto"?`按剧本选择：A 剪影（皮影、影窗）；B 夜景（暖灯与冷月光）；C 暖调胶片（回忆、闪回）；N 中性日景（日景、现代或其他题材）。`:`固定用 "${lineOpt}"。`;
+  return `你是一位电影导演兼摄影指导。把下面这一场剧本拆成分镜，输出一份 JSON，交给"分镜动态预览台"用简化人偶播放。
+
+## 分镜原则（按顺序执行）
+1. 一镜一信息：每镜只交代一条新信息，能用"主语＋动词"说清；回答上一镜留下的问题，再抛出下一个问题。相邻镜头不重复信息。
+2. 景别由信息类型决定：局势用全景/大全景，交互用中景，判断用近景，因果物（手、刀、伤口、关键道具）用特写，转折用大特写。
+3. 动作短、结果长：攻击拆成意图（0.5–1秒）、动作（0.2–1秒，可省略）、结果（1–2秒）、反应（1.5–3秒）。
+4. 运镜就是揭示：移动镜头必须从信息A带到信息B；写不出B就用手持定点（move: "handheld"）。
+5. 关键决定用视线链：看 → 看见（主观或对象镜头） → 决定（近景，给足时间） → 行动。
+6. 一画一主体；正反打保持轴线，人物在画面中的左右关系不跳。
+全片默认手持（hh：0 几乎静止，1 轻微，2 贴身肩扛，3 近身跟拍），并用 settle 写出本镜在哪个时刻稳住；只有确有必要才用 static。
+
+## 输出格式
+只输出一个 JSON 对象，不要解释，不要 Markdown 代码块，不要注释。结构与取值范围如下（// 后是说明，不要输出）：
+${SCHEMA_BRIEF}
+
+## 约束
+- 保留剧本的全部情节、对白与先后顺序；不添加剧本没有的事件。对白只写在对应镜头的 audio 里。
+- 每镜 0.5–5 秒；本场最多 40 镜，情节多时合并次要动作。
+- 人物 id 用小写英文字母；不同人物服装颜色要明显不同；人物 x 在 120–1480 之间（画面世界宽 1600，地面 y=760，人物约 420 高）；face 1 面向画右、-1 面向画左；人物位置在镜头之间连贯。还没登场的人物不要放进 acts。
+- view 为 insert 的镜头不写 acts；view 为 plan 的镜头用 plan.actors 写走位路径。
+- 每个 side 镜头都写 plan.actors 与 plan.cam，机位保持在两人连线的同一侧。
+- meta.line：${lineRule}
+- meta.aspect 用 "${$("aspect-opt").value}"${$("aspect-opt").value==="9:16"?"（竖屏短剧：以近景、中近景为主，人物放在画面中央，全景少而短，节奏快）":""}。
+- 剧本里以「△」开头的是画面动作；「旁白」是画外音：写进对应镜头的 audio（标"旁白（画外）"），并为它设计画面，通常是「我」或相关人物的反应镜头。${meName?`第一人称「我」指 ${meName}。`:""}
+- 人物的 name 必须与剧本里的名字完全一致${castList?`（${castList}）`:""}，页面靠名字匹配用户上传的角色形象；剧本只提到、本场没有出场的人物不要放进 actors。
+- 剧本若同时有中文和英文两版对白，audio 里用剧本中这一场实际使用的语言。
+- 不写任何影片名、导演或摄影师姓名。
+
+## 剧本（${scene.title}）
+${scene.text.slice(0,30000)}`;
+}
+let samplePromise=null;
+function getSample(){
+  // 桌面版 / 安卓版由 claude-bridge.js 提供 window.sbpNative.sample（用户自己的 API 密钥）
+  if(!samplePromise&&window.sbpNative&&window.sbpNative.sample) samplePromise=Promise.resolve(window.sbpNative.sample);
+  if(!samplePromise) samplePromise=(window.claude&&typeof window.claude.use==="function")?Promise.resolve(window.claude.use("sample")).catch(()=>null):Promise.resolve(null);
+  return samplePromise;
+}
+const SAMPLE_ERR={
+  not_granted:"没有获得使用 Claude 的许可，本次只能用快速拆镜。",sampling_disabled:"这个账号暂时不能在页面里调用 Claude，请用快速拆镜。",
+  rate_limited:"Claude 调用太频繁或已到用量上限，请稍后再试。",session_expired:"登录已过期，请重新登录 claude.ai 后刷新本页。",
+  prompt_too_large:"这一场太长，请把它拆成几场再试。",refused:"Claude 没有处理这一场，请检查剧本内容后再试。",
+  empty_completion:"Claude 没有返回内容，请稍后再试。",invalid_json:"Claude 返回的分镜格式不完整，可以再试一次，或先用快速拆镜。",
+  upstream_error:"连接 Claude 时出错，请稍后再试。",
+  no_key:"还没有填 Claude API 密钥：点「Claude 设置」填入后再试。",auth_error:"API 密钥无效或没有权限，请在「Claude 设置」里检查。",
+  network:"连不上 Claude，请检查网络后再试。",bad_request:"Claude 拒绝了这次请求的参数，请在「Claude 设置」里换个模型再试。"
+};
+let aiCtl=null, busy=false;
+async function genClaude(i){
+  const sample=await getSample(); if(!sample) return false;
+  const sc=project.scenes[i];
+  aiCtl=new AbortController(); setBusy(true);
+  genMsg(`「${sc.title}」：Claude 正在读剧本…`,true);
+  try{
+    const data=await sample.json(buildPrompt(sc,$("line-opt").value),{signal:aiCtl.signal,modelTier:"default",
+      onText:({text})=>{ const n=(text.match(/"dur"\s*:/g)||[]).length; genMsg(`「${sc.title}」：Claude 正在设计第 ${Math.max(1,n)} 镜…`,true); }});
+    normalize(data);
+    data.meta=Object.assign({aspect:$("aspect-opt").value},data.meta||{});
+    sc.board=data; sc.source="claude"; saveProject(); renderScenes();
+    showScene(i); genMsg(`「${sc.title}」已由 Claude 拆成 ${data.shots.length} 镜。`,true);
+    return true;
+  }catch(e){
+    if(e&&e.code==="cancelled"){ genMsg("已停止。",true); return false; }
+    if(e&&(e.code==="not_granted"||e.code==="sampling_disabled")) hideAI();
+    genMsg((e&&SAMPLE_ERR[e.code])||(e&&e.message?("生成的分镜无法播放："+e.message):"Claude 拆镜失败，请稍后再试。"),false);
+    return false;
+  }finally{ setBusy(false); aiCtl=null; }
+}
+function hideAI(){ document.querySelectorAll(".ai-only").forEach(el=>el.hidden=true); $("ai-off").hidden=false; renderScenes(); }
+let aiReady=false;
+getSample().then(s=>{ if(s){ aiReady=true; document.querySelectorAll(".ai-only").forEach(el=>el.hidden=false); $("ai-off").hidden=true; renderScenes(); } });
+
+/* ---------- 场次列表与切换 ---------- */
+function genMsg(t,ok){ const m=$("gen-msg"); m.textContent=t; m.className="msg "+(ok?"ok":"err"); }
+function setBusy(v){ busy=v; $("btn-stop").hidden=!v; document.querySelectorAll("#scene-list button,#btn-all-local,#btn-all-ai,#btn-split").forEach(b=>b.disabled=v); }
+const SRC={sample:"示例",local:"快速拆镜",claude:"Claude 拆镜",edited:"已手动修改"};
+function renderScenes(){
+  if(!project) return;
+  $("scene-list").innerHTML=project.scenes.map((s,i)=>{
+    const n=s.board&&Array.isArray(s.board.shots)?s.board.shots.length:0;
+    return `<li class="scene-row${i===project.cur?" active":""}"><div class="sc-title">${esc(s.title)}</div>
+      <div class="sc-meta">${s.text.length} 字 · ${s.meta?"人物资料，用来识别人物与「我」":n?`${esc(SRC[s.source]||"已生成")} · ${n} 镜`:"未生成"}</div>
+      <div class="sc-actions">${s.meta?"":aiReady?`<button type="button" data-act="ai" data-i="${i}">Claude 拆镜</button>`:""}${s.meta?"":`<button type="button" data-act="local" data-i="${i}">快速拆镜</button><button type="button" data-act="view" data-i="${i}" ${n?"":"disabled"}>预览</button>`}</div></li>`;
+  }).join("");
+  const withBoards=project.scenes.map((s,i)=>[s,i]).filter(([s])=>s.board);
+  const sel=$("scene-sel"); sel.hidden=withBoards.length<2;
+  sel.innerHTML=withBoards.map(([s,i])=>`<option value="${i}" ${i===project.cur?"selected":""}>${esc(s.title)}</option>`).join("");
+  if(busy) setBusy(true);
+}
+function showScene(i){
+  const sc=project.scenes[i]; if(!sc||!sc.board) return;
+  try{ setPlaying(false); project.cur=i; load(sc.board); saveProject(); renderScenes(); renderAssets();
+    const asp=(sc.board.meta&&sc.board.meta.aspect)||"16:9"; if([...$("aspect-opt").options].some(o=>o.value===asp)) $("aspect-opt").value=asp; }
+  catch(e){ genMsg(`「${sc.title}」的分镜数据有误：${e.message}`,false); }
+}
+function genLocal(i){
+  const sc=project.scenes[i];
+  if(sc.meta){ genMsg(`「${sc.title}」是人物资料，不生成分镜。`,false); return false; }
+  try{ sc.cast=project.cast; sc.me=project.me; sc.board=quickBoard(sc,$("line-opt").value); sc.source="local"; return true; }
+  catch(e){ genMsg(`「${sc.title}」：${e.message}`,false); return false; }
+}
+$("scene-list").addEventListener("click",async ev=>{
+  const b=ev.target.closest("button[data-act]"); if(!b||busy) return; const i=+b.dataset.i;
+  if(b.dataset.act==="view") showScene(i);
+  if(b.dataset.act==="local"){ if(genLocal(i)){ saveProject(); showScene(i); genMsg(`「${project.scenes[i].title}」已快速拆成 ${project.scenes[i].board.shots.length} 镜。`,true); } }
+  if(b.dataset.act==="ai") await genClaude(i);
+});
+$("scene-sel").onchange=e=>showScene(+e.target.value);
+$("btn-stop").onclick=()=>{ stopAll=true; if(aiCtl) aiCtl.abort(); };
+let stopAll=false;
+$("btn-all-local").onclick=()=>{
+  let ok=0; project.scenes.forEach((s,i)=>{ if(!s.meta&&genLocal(i)) ok++; });
+  saveProject(); renderScenes(); const first=project.scenes.findIndex(s=>s.board); if(first>=0) showScene(first);
+  genMsg(`已快速拆镜 ${ok} / ${project.scenes.length} 场。`,ok>0);
+};
+$("btn-all-ai").onclick=async()=>{
+  stopAll=false; let ok=0;
+  const todo=project.scenes.map((s,i)=>i).filter(i=>!project.scenes[i].meta);
+  for(const i of todo){ if(stopAll) break; if(await genClaude(i)) ok++; else if(!aiReady||stopAll) break; }
+  if(!stopAll) genMsg(`Claude 已完成 ${ok} / ${todo.length} 场。`,ok>0);
+};
+
+/* ---------- 读剧本文件 ---------- */
+function decodeText(buf){
+  const u8=new Uint8Array(buf);
+  try{ return new TextDecoder("utf-8",{fatal:true}).decode(u8); }catch(e){}
+  try{ return new TextDecoder("gb18030").decode(u8); }catch(e){}
+  return new TextDecoder("utf-8").decode(u8);
+}
+async function docxText(buf){
+  if(!window.JSZip) throw new Error("读取 .docx 需要联网加载解压组件，请把剧本另存为 .txt 后再打开，或直接粘贴。");
+  const zip=await window.JSZip.loadAsync(buf); const f=zip.file("word/document.xml"); if(!f) throw new Error("这个 .docx 里没有找到正文。");
+  const xml=await f.async("string");
+  const doc=new DOMParser().parseFromString(xml,"application/xml"); const W="http://schemas.openxmlformats.org/wordprocessingml/2006/main";
+  const parts=p=>{ let s=""; const walk=n=>{ for(const c of n.childNodes){ if(c.namespaceURI===W&&c.localName==="t") s+=c.textContent; else if(c.namespaceURI===W&&(c.localName==="br"||c.localName==="cr")) s+="\n"; else if(c.namespaceURI===W&&c.localName==="tab") s+="\t"; else if(c.nodeType===1&&c.localName!=="p") walk(c); } }; walk(p); return s; };
+  return [...doc.getElementsByTagNameNS(W,"p")].map(parts).join("\n");
+}
+// 安卓应用的文件选择器不认识 .md 这类扩展名，会把文件置灰；应用里不过滤，读的时候再判断类型
+if(window.sbpNative) $("script-file").removeAttribute("accept");
+const SCRIPT_EXT=/\.(pdf|docx|doc|md|markdown|txt|text|fountain|json)$/i;
+function cleanMarkdown(text){
+  return text.split("\n").map(l=>l
+    .replace(/^\s{0,3}>\s?/,"")                 // 引用
+    .replace(/^\s*[-*+]\s+(?=\S)/,"")           // 列表符号
+    .replace(/^\s*(?:-{3,}|\*{3,}|_{3,})\s*$/,"")   // 分隔线
+    .replace(/(\*\*|__)(.+?)\1/g,"$2")          // 粗体
+    .replace(/(^|[^*])\*([^*\n]+)\*(?!\*)/g,"$1$2") // 斜体
+    .replace(/`([^`]*)`/g,"$1")
+    .replace(/!\[[^\]]*\]\([^)]*\)/g,"")          // 图片
+    .replace(/\[([^\]]+)\]\([^)]*\)/g,"$1")        // 链接
+  ).join("\n");
+}
+async function readScriptFile(f){
+  const name=f.name.toLowerCase(), buf=await f.arrayBuffer();
+  if(name.endsWith(".pdf")) return await pdfText(buf);
+  if(name.endsWith(".docx")) return await docxText(buf);
+  if(name.endsWith(".doc")) throw new Error(`「${f.name}」是旧版 Word（.doc），请在 Word 里另存为 .docx 后再上传。`);
+  const text=decodeText(buf);
+  return /\.(md|markdown)$/.test(name)?cleanMarkdown(text):text;
+}
+async function importScriptFiles(list){
+  const files=[...list].filter(Boolean); if(!files.length) return;
+  const json=files.find(f=>/\.json$/i.test(f.name));
+  if(json&&files.length===1){
+    try{ const raw=JSON.parse(decodeText(await json.arrayBuffer())); normalize(raw); project.scenes.push({title:(raw.meta&&raw.meta.title)||json.name,text:"",board:raw,source:"edited"}); saveProject(); renderScenes(); showScene(project.scenes.length-1); genMsg("已导入分镜数据。",true); }
+    catch(err){ genMsg(`「${json.name}」不是可用的分镜数据：${err.message}`,false); }
+    return;
+  }
+  const bad=files.filter(f=>!SCRIPT_EXT.test(f.name)||/\.json$/i.test(f.name));
+  const ok=files.filter(f=>!bad.includes(f)).sort((a,b)=>a.name.localeCompare(b.name,"zh-Hans-CN",{numeric:true}));
+  if(!ok.length){ genMsg(`不支持这种文件：${bad.map(f=>f.name).join("、")}。请上传 PDF、Word（.docx）、Markdown、TXT 或 Fountain。`,false); return; }
+  const texts=[], failed=[];
+  for(const f of ok){
+    genMsg(`正在读取「${f.name}」（${texts.length+failed.length+1} / ${ok.length}）…`,true);
+    try{ const t=(await readScriptFile(f)).trim(); if(t) texts.push(t); else failed.push(`「${f.name}」里没有读到文字`); }
+    catch(err){ failed.push(err.message||`无法读取「${f.name}」`); }
+  }
+  if(texts.length){ $("script-input").value=texts.join("\n\n"); updateStat(); }
+  let m=texts.length?`已读入 ${texts.length} 个文件${texts.length>1?"，已按文件名顺序合并":""}。点「拆分场次并生成预览」继续。`:"";
+  if(failed.length) m+=(m?" ":"")+failed.map(x=>x.replace(/[。.]+$/,"")).join("；")+"。";
+  if(bad.length) m+=` 已跳过不支持的文件：${bad.map(f=>f.name).join("、")}。`;
+  genMsg(m.trim(),texts.length>0&&!failed.length);
+}
+const dz=$("dropzone");
+dz.addEventListener("click",()=>$("script-file").click());
+dz.addEventListener("keydown",e=>{ if(e.key==="Enter"||e.key===" "){ e.preventDefault(); $("script-file").click(); } });
+$("script-file").onchange=async e=>{ const files=[...e.target.files]; e.target.value=""; await importScriptFiles(files); };
+for(const el of [dz,$("script-input")]){
+  el.addEventListener("dragover",e=>{ if(e.dataTransfer&&[...e.dataTransfer.types].includes("Files")){ e.preventDefault(); dz.classList.add("over"); } });
+  el.addEventListener("dragleave",()=>dz.classList.remove("over"));
+  el.addEventListener("drop",e=>{ if(!e.dataTransfer||!e.dataTransfer.files.length) return; e.preventDefault(); dz.classList.remove("over"); importScriptFiles(e.dataTransfer.files); });
+}
+function updateStat(){ const t=$("script-input").value; const n=t.trim()?splitScenes(t).length:0; $("script-stat").textContent=t.trim()?`${t.length} 字 · 约 ${n} 场`:"粘贴剧本或打开文件"; }
+$("script-input").addEventListener("input",updateStat);
+$("btn-split").onclick=()=>{
+  const text=$("script-input").value; if(!text.trim()){ genMsg("先粘贴剧本，或打开一个剧本文件。",false); return; }
+  const sc=splitScenes(text); if(!sc.length){ genMsg("没有读到剧本内容。",false); return; }
+  const allLines=text.split("\n").map(l=>l.trim()).filter(Boolean);
+  const cast=castInfo(text);
+  const allNames=cast.names.concat(findNames(allLines)).filter((n,i,a)=>a.indexOf(n)===i);
+  const keepAssets=project&&project.assets||{};
+  project={text,cur:0,cast,me:"auto",assets:keepAssets,scenes:sc.map(s=>({title:s.title,text:s.text,names:allNames,meta:s.meta,board:null,source:null}))};
+  ASSETS=project.assets; fillMe();
+  let ok=0; project.scenes.forEach((s,i)=>{ if(!s.meta&&genLocal(i)) ok++; });
+  saveProject(); renderScenes();
+  const first=project.scenes.findIndex(s=>s.board); if(first>=0) showScene(first);
+  const metaN=sc.filter(s=>s.meta).length;
+  genMsg(`拆出 ${sc.length-metaN} 场${metaN?`（另有 ${metaN} 段人物资料，只用来识别人物）`:""}，已快速生成 ${ok} 场预览。${cast.lead&&/我(?!们)/.test(text)?`「我」按 ${cast.lead} 处理。`:""}${aiReady?"想要更细的镜头设计，可以对单场点「Claude 拆镜」。":""}`,ok>0);
+  renderAssets();
+  if(first>=0) document.querySelector(".stage-box").scrollIntoView({behavior:REDUCED?"auto":"smooth",block:"start"});
+};
+$("btn-goto-import").onclick=()=>{ $("importer").scrollIntoView({behavior:REDUCED?"auto":"smooth",block:"start"}); $("script-input").focus({preventScroll:true}); };
+
+/* ---------- 「我」与画幅 ---------- */
+function fillMe(){
+  const sel=$("me-opt"), names=(project.cast&&project.cast.names.length?project.cast.names:assetNames());
+  const lead=project.cast&&project.cast.lead;
+  sel.innerHTML=`<option value="auto">自动${lead?`（${esc(lead)}）`:""}</option>`+names.map(n=>`<option value="${esc(n)}" ${project.me===n?"selected":""}>${esc(n)}</option>`).join("");
+}
+$("me-opt").onchange=e=>{ project.me=e.target.value; saveProject(); genMsg("已更改「我」对应的人物。重新点「快速拆镜」或「Claude 拆镜」后生效。",true); };
+$("aspect-opt").onchange=e=>{
+  const v=e.target.value, sc=project.scenes[project.cur];
+  if(sc&&sc.board){ sc.board.meta=Object.assign({},sc.board.meta,{aspect:v}); saveProject(); showScene(project.cur); }
+  else if(!SHOTS.length) showEmpty();
+  genMsg(`画幅改为 ${v}；当前场次已切换，之后生成的场次也会用这个画幅。`,true);
+};
+
+/* ---------- 角色资产 ---------- */
+function assetNames(){
+  const s=new Set(); ((project.cast&&project.cast.names)||[]).forEach(n=>s.add(n));
+  for(const sc of project.scenes){ if(sc.board&&sc.board.actors) Object.values(sc.board.actors).forEach(a=>a&&a.name&&s.add(a.name)); }
+  Object.keys(project.assets||{}).forEach(n=>s.add(n));
+  return [...s];
+}
+function renderAssets(){
+  const names=assetNames(), A=project.assets||{};
+  $("asset-list").innerHTML=names.map(n=>{ const a=A[n];
+    return `<li class="asset"><div class="thumb" ${a?`style="background-image:url('${a.img}')"`:""} aria-hidden="true">${a?"":esc(n.slice(0,1))}</div>
+      <div class="nm">${esc(n)}</div>
+      <div class="ctl">${a?`<select data-n="${esc(n)}" data-k="mode" aria-label="${esc(n)} 的显示方式"><option value="standee" ${a.mode==="standee"?"selected":""}>立绘</option><option value="head" ${a.mode==="head"?"selected":""}>头像</option></select>
+        <select data-n="${esc(n)}" data-k="facing" aria-label="${esc(n)} 的原图朝向"><option value="front" ${a.facing==="front"?"selected":""}>正面</option><option value="right" ${a.facing==="right"?"selected":""}>朝右</option><option value="left" ${a.facing==="left"?"selected":""}>朝左</option></select>
+        <button type="button" data-n="${esc(n)}" data-a="del">移除</button>`:`<button type="button" data-n="${esc(n)}" data-a="up">上传</button>`}</div></li>`; }).join("")
+    || `<li class="hint" style="grid-column:1/-1">导入剧本后，这里会列出人物；也可以直接批量上传，文件名写人物名，如「人物名.png」。</li>`;
+}
+async function toAsset(file){
+  const url=URL.createObjectURL(file); const img=new Image();
+  try{ await new Promise((res,rej)=>{ img.onload=res; img.onerror=()=>rej(new Error(`无法读取图片「${file.name}」。`)); img.src=url; }); }
+  finally{ setTimeout(()=>URL.revokeObjectURL(url),1000); }
+  const sc=Math.min(1,720/img.naturalHeight,720/img.naturalWidth), w=Math.max(1,Math.round(img.naturalWidth*sc)), h=Math.max(1,Math.round(img.naturalHeight*sc));
+  const c=document.createElement("canvas"); c.width=w; c.height=h; c.getContext("2d").drawImage(img,0,0,w,h);
+  let data=c.toDataURL("image/webp",.86); if(!data.startsWith("data:image/webp")) data=c.toDataURL("image/png");
+  return {img:data,ratio:h/w,mode:h/w>1.3?"standee":"head",facing:"front"};
+}
+function cleanBase(base){ return base.replace(/[_\-\s]*(定妆照?|立绘|全身|半身|头像|形象|设定|角色|final|v\d+|\d+)$/i,"").trim()||base; }
+function matchName(base,names){
+  const b=cleanBase(base); void base.replace(/[_\-\s]*(定妆照?|立绘|全身|半身|头像|形象|设定|角色|final|v\d+|\d+)$/i,"").trim();
+  const sorted=[...names].sort((x,y)=>y.length-x.length);
+  return sorted.find(n=>b===n)||sorted.find(n=>b.includes(n))||sorted.find(n=>n.includes(b)&&b.length>=2)||null;
+}
+function assetsChanged(){ ASSETS=project.assets; saveProject(); renderAssets(); draw(); }
+let assetTarget=null;
+$("btn-assets").onclick=()=>$("asset-files").click();
+$("asset-files").onchange=async e=>{
+  const files=[...e.target.files]; e.target.value=""; if(!files.length) return;
+  project.assets=project.assets||{}; const names=assetNames(), hit=[], miss=[];
+  for(const f of files){
+    try{ const base=f.name.replace(/\.[^.]+$/,""); const n=matchName(base,names)||cleanBase(base); project.assets[n]=await toAsset(f); (matchName(base,names)?hit:miss).push(n); }
+    catch(err){ genMsg(err.message,false); }
+  }
+  assetsChanged();
+  genMsg(`已载入 ${hit.length+miss.length} 个角色形象${hit.length?`：${hit.join("、")}`:""}。${miss.length?`另有 ${miss.join("、")} 没对上剧本里的名字，已按文件名保存，Claude 拆镜时会用到。`:""}`,true);
+};
+$("asset-list").addEventListener("click",e=>{
+  const b=e.target.closest("button[data-a]"); if(!b) return; const n=b.dataset.n;
+  if(b.dataset.a==="up"){ assetTarget=n; $("asset-one").click(); }
+  if(b.dataset.a==="del"){ delete project.assets[n]; assetsChanged(); }
+});
+$("asset-list").addEventListener("change",e=>{
+  const s=e.target.closest("select[data-k]"); if(!s) return; const a=project.assets[s.dataset.n]; if(!a) return;
+  a[s.dataset.k]=s.value; assetsChanged();
+});
+$("asset-one").onchange=async e=>{
+  const f=e.target.files[0]; e.target.value=""; if(!f||!assetTarget) return;
+  try{ project.assets=project.assets||{}; project.assets[assetTarget]=await toAsset(f); assetsChanged(); genMsg(`已载入「${assetTarget}」的角色形象。`,true); }
+  catch(err){ genMsg(err.message,false); }
+};
+
+/* ---------- PDF 剧本 ---------- */
+const PDFJS=(window.SBP_VENDOR&&window.SBP_VENDOR.pdfjs)||"https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/";
+let pdfReady=null;
+function loadScript(src){ return new Promise((res,rej)=>{ const s=document.createElement("script"); s.src=src; s.onload=res; s.onerror=()=>rej(new Error("load")); document.head.appendChild(s); }); }
+function unwrapLines(lines){
+  const out=[];
+  for(const raw of lines){ const l=raw.replace(/\s+$/,"");
+    const prev=out.length?out[out.length-1]:"";
+    const startsNew=!l.trim()||/^\s*(△|第\s*[^\s]{1,6}\s*[集场幕]|【|#|[^\s：:，。]{1,12}\s*(?:[（(][^）)]*[）)])?\s*[：:])/.test(l);
+    if(prev.trim()&&!startsNew&&!/[。！？!?」”…：:】）)]$/.test(prev.trim())){ out[out.length-1]=prev+(/[A-Za-z,.'"]$/.test(prev)&&/^\s*[A-Za-z]/.test(l)?" ":"")+l.trim(); }
+    else out.push(l.trim()?l.trim():"");
+  }
+  return out;
+}
+async function pdfText(buf){
+  if(!pdfReady) pdfReady=loadScript(PDFJS+"pdf.min.js").then(()=>loadScript(PDFJS+"pdf.worker.min.js"));
+  try{ await pdfReady; }catch(e){ pdfReady=null; throw new Error("读取 PDF 需要联网加载解析组件，请检查网络后再试，或把 PDF 里的文字复制后直接粘贴。"); }
+  const lib=window.pdfjsLib; if(!lib) throw new Error("PDF 解析组件没有加载成功，请把文字复制后直接粘贴。");
+  const doc=await lib.getDocument({data:new Uint8Array(buf),isEvalSupported:false}).promise;
+  const lines=[];
+  for(let i=1;i<=doc.numPages;i++){
+    const tc=await (await doc.getPage(i)).getTextContent(); let line="", lastY=null;
+    for(const it of tc.items){ if(typeof it.str!=="string") continue; const y=it.transform[5];
+      if(lastY!==null&&Math.abs(y-lastY)>2&&line){ lines.push(line); line=""; }
+      line+=it.str; lastY=y; if(it.hasEOL){ lines.push(line); line=""; lastY=null; } }
+    if(line) lines.push(line); lines.push("");
+  }
+  const text=unwrapLines(lines).join("\n").replace(/\n{3,}/g,"\n\n").trim();
+  if(!text) throw new Error("这个 PDF 里没有可复制的文字（可能是扫描件），请先用文字识别转成文字再粘贴。");
+  return text;
+}
+
+/* ---------- 启动 ---------- */
+try{ const p=JSON.parse(localStorage.getItem(PROJECT_KEY)||"null"); if(p&&Array.isArray(p.scenes)) project=p; }catch(e){}
+if(!project) project=defaultProject();
+project.scenes=project.scenes.filter(s=>s.source!=="sample");   // 旧版本存下的示例场次不再保留
+if(project.cur>=project.scenes.length) project.cur=0;
+project.assets=project.assets||{}; ASSETS=project.assets;
+$("script-input").placeholder=SCRIPT_HINT;
+$("script-input").value=project.text&&project.scenes.length?project.text:"";
+fillMe(); updateStat(); renderScenes(); renderAssets();
+// 由技能生成的页面会把分镜写进 storyboard-data；用户自己导入的场次保存在本机
+let embedded=null; try{ embedded=JSON.parse($("storyboard-data").textContent); }catch(e){}
+const startIdx=project.scenes[project.cur]&&project.scenes[project.cur].board?project.cur:project.scenes.findIndex(s=>s.board);
+if(embedded&&Array.isArray(embedded.shots)&&embedded.shots.length) load(embedded);
+else if(startIdx>=0) showScene(startIdx);
+else showEmpty();
+})();
+</script>
