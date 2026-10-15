@@ -103,6 +103,15 @@ textarea{width:100%;min-height:360px;background:#0b0e0d;color:var(--fg);border:1
 .importer h2{margin-bottom:4px}
 .imp-grid{display:grid;grid-template-columns:minmax(0,1fr) minmax(0,1fr);gap:16px;margin-top:10px}
 @media (max-width:820px){.imp-grid{grid-template-columns:minmax(0,1fr)}}
+.dropzone{display:flex;align-items:center;gap:14px;padding:14px 16px;margin-bottom:10px;border:1.5px dashed #4a5650;border-radius:6px;background:#121816;cursor:pointer;transition:border-color .15s,background .15s}
+.dropzone:hover,.dropzone.over{border-color:var(--lamp);background:#1a1f17}
+.dropzone:focus-visible{outline:2px solid var(--lamp);outline-offset:2px}
+.dz-icon{flex:none;width:38px;height:46px;border:2px solid var(--lamp);border-radius:4px;position:relative}
+.dz-icon::after{content:"";position:absolute;left:8px;right:8px;top:12px;height:2px;background:var(--lamp);box-shadow:0 7px 0 var(--lamp),0 14px 0 var(--lamp)}
+.dz-text{display:flex;flex-direction:column;gap:2px;min-width:0}
+.dz-text b{font-size:15px}
+.dz-text span{font-size:12.5px;color:var(--muted)}
+.dz-formats{display:flex;flex-wrap:wrap;gap:4px;margin-top:4px}
 #script-input{min-height:260px;font-family:var(--f-body);font-size:13.5px;line-height:1.7}
 .opts{display:flex;flex-wrap:wrap;gap:8px 16px;align-items:center;font-size:13px;color:var(--muted)}
 .opts label{display:flex;gap:6px;align-items:center}
@@ -173,14 +182,22 @@ button:disabled{opacity:.45;cursor:not-allowed}
   </div>
 
   <section class="card importer" id="importer" aria-labelledby="imp-h">
-    <h2 id="imp-h">剧本 → 分镜 <span class="tag">粘贴剧本，或打开 .pdf / .docx / .txt / .md / .fountain</span></h2>
+    <h2 id="imp-h">剧本 → 分镜 <span class="tag">上传 PDF / Word / Markdown / TXT，或直接粘贴</span></h2>
     <div class="imp-grid">
       <div>
+        <div class="dropzone" id="dropzone" role="button" tabindex="0" aria-describedby="dz-desc">
+          <div class="dz-icon" aria-hidden="true"></div>
+          <div class="dz-text">
+            <b>上传剧本文件</b>
+            <span id="dz-desc">点这里选择文件，或把文件拖到这里；可以一次选多个文件（如多集），按文件名顺序合并。</span>
+            <div class="dz-formats"><span class="chip">PDF</span><span class="chip">Word（.docx）</span><span class="chip">Markdown（.md）</span><span class="chip">TXT</span><span class="chip">Fountain</span></div>
+          </div>
+        </div>
         <textarea id="script-input" spellcheck="false" aria-label="剧本文本"></textarea>
         <div class="row">
           <button class="primary" id="btn-split" type="button">拆分场次并生成预览</button>
-          <button id="btn-open-script" type="button">打开剧本文件</button>
-          <input type="file" id="script-file" accept=".pdf,.txt,.md,.fountain,.docx,.json,text/plain,application/pdf" hidden>
+          <input type="file" id="script-file" multiple hidden
+            accept=".pdf,.docx,.doc,.md,.markdown,.txt,.fountain,.json,application/pdf,application/vnd.openxmlformats-officedocument.wordprocessingml.document,application/msword,text/markdown,text/x-markdown,text/plain,application/json">
           <span class="hint" id="script-stat"></span>
         </div>
       </div>
@@ -1535,19 +1552,64 @@ async function docxText(buf){
   const zip=await window.JSZip.loadAsync(buf); const f=zip.file("word/document.xml"); if(!f) throw new Error("这个 .docx 里没有找到正文。");
   const xml=await f.async("string");
   const doc=new DOMParser().parseFromString(xml,"application/xml"); const W="http://schemas.openxmlformats.org/wordprocessingml/2006/main";
-  return [...doc.getElementsByTagNameNS(W,"p")].map(p=>[...p.getElementsByTagNameNS(W,"t")].map(t=>t.textContent).join("")).join("\n");
+  const parts=p=>{ let s=""; const walk=n=>{ for(const c of n.childNodes){ if(c.namespaceURI===W&&c.localName==="t") s+=c.textContent; else if(c.namespaceURI===W&&(c.localName==="br"||c.localName==="cr")) s+="\n"; else if(c.namespaceURI===W&&c.localName==="tab") s+="\t"; else if(c.nodeType===1&&c.localName!=="p") walk(c); } }; walk(p); return s; };
+  return [...doc.getElementsByTagNameNS(W,"p")].map(parts).join("\n");
 }
-$("btn-open-script").onclick=()=>$("script-file").click();
-$("script-file").onchange=async e=>{
-  const f=e.target.files[0]; e.target.value=""; if(!f) return;
-  try{
-    const buf=await f.arrayBuffer(), name=f.name.toLowerCase();
-    if(name.endsWith(".json")){ const raw=JSON.parse(decodeText(buf)); normalize(raw); project.scenes.push({title:(raw.meta&&raw.meta.title)||f.name,text:"",board:raw,source:"edited"}); saveProject(); showScene(project.scenes.length-1); genMsg("已导入分镜数据。",true); return; }
-    if(name.endsWith(".pdf")) genMsg(`正在读取「${f.name}」…`,true);
-    const text=name.endsWith(".pdf")?await pdfText(buf):name.endsWith(".docx")?await docxText(buf):decodeText(buf);
-    $("script-input").value=text; updateStat(); genMsg(`已读入「${f.name}」，点「拆分场次并生成预览」继续。`,true);
-  }catch(err){ genMsg(err.message||"无法读取这个文件。",false); }
-};
+// 安卓应用的文件选择器不认识 .md 这类扩展名，会把文件置灰；应用里不过滤，读的时候再判断类型
+if(window.sbpNative) $("script-file").removeAttribute("accept");
+const SCRIPT_EXT=/\.(pdf|docx|doc|md|markdown|txt|text|fountain|json)$/i;
+function cleanMarkdown(text){
+  return text.split("\n").map(l=>l
+    .replace(/^\s{0,3}>\s?/,"")                 // 引用
+    .replace(/^\s*[-*+]\s+(?=\S)/,"")           // 列表符号
+    .replace(/^\s*(?:-{3,}|\*{3,}|_{3,})\s*$/,"")   // 分隔线
+    .replace(/(\*\*|__)(.+?)\1/g,"$2")          // 粗体
+    .replace(/(^|[^*])\*([^*\n]+)\*(?!\*)/g,"$1$2") // 斜体
+    .replace(/`([^`]*)`/g,"$1")
+    .replace(/!\[[^\]]*\]\([^)]*\)/g,"")          // 图片
+    .replace(/\[([^\]]+)\]\([^)]*\)/g,"$1")        // 链接
+  ).join("\n");
+}
+async function readScriptFile(f){
+  const name=f.name.toLowerCase(), buf=await f.arrayBuffer();
+  if(name.endsWith(".pdf")) return await pdfText(buf);
+  if(name.endsWith(".docx")) return await docxText(buf);
+  if(name.endsWith(".doc")) throw new Error(`「${f.name}」是旧版 Word（.doc），请在 Word 里另存为 .docx 后再上传。`);
+  const text=decodeText(buf);
+  return /\.(md|markdown)$/.test(name)?cleanMarkdown(text):text;
+}
+async function importScriptFiles(list){
+  const files=[...list].filter(Boolean); if(!files.length) return;
+  const json=files.find(f=>/\.json$/i.test(f.name));
+  if(json&&files.length===1){
+    try{ const raw=JSON.parse(decodeText(await json.arrayBuffer())); normalize(raw); project.scenes.push({title:(raw.meta&&raw.meta.title)||json.name,text:"",board:raw,source:"edited"}); saveProject(); renderScenes(); showScene(project.scenes.length-1); genMsg("已导入分镜数据。",true); }
+    catch(err){ genMsg(`「${json.name}」不是可用的分镜数据：${err.message}`,false); }
+    return;
+  }
+  const bad=files.filter(f=>!SCRIPT_EXT.test(f.name)||/\.json$/i.test(f.name));
+  const ok=files.filter(f=>!bad.includes(f)).sort((a,b)=>a.name.localeCompare(b.name,"zh-Hans-CN",{numeric:true}));
+  if(!ok.length){ genMsg(`不支持这种文件：${bad.map(f=>f.name).join("、")}。请上传 PDF、Word（.docx）、Markdown、TXT 或 Fountain。`,false); return; }
+  const texts=[], failed=[];
+  for(const f of ok){
+    genMsg(`正在读取「${f.name}」（${texts.length+failed.length+1} / ${ok.length}）…`,true);
+    try{ const t=(await readScriptFile(f)).trim(); if(t) texts.push(t); else failed.push(`「${f.name}」里没有读到文字`); }
+    catch(err){ failed.push(err.message||`无法读取「${f.name}」`); }
+  }
+  if(texts.length){ $("script-input").value=texts.join("\n\n"); updateStat(); }
+  let m=texts.length?`已读入 ${texts.length} 个文件${texts.length>1?"，已按文件名顺序合并":""}。点「拆分场次并生成预览」继续。`:"";
+  if(failed.length) m+=(m?" ":"")+failed.map(x=>x.replace(/[。.]+$/,"")).join("；")+"。";
+  if(bad.length) m+=` 已跳过不支持的文件：${bad.map(f=>f.name).join("、")}。`;
+  genMsg(m.trim(),texts.length>0&&!failed.length);
+}
+const dz=$("dropzone");
+dz.addEventListener("click",()=>$("script-file").click());
+dz.addEventListener("keydown",e=>{ if(e.key==="Enter"||e.key===" "){ e.preventDefault(); $("script-file").click(); } });
+$("script-file").onchange=async e=>{ const files=[...e.target.files]; e.target.value=""; await importScriptFiles(files); };
+for(const el of [dz,$("script-input")]){
+  el.addEventListener("dragover",e=>{ if(e.dataTransfer&&[...e.dataTransfer.types].includes("Files")){ e.preventDefault(); dz.classList.add("over"); } });
+  el.addEventListener("dragleave",()=>dz.classList.remove("over"));
+  el.addEventListener("drop",e=>{ if(!e.dataTransfer||!e.dataTransfer.files.length) return; e.preventDefault(); dz.classList.remove("over"); importScriptFiles(e.dataTransfer.files); });
+}
 function updateStat(){ const t=$("script-input").value; const n=t.trim()?splitScenes(t).length:0; $("script-stat").textContent=t.trim()?`${t.length} 字 · 约 ${n} 场`:"粘贴剧本或打开文件"; }
 $("script-input").addEventListener("input",updateStat);
 $("btn-split").onclick=()=>{
