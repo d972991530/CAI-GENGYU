@@ -11,10 +11,10 @@
 
 ## 下载安装包
 
-每次修改预览台或本目录并推送后，GitHub Actions 的「分镜预览台安装包」工作流会自动构建，并发布到仓库的 **Releases** 页面（版本号 1.0.构建序号）。下面两个链接永远指向最新版，手机上点开即可下载：
+每次修改预览台或本目录并推送后，GitHub Actions 的「分镜预览台安装包」工作流会自动构建，并发布到仓库的 **Releases** 页面：每次构建一个版本（1.0.构建序号），同时更新固定的「最新版」页面 https://github.com/d972991530/CAI-GENGYU/releases/tag/storyboard-app-latest 。下面两个链接永远指向最新版，手机上点开即可下载：
 
-- 安卓：https://github.com/d972991530/CAI-GENGYU/releases/latest/download/StoryboardPreviewer-android.apk
-- Windows：https://github.com/d972991530/CAI-GENGYU/releases/latest/download/StoryboardPreviewer-Setup.exe
+- 安卓：https://github.com/d972991530/CAI-GENGYU/releases/download/storyboard-app-latest/StoryboardPreviewer-android.apk
+- Windows：https://github.com/d972991530/CAI-GENGYU/releases/download/storyboard-app-latest/StoryboardPreviewer-Setup.exe
 
 也可以在 Actions 页面手动点 **Run workflow** 重新构建。
 

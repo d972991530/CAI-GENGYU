@@ -92,32 +92,47 @@ jobs:
         run: |
           mv out/StoryboardPreviewer-Setup-*.exe out/StoryboardPreviewer-Setup.exe
           ls -la out
-      - uses: softprops/action-gh-release@v2
+      - name: 发布本次版本
+        uses: softprops/action-gh-release@v2
         with:
           tag_name: storyboard-app-build-${{ github.run_number }}
           target_commitish: ${{ github.sha }}
           name: 分镜预览台 1.0.${{ github.run_number }}
-          make_latest: "true"
+          make_latest: "false"
           body: |
+            分镜预览台 1.0.${{ github.run_number }}（构建提交 ${{ github.sha }}）
+
+            始终下载最新版请用：https://github.com/${{ github.repository }}/releases/tag/storyboard-app-latest
+          files: |
+            out/StoryboardPreviewer-android.apk
+            out/StoryboardPreviewer-Setup.exe
+          fail_on_unmatched_files: true
+      - name: 更新「最新版」页面（固定链接，每次覆盖文件）
+        uses: softprops/action-gh-release@v2
+        with:
+          tag_name: storyboard-app-latest
+          target_commitish: ${{ github.sha }}
+          name: 分镜预览台 · 最新版
+          make_latest: "false"
+          overwrite_files: true
+          body: |
+            当前版本：1.0.${{ github.run_number }}（构建提交 ${{ github.sha }}）
+
             ## 下载
 
-            | 平台 | 文件 |
+            | 平台 | 直接下载 |
             | --- | --- |
-            | 安卓 8.0 及以上 | StoryboardPreviewer-android.apk |
-            | Windows 10/11（64 位） | StoryboardPreviewer-Setup.exe |
+            | 安卓 8.0 及以上 | https://github.com/${{ github.repository }}/releases/download/storyboard-app-latest/StoryboardPreviewer-android.apk |
+            | Windows 10/11（64 位） | https://github.com/${{ github.repository }}/releases/download/storyboard-app-latest/StoryboardPreviewer-Setup.exe |
 
-            永远指向最新版的链接：
-            - 安卓：https://github.com/${{ github.repository }}/releases/latest/download/StoryboardPreviewer-android.apk
-            - Windows：https://github.com/${{ github.repository }}/releases/latest/download/StoryboardPreviewer-Setup.exe
+            这两个链接始终指向最新版。
 
             ## 安装
 
-            - **安卓**：用手机打开链接下载，点开安装；系统提示时允许「安装未知来源应用」。之后的新版本可以直接覆盖安装，本机数据会保留。
+            - **安卓**：用手机打开链接下载，点开安装；系统提示时允许「安装未知来源应用」。新版本可以直接覆盖安装，本机数据会保留。
             - **Windows**：安装包没有代码签名，首次运行如出现 SmartScreen 提示，点「更多信息 → 仍要运行」。
 
             「Claude 拆镜」需要在应用里的「Claude 设置」填入自己的 Claude API 密钥；其他功能离线可用。
-
-            构建提交：${{ github.sha }}
           files: |
             out/StoryboardPreviewer-android.apk
             out/StoryboardPreviewer-Setup.exe
