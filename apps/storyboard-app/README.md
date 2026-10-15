@@ -11,7 +11,14 @@
 
 ## 下载安装包
 
-每次修改预览台或本目录并推送后，GitHub Actions 的「分镜预览台安装包」工作流会自动构建，构建结果在该次运行页面底部的 **Artifacts** 里下载（需要登录 GitHub）。也可以在 Actions 页面手动点 **Run workflow**。
+每次修改预览台或本目录并推送后，GitHub Actions 的「分镜预览台安装包」工作流会自动构建，并发布到仓库的 **Releases** 页面（版本号 1.0.构建序号）。下面两个链接永远指向最新版，手机上点开即可下载：
+
+- 安卓：https://github.com/d972991530/CAI-GENGYU/releases/latest/download/StoryboardPreviewer-android.apk
+- Windows：https://github.com/d972991530/CAI-GENGYU/releases/latest/download/StoryboardPreviewer-Setup.exe
+
+也可以在 Actions 页面手动点 **Run workflow** 重新构建。
+
+安卓包用 `android-signing/debug.keystore`（调试级签名，密码 `android`）固定签名，所以新版本能直接覆盖旧版本、保留本机数据；不要换掉这个文件，否则用户需要先卸载旧版。要上架应用商店，需另配正式签名。
 
 - **Windows**：安装包没有代码签名，首次运行时 SmartScreen 会提示「已保护你的电脑」，点「更多信息 → 仍要运行」。
 - **安卓**：这是调试签名的 APK，适合自用和内部分发。安装时需允许「安装未知来源应用」。要上架应用商店，需要另配正式签名。

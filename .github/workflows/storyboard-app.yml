@@ -61,6 +61,11 @@ jobs:
         continue-on-error: true
         run: npx --yes @capacitor/assets@3.0.5 generate --android --iconBackgroundColor "#0f1312" --splashBackgroundColor "#0f1312"
       - run: npx cap sync android
+      - name: 版本号与固定签名（新版本可直接覆盖安装）
+        run: |
+          sed -i -E "s/versionCode [0-9]+/versionCode ${{ github.run_number }}/; s/versionName \"[^\"]*\"/versionName \"1.0.${{ github.run_number }}\"/" android/app/build.gradle
+          grep -E "versionCode|versionName" android/app/build.gradle
+          mkdir -p ~/.android && cp android-signing/debug.keystore ~/.android/debug.keystore
       - name: 编译 APK
         working-directory: apps/storyboard-app/android
         run: ./gradlew assembleDebug --no-daemon
@@ -71,3 +76,49 @@ jobs:
           name: StoryboardPreviewer-Android
           path: apps/storyboard-app/StoryboardPreviewer-android.apk
           if-no-files-found: error
+
+  release:
+    name: 发布到 Releases
+    needs: [windows, android]
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+    steps:
+      - uses: actions/download-artifact@v4
+        with:
+          path: out
+          merge-multiple: true
+      - name: 固定文件名（「最新版」链接始终指向同名文件）
+        run: |
+          mv out/StoryboardPreviewer-Setup-*.exe out/StoryboardPreviewer-Setup.exe
+          ls -la out
+      - uses: softprops/action-gh-release@v2
+        with:
+          tag_name: storyboard-app-build-${{ github.run_number }}
+          target_commitish: ${{ github.sha }}
+          name: 分镜预览台 1.0.${{ github.run_number }}
+          make_latest: "true"
+          body: |
+            ## 下载
+
+            | 平台 | 文件 |
+            | --- | --- |
+            | 安卓 8.0 及以上 | StoryboardPreviewer-android.apk |
+            | Windows 10/11（64 位） | StoryboardPreviewer-Setup.exe |
+
+            永远指向最新版的链接：
+            - 安卓：https://github.com/${{ github.repository }}/releases/latest/download/StoryboardPreviewer-android.apk
+            - Windows：https://github.com/${{ github.repository }}/releases/latest/download/StoryboardPreviewer-Setup.exe
+
+            ## 安装
+
+            - **安卓**：用手机打开链接下载，点开安装；系统提示时允许「安装未知来源应用」。之后的新版本可以直接覆盖安装，本机数据会保留。
+            - **Windows**：安装包没有代码签名，首次运行如出现 SmartScreen 提示，点「更多信息 → 仍要运行」。
+
+            「Claude 拆镜」需要在应用里的「Claude 设置」填入自己的 Claude API 密钥；其他功能离线可用。
+
+            构建提交：${{ github.sha }}
+          files: |
+            out/StoryboardPreviewer-android.apk
+            out/StoryboardPreviewer-Setup.exe
+          fail_on_unmatched_files: true
