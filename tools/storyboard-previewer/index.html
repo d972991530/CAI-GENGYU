@@ -5,7 +5,7 @@
 <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Noto+Serif+SC:wght@600;900&family=Noto+Sans+SC:wght@400;500;700&family=JetBrains+Mono:wght@400;600&display=swap">
 <style>
 /* 布局：放映室式单列——片头信息 → 16:9 画面 → 走带控制与时间轴 → 当前镜头 + 俯视走位 → 分镜表 / 提示词 / 数据。
-   单一暗色：这是看片用的工具，刻意只做一套深色，颜色取自现实线的灯火黄与钢青月光。 */
+   单一暗色：这是看片用的工具，刻意只做一套深色，颜色取自夜景风格里的灯火黄与钢青月光。 */
 :root{
   color-scheme: dark;
   --bg:#0f1312;          /* 墨绿黑，放映室底色 */
@@ -168,7 +168,7 @@ button:disabled{opacity:.45;cursor:not-allowed}
       <span><i style="background:repeating-linear-gradient(135deg,#2b2a1e 0 3px,#38351f 3px 6px)"></i>升格</span>
       <span><i style="background:#1f2a2e"></i>插入特写</span>
       <span><i style="background:#0a0d0c;border:1px solid #2a332f"></i>暗场</span>
-      <span>顶部色条：视觉线</span>
+      <span>顶部色条：画面风格</span>
     </div>
   </div>
 
@@ -186,13 +186,13 @@ button:disabled{opacity:.45;cursor:not-allowed}
       </div>
       <div>
         <div class="opts">
-          <label>视觉线
+          <label>画面风格
             <select id="line-opt">
               <option value="auto" selected>自动判断</option>
-              <option value="B">B 现实线（夜景）</option>
-              <option value="C">C 回忆线（胶片暖金）</option>
-              <option value="A">A 影戏线（皮影）</option>
-              <option value="N">N 通用（日景 / 现代 / 其他题材）</option>
+              <option value="B">B 夜景（暖灯与冷月光）</option>
+              <option value="C">C 暖调胶片（深黑与暖金）</option>
+              <option value="A">A 剪影（皮影 / 影窗）</option>
+              <option value="N">N 中性日景（现代 / 其他题材）</option>
             </select>
           </label>
           <label>画幅
@@ -269,7 +269,7 @@ button:disabled{opacity:.45;cursor:not-allowed}
         <button class="primary" id="btn-apply" type="button">应用</button>
         <button id="btn-copyjson" type="button">复制 JSON</button>
         <label class="btn-like"><button id="btn-import" type="button">导入 .json 文件</button><input type="file" id="file" accept="application/json,.json" hidden></label>
-        <button id="btn-sample" type="button">载入示例</button>
+        <button id="btn-sample" type="button">填入空白模板</button>
         <button id="btn-draft" type="button" hidden>恢复上次草稿</button>
       </div>
       <p class="msg" id="msg" role="status"></p>
@@ -278,163 +278,7 @@ button:disabled{opacity:.45;cursor:not-allowed}
 </div>
 
 <script type="application/json" id="storyboard-data">
-{
-  "meta": {
-    "title": "西廊书房·夜取信",
-    "line": "B",
-    "place": "沈府 西廊书房",
-    "time": "夏夜深夜",
-    "aspect": "16:9",
-    "fps": 24,
-    "summary": "示例分镜：沈蘅潜入书房偷看密信，护院头目破门劈砍，烛台倒灭后她在月光暗处夺刀反制，停在剑抵喉、门外再起脚步的一刻。"
-  },
-  "actors": {
-    "heng": { "name": "沈蘅", "body": "#5f707a", "legs": "#2a3034", "sash": "#c7362c", "skin": "#e6cfb1", "hair": "bun", "weapon": "sword" },
-    "guard": { "name": "护院头目", "body": "#82603f", "legs": "#3a2c20", "sash": "#d1a640", "skin": "#d8b48f", "hair": "band", "beard": true, "robe": true, "weapon": "blade", "scale": 1.08 }
-  },
-  "set": [
-    { "type": "window", "x": 160, "w": 330, "y": 230, "h": 250 },
-    { "type": "desk", "x": 600, "w": 460, "h": 150 },
-    { "type": "candle", "id": "c1", "x": 980, "h": 150 },
-    { "type": "jar", "x": 1150 },
-    { "type": "pillar", "x": 1330 },
-    { "type": "door", "id": "door", "x": 1450, "w": 190 }
-  ],
-  "plan": {
-    "w": 1000, "h": 600,
-    "props": [
-      { "label": "窗", "x": 90, "y": 0, "w": 260, "h": 18, "kind": "window" },
-      { "label": "书案", "x": 360, "y": 230, "w": 260, "h": 80 },
-      { "label": "烛台", "x": 590, "y": 250, "w": 22, "h": 22, "kind": "candle" },
-      { "label": "柱", "x": 800, "y": 400, "w": 44, "h": 44 },
-      { "label": "门", "x": 982, "y": 230, "w": 18, "h": 150, "kind": "door" }
-    ]
-  },
-  "shots": [
-    { "dur": 2.0, "view": "side", "lens": "24mm", "size": "全景", "angle": "平视略低",
-      "cam": { "move": "handheld", "hh": 1, "target": "heng" },
-      "light": { "candle": true, "moon": true, "dark": 0.25 },
-      "acts": { "heng": [ { "t": 0, "x": 1000, "pose": "crouch", "face": 1 }, { "t": 1, "x": 1000, "pose": "reach", "face": 1 } ] },
-      "plan": { "actors": { "heng": [[600, 330]] }, "cam": [520, 560, 19] },
-      "beat": "翻信", "info": "她蹲在书案后翻看密信", "q": "她会被发现吗？",
-      "action": "她蹲在书案尽头的烛光里，一手压住信纸，一手轻轻翻页，指尖在一行字上停住。",
-      "audio": "纸页摩擦，烛芯轻爆，远处更鼓两响。" },
-    { "dur": 1.2, "view": "insert", "lens": "50mm", "size": "特写", "angle": "贴地",
-      "cam": { "move": "handheld", "hh": 1 }, "insert": { "kind": "boots" },
-      "plan": { "cam": [930, 330, 90] },
-      "beat": "门外脚步", "info": "门缝下一双靴影停住", "q": "来的是谁？",
-      "action": "门缝下的灯笼光被一双靴影切断，靴影向画左滑入后停住。",
-      "audio": "沉重的靴底踏上回廊木板，停住。" },
-    { "dur": 1.6, "view": "side", "lens": "85mm", "size": "近景", "angle": "平视",
-      "cam": { "move": "handheld", "hh": 1, "target": "heng", "settle": 0.55 },
-      "acts": { "heng": [ { "t": 0, "x": 1000, "pose": "reach", "face": 1 }, { "t": 0.5, "x": 1000, "pose": "crouchLook", "face": 1 } ] },
-      "plan": { "actors": { "heng": [[600, 330]] }, "cam": [470, 360, 77] },
-      "beat": "抬眼", "info": "她停手抬眼望向门", "q": "她要躲吗？",
-      "action": "她翻页的手停在半空，呼吸屏住，眼睛先抬起，头再慢半拍转向画右的门。",
-      "audio": "烛火轻响，她屏住的呼吸。" },
-    { "dur": 0.9, "view": "side", "lens": "35mm", "size": "中景", "angle": "平视",
-      "cam": { "move": "track", "dir": -1, "hh": 2, "target": "guard" },
-      "props": { "door": { "open": true } },
-      "acts": { "guard": [ { "t": 0, "x": 1580, "pose": "walk", "face": -1 }, { "t": 1, "x": 1330, "pose": "guard", "face": -1 } ] },
-      "fx": [ { "t": 0.05, "kind": "dust", "x": 1460, "y": 520 } ],
-      "plan": { "actors": { "heng": [[600, 330]], "guard": [[1000, 300], [860, 300]] }, "cam": [700, 520, 42] },
-      "beat": "破门", "info": "护院头目踹门闯入", "q": "他看见她了吗？",
-      "action": "门板被一脚踹开撞向墙面，护院头目跨进门槛，镜头随他向画左横移半步后停住。",
-      "audio": "门板撞墙的闷响，门轴尖叫。" },
-    { "dur": 0.7, "view": "insert", "lens": "50mm", "size": "特写", "angle": "平视",
-      "cam": { "move": "handheld", "hh": 2 }, "insert": { "kind": "draw" },
-      "plan": { "actors": { "heng": [[600, 330]], "guard": [[860, 300]] }, "cam": [800, 380, 37] },
-      "beat": "拔刀", "info": "他拔刀出鞘", "q": "她怎么应对？",
-      "action": "刀刃从鞘口滑出，刃面掠过一道灯火的反光。",
-      "audio": "刀身擦过鞘口的金属长音。" },
-    { "dur": 1.6, "view": "side", "lens": "35mm", "size": "中景", "angle": "平视", "tags": ["key"],
-      "cam": { "move": "handheld", "hh": 2, "target": ["heng", "guard"], "settle": 0.6 },
-      "acts": {
-        "heng": [ { "t": 0, "x": 1000, "pose": "crouchLook", "face": 1 }, { "t": 0.35, "x": 960, "pose": "stand", "face": 1 }, { "t": 0.6, "x": 860, "pose": "dodge", "face": 1 }, { "t": 1, "x": 830, "pose": "guard", "face": 1, "weapon": "hand" } ],
-        "guard": [ { "t": 0, "x": 1300, "pose": "raise", "face": -1, "weapon": "hand" }, { "t": 0.45, "x": 1180, "pose": "chop", "face": -1, "weapon": "hand" }, { "t": 1, "x": 1170, "pose": "chop", "face": -1, "weapon": "hand" } ]
-      },
-      "fx": [ { "t": 0.72, "kind": "impact", "x": 1040, "y": 612 }, { "t": 0.74, "kind": "spark", "x": 1040, "y": 612 } ],
-      "plan": { "actors": { "heng": [[600, 330], [520, 340]], "guard": [[860, 300], [700, 300]] }, "cam": [640, 560, -7] },
-      "beat": "劈案 · 闪开", "info": "刀劈进书案，她已闪开", "q": "下一刀呢？",
-      "action": "他举刀直劈，她起身后仰闪向画左，刀刃砍进她刚离开的案角，木屑与信纸一起飞起；她落定时剑已出鞘。",
-      "audio": "刀砍入硬木的钝响，木屑落地，她短促的吸气。" },
-    { "dur": 1.0, "view": "insert", "lens": "100mm 微距", "size": "大特写", "angle": "平视", "tags": ["key"],
-      "cam": { "move": "handheld", "hh": 1 }, "insert": { "kind": "candle", "out": 0.5, "tip": true },
-      "light": { "candle": false, "dark": 0.72 },
-      "plan": { "cam": [560, 330, 30] },
-      "beat": "烛灭", "info": "烛台被震倒，火灭", "q": "黑暗里谁先动？",
-      "action": "被震倒的烛台斜倒下去，火苗一缩即灭，一缕白烟升起。",
-      "audio": "铜烛台倒地的叮当声，随后一片安静。" },
-    { "dur": 2.0, "view": "plan", "lens": "24mm", "size": "全景", "angle": "高机位俯视",
-      "cam": { "move": "handheld", "hh": 1 },
-      "plan": { "actors": { "heng": [[520, 340], [380, 470], [230, 110]], "guard": [[700, 300], [640, 290]] } },
-      "beat": "暗中换位", "info": "黑暗中她绕向窗下暗角", "q": "他找得到她吗？",
-      "action": "高机位俯视整间书房，窗格月光在地上切出斜条，她贴着书案的阴影绕到窗下暗角，他在原地横刀四顾。",
-      "audio": "他粗重的喘息，她几乎听不见的脚步。" },
-    { "dur": 1.2, "view": "side", "lens": "85mm", "size": "近景", "angle": "平视",
-      "cam": { "move": "handheld", "hh": 1, "target": "guard", "settle": 0.4 },
-      "acts": { "guard": [ { "t": 0, "x": 1100, "pose": "guard", "face": -1, "head": -10, "weapon": "hand" }, { "t": 0.5, "x": 1100, "pose": "guard", "face": 1, "head": -6, "weapon": "hand" }, { "t": 1, "x": 1100, "pose": "guard", "face": -1, "head": 4, "weapon": "hand" } ] },
-      "plan": { "actors": { "guard": [[640, 290]], "heng": [[230, 110]] }, "cam": [420, 300, 87] },
-      "beat": "四顾", "info": "他在月光里四处找人", "q": "她在哪？",
-      "action": "月光切过他半张脸，他左右转头，眼白在暗处一闪，握刀的手越握越紧。",
-      "audio": "他的喘息，刀柄缠绳被攥紧的细响。" },
-    { "dur": 0.8, "view": "side", "lens": "35mm", "size": "中景", "angle": "平视", "tags": ["key"],
-      "cam": { "move": "handheld", "hh": 3, "target": "guard", "settle": 0.7 },
-      "acts": {
-        "heng": [ { "t": 0, "x": 760, "pose": "guard", "face": 1, "weapon": "hand" }, { "t": 0.4, "x": 960, "pose": "thrust", "face": 1, "weapon": "hand" }, { "t": 1, "x": 980, "pose": "thrust", "face": 1, "weapon": "hand" } ],
-        "guard": [ { "t": 0, "x": 1120, "pose": "guard", "face": -1, "weapon": "hand" }, { "t": 0.42, "x": 1130, "pose": "guard", "face": -1, "weapon": "hand" }, { "t": 1, "x": 1190, "pose": "stagger", "face": -1, "weapon": "none" } ]
-      },
-      "fx": [ { "t": 0.36, "kind": "impact", "at": "guard.hand" }, { "t": 0.37, "kind": "spark", "at": "guard.hand" } ],
-      "plan": { "actors": { "heng": [[300, 200], [560, 290]], "guard": [[660, 290], [700, 300]] }, "cam": [600, 540, 7] },
-      "beat": "击腕", "info": "剑从暗处击中他的手腕", "q": "刀还在吗？",
-      "action": "她从画左的暗处冲出，剑尖直取他握刀的手腕，接触即收；他整个人向画右踉跄。",
-      "audio": "剑脊击中腕骨的脆响，他的闷哼。" },
-    { "dur": 1.4, "view": "insert", "lens": "50mm", "size": "特写", "angle": "贴地",
-      "cam": { "move": "handheld", "hh": 1 }, "insert": { "kind": "drop" },
-      "plan": { "cam": [740, 420, -24] },
-      "beat": "刀落地", "info": "刀脱手落在砖地上", "q": "他还能反抗吗？",
-      "action": "刀从画面上方落下，刀尖先触地弹起一次，横躺在月光照着的砖缝间。",
-      "audio": "刀身落地的两声金属弹响。" },
-    { "dur": 2.0, "view": "side", "lens": "35mm", "size": "中景", "angle": "平视", "tags": ["slowmo"],
-      "cam": { "move": "push", "hh": 2, "target": ["heng", "guard"], "settle": 0.7 },
-      "acts": {
-        "heng": [ { "t": 0, "x": 980, "pose": "guard", "face": 1, "weapon": "hand" }, { "t": 0.55, "x": 1190, "pose": "push", "face": 1, "weapon": "hand" }, { "t": 1, "x": 1200, "pose": "threaten", "face": 1, "weapon": "hand" } ],
-        "guard": [ { "t": 0, "x": 1190, "pose": "stagger", "face": -1, "weapon": "none" }, { "t": 0.55, "x": 1320, "pose": "pinned", "face": -1, "weapon": "none" }, { "t": 1, "x": 1320, "pose": "pinned", "face": -1, "weapon": "none" } ]
-      },
-      "fx": [ { "t": 0.55, "kind": "dust", "x": 1340, "y": 420 } ],
-      "plan": { "actors": { "heng": [[560, 290], [760, 400]], "guard": [[700, 300], [810, 410]] }, "cam": [560, 560, 55] },
-      "beat": "压柱 · 升格", "info": "她把他压在柱上，剑抵喉", "q": "她会杀他吗？",
-      "action": "升格。她用肩撞进他怀里，把他一路顶到廊柱上，柱上的积灰被震落，她的剑横到他喉前停住。",
-      "audio": "背脊撞柱的闷响，灰尘簌簌落下。" },
-    { "dur": 1.2, "view": "insert", "lens": "100mm 微距", "size": "大特写", "angle": "平视",
-      "cam": { "move": "handheld", "hh": 1 }, "insert": { "kind": "throat" },
-      "plan": { "cam": [700, 470, 61] },
-      "beat": "剑抵喉", "info": "剑刃贴着他的喉结", "q": "他会求饶吗？",
-      "action": "剑刃贴着他的喉结，喉结上下滚动一次，一滴汗沿着颈侧滑到刃口。",
-      "audio": "他吞咽的喉音。" },
-    { "dur": 2.4, "view": "side", "lens": "85mm", "size": "近景", "angle": "平视",
-      "cam": { "move": "handheld", "hh": 1, "target": "guard", "settle": 0.3 },
-      "acts": {
-        "heng": [ { "t": 0, "x": 1200, "pose": "threaten", "face": 1, "weapon": "hand" } ],
-        "guard": [ { "t": 0, "x": 1320, "pose": "pinned", "face": -1, "head": -18, "weapon": "none" }, { "t": 0.6, "x": 1320, "pose": "pinned", "face": -1, "head": -8, "weapon": "none" }, { "t": 1, "x": 1320, "pose": "pinned", "face": -1, "head": -14, "weapon": "none" } ]
-      },
-      "plan": { "actors": { "heng": [[760, 400]], "guard": [[810, 410]] }, "cam": [620, 420, 87] },
-      "beat": "僵住", "info": "他僵住，不敢再动", "q": "她要怎么处置他？",
-      "action": "他后脑抵着柱子，下巴抬高避开刃口，眼睛先瞪大，再慢慢垂下看向她，嘴唇动了动没有出声。",
-      "audio": "两人交错的喘息，远处一只狗叫了两声。" },
-    { "dur": 3.0, "view": "side", "lens": "85mm→50mm", "size": "近景", "angle": "平视",
-      "cam": { "move": "pull", "hh": 1, "target": "heng", "settle": 0.85 },
-      "light": { "dark": 0.6 },
-      "acts": {
-        "heng": [ { "t": 0, "x": 1200, "pose": "threaten", "face": 1, "weapon": "hand" }, { "t": 0.5, "x": 1200, "pose": "threaten", "face": 1, "head": -14, "weapon": "hand" }, { "t": 1, "x": 1200, "pose": "threaten", "face": 1, "head": -18, "weapon": "hand" } ],
-        "guard": [ { "t": 0, "x": 1320, "pose": "pinned", "face": -1, "head": -14, "weapon": "none" } ]
-      },
-      "plan": { "actors": { "heng": [[760, 400]], "guard": [[810, 410]] }, "cam": [640, 470, 60] },
-      "beat": "门外再起脚步", "info": "她听见更多脚步，抬眼望向门外", "q": "来的是谁？",
-      "action": "她的剑没有动，眼睛先移向画右的门，镜头缓缓拉开成中景，门外的回廊上灯笼光一盏接一盏亮起来。",
-      "audio": "院中杂乱的脚步由远而近，灯笼提杆碰撞的声音。无字幕，无配乐。" }
-  ]
-}
+{"meta":{},"actors":{},"set":[],"plan":{"props":[]},"shots":[]}
 </script>
 
 <script src="https://cdnjs.cloudflare.com/ajax/libs/jszip/3.10.1/jszip.min.js"></script>
@@ -455,11 +299,12 @@ const REDUCED=window.matchMedia&&matchMedia("(prefers-reduced-motion: reduce)").
 
 /* ---------- 视觉线配色：取自导演技能的三条线 ---------- */
 const PAL={
-  A:{name:"影戏线",wall:"#efd9a8",wall2:"#e3c58b",floor:"#c99d5a",floorLine:"#b08447",warm:"#fff1cf",cool:"#2f7d5b",accent:"#b8322a",dark:"#2a170b",ink:"#24140a",paper:"#f2e2bf",strip:"#e3a548"},
-  B:{name:"现实线",wall:"#2a302d",wall2:"#232826",floor:"#1b201e",floorLine:"#2d3531",warm:"#e3b34c",cool:"#a7c3d4",accent:"#c7362c",dark:"#090c0b",ink:"#101412",paper:"#d9d2bf",strip:"#a7c3d4"},
-  C:{name:"回忆线",wall:"#1d1712",wall2:"#17120e",floor:"#120e0b",floorLine:"#271e17",warm:"#e3a548",cool:"#3c9a83",accent:"#b5402f",dark:"#050403",ink:"#0c0907",paper:"#e8d6b0",strip:"#4fae93"},
-  N:{name:"通用",wall:"#3a3e40",wall2:"#323638",floor:"#26292b",floorLine:"#373b3d",warm:"#ecc77e",cool:"#a4bfd2",accent:"#cc4a3e",dark:"#0d0f10",ink:"#141617",paper:"#e4dfd3",strip:"#cfc9bb"}
+  A:{name:"剪影",wall:"#efd9a8",wall2:"#e3c58b",floor:"#c99d5a",floorLine:"#b08447",warm:"#fff1cf",cool:"#2f7d5b",accent:"#b8322a",dark:"#2a170b",ink:"#24140a",paper:"#f2e2bf",strip:"#e3a548"},
+  B:{name:"夜景",wall:"#2a302d",wall2:"#232826",floor:"#1b201e",floorLine:"#2d3531",warm:"#e3b34c",cool:"#a7c3d4",accent:"#c7362c",dark:"#090c0b",ink:"#101412",paper:"#d9d2bf",strip:"#a7c3d4"},
+  C:{name:"暖调胶片",wall:"#1d1712",wall2:"#17120e",floor:"#120e0b",floorLine:"#271e17",warm:"#e3a548",cool:"#3c9a83",accent:"#b5402f",dark:"#050403",ink:"#0c0907",paper:"#e8d6b0",strip:"#4fae93"},
+  N:{name:"中性日景",wall:"#3a3e40",wall2:"#323638",floor:"#26292b",floorLine:"#373b3d",warm:"#ecc77e",cool:"#a4bfd2",accent:"#cc4a3e",dark:"#0d0f10",ink:"#141617",paper:"#e4dfd3",strip:"#cfc9bb"}
 };
+function styleName(code){ const n=DATA&&DATA.meta&&DATA.meta.styleNames; return (n&&n[code])||(PAL[code]?PAL[code].name:code); }
 const SIZES={"大全景":0.78,"全景":1,"中全景":1.3,"中景":1.7,"中近景":2.15,"近景":2.6,"特写":3.5,"大特写":4.4};
 const MOVE_CN={static:"固定",handheld:"手持定点",push:"推",pull:"拉",pan:"摇",track:"移/跟",tilt:"俯仰",crane:"升降"};
 const MOVE_EN={static:"LOCKED",handheld:"HANDHELD",push:"PUSH IN",pull:"PULL OUT",pan:"PAN",track:"TRACK",tilt:"TILT",crane:"CRANE"};
@@ -644,7 +489,7 @@ function puppet(def,st,silhouette,uid){
   }
   g+=limb(p.sho,p.e1,col("body"),sw*.95)+limb(p.e1,p.h1,col("body"),sw*.9);
   g+=`<circle cx="${p.h1[0]}" cy="${p.h1[1]}" r="${11*s}" fill="${silhouette?dark:(def.skin||"#e2c9a8")}" stroke="${silhouette?"none":ol}" stroke-width="3"/>`;
-  // 影戏线：签子
+  // 剪影风格：签子
   if(silhouette){
     g+=`<line x1="${p.neck[0]}" y1="${p.neck[1]}" x2="${p.neck[0]+20}" y2="${H+40}" stroke="${dark}" stroke-width="3" opacity=".55"/>`;
     g+=`<line x1="${p.h1[0]}" y1="${p.h1[1]}" x2="${p.h1[0]+40}" y2="${H+40}" stroke="${dark}" stroke-width="2.5" opacity=".45"/>`;
@@ -958,7 +803,7 @@ function render(t){
   if(asp&&asp!=="16:9"){ const r=parseFloat(asp.split(":")[0])/parseFloat(asp.split(":")[1]||1); if(r>16/9){ const vh=VW/r, bar=(VH-vh)/2; hud+=`<rect x="0" y="0" width="${VW}" height="${bar}" fill="#000"/><rect x="0" y="${VH-bar}" width="${VW}" height="${bar}" fill="#000"/>`; } }
   if(showOverlay){
     hud+=moveOverlay(shot,p);
-    const label=`SHOT ${pad2(shot.i+1)}  ${shot.lens||""} · ${shot.size||""} · ${shot.angle||""}${shot.line!==DATA.meta.line?" · "+PAL[shot.line].name:""}`;
+    const label=`SHOT ${pad2(shot.i+1)}  ${shot.lens||""} · ${shot.size||""} · ${shot.angle||""}${shot.line!==DATA.meta.line?" · "+styleName(shot.line):""}`;
     hud+=`<rect x="24" y="22" width="${Math.min(VW-48,label.length*19+40)}" height="46" rx="4" fill="#000" opacity=".45"/><text x="44" y="54" font-size="24" font-family="var(--f-mono)" font-weight="600" fill="#e9edf0" letter-spacing="1">${esc(label)}</text>`;
     if(shot.tags.includes("slowmo")) hud+=`<rect x="${VW-200}" y="${VH>VW?80:22}" width="176" height="46" rx="4" fill="#e3b34c"/><text x="${VW-112}" y="${VH>VW?112:54}" text-anchor="middle" font-size="24" font-family="var(--f-body)" font-weight="700" fill="#1a1405">升格 慢动作</text>`;
   }
@@ -1002,7 +847,7 @@ function axisCheck(shot){
 function renderShotCard(shot){
   $("shot-title").innerHTML=`shot${shot.i+1} <span class="tag">${fmt(shot.start)}—${fmt(shot.end)} s · ${shot.dur.toFixed(1)} 秒</span>`;
   const c=shot.cam, chips=[];
-  chips.push(`<span class="chip">${esc(PAL[shot.line].name)}</span>`);
+  chips.push(`<span class="chip">${esc(styleName(shot.line))}</span>`);
   if(shot.tags.includes("key")) chips.push(`<span class="chip ok">关键镜</span>`);
   if(shot.tags.includes("slowmo")) chips.push(`<span class="chip ok">升格</span>`);
   const ax=axisCheck(shot); if(ax) chips.push(`<span class="chip warn">越轴</span>`);
@@ -1047,7 +892,7 @@ function buildTable(){
   $("out-camera").textContent="【CAMERA】"+SHOTS.map(s=>{
     const c=s.cam, mv=c.move==="static"?"固定机位":c.move==="handheld"?["手持定点，几乎静止","轻微手持，画面带呼吸般的细微起伏","贴身肩扛跟随","近身手持跟拍"][clamp(Math.round(c.hh??1),0,3)]:`手持${MOVE_CN[c.move]}`;
     const settle=c.settle!=null&&c.move!=="static"?`，约在本镜${Math.round(c.settle*100)}%处稳住`:"";
-    const ln=s.line!==DATA.meta.line?`，${PAL[s.line].name}`:"";
+    const ln=s.line!==DATA.meta.line?`，${styleName(s.line)}`:"";
     return `shot${s.i+1}（${sec(s.start)}—${sec(s.end)}秒${ln}）：${s.lens||""}${s.size||""}，${s.angle||""}，${mv}${settle}。${s.action||s.info||""}`;
   }).join("");
 }
@@ -1065,9 +910,10 @@ $("tbody").addEventListener("keydown",ev=>{ if(ev.key==="Enter"){const tr=ev.tar
 
 /* ---------- 播放 ---------- */
 let time=0, playing=false, last=0, speed=1, loop=false, curShot=-1;
-function setTime(t){ time=clamp(t,0,TOTAL-1e-4); draw(); }
-function gotoShot(i){ i=clamp(i,0,SHOTS.length-1); setTime(SHOTS[i].start+1e-3); }
+function setTime(t){ time=clamp(t,0,Math.max(0,TOTAL-1e-4)); draw(); }
+function gotoShot(i){ if(!SHOTS.length) return; i=clamp(i,0,SHOTS.length-1); setTime(SHOTS[i].start+1e-3); }
 function draw(){
+  if(!SHOTS.length){ renderEmpty(); return; }
   const shot=render(time), p=clamp((time-shot.start)/shot.dur,0,1);
   renderPlan(shot,p);
   $("clock").innerHTML=`${fmt(time)} <small>/ ${fmt(TOTAL)} s</small>`;
@@ -1085,11 +931,11 @@ function tick(now){
   if(time>=TOTAL){ if(loop) time=0; else { time=TOTAL-1e-4; setPlaying(false); } }
   draw(); if(playing) requestAnimationFrame(tick);
 }
-function setPlaying(v){ playing=v; $("btn-play").textContent=v?"暂停":"播放"; if(v){ if(time>=TOTAL-.01) time=0; last=performance.now(); requestAnimationFrame(tick);} }
+function setPlaying(v){ if(v&&!SHOTS.length) return; playing=v; $("btn-play").textContent=v?"暂停":"播放"; if(v){ if(time>=TOTAL-.01) time=0; last=performance.now(); requestAnimationFrame(tick);} }
 $("btn-play").onclick=()=>setPlaying(!playing);
 $("btn-restart").onclick=()=>{ setTime(0); };
-$("btn-prev").onclick=()=>{ const s=shotAt(time); gotoShot(time-s.start>.4?s.i:s.i-1); };
-$("btn-next").onclick=()=>gotoShot(shotAt(time).i+1);
+$("btn-prev").onclick=()=>{ if(!SHOTS.length) return; const s=shotAt(time); gotoShot(time-s.start>.4?s.i:s.i-1); };
+$("btn-next").onclick=()=>{ if(SHOTS.length) gotoShot(shotAt(time).i+1); };
 $("speed").onchange=e=>{ speed=+e.target.value; };
 $("btn-loop").onclick=e=>{ loop=!loop; e.currentTarget.setAttribute("aria-pressed",loop); };
 $("btn-overlay").onclick=e=>{ showOverlay=!showOverlay; e.currentTarget.setAttribute("aria-pressed",showOverlay); draw(); };
@@ -1105,18 +951,51 @@ document.addEventListener("keydown",ev=>{
 const tabs=[["tab-list","panel-list"],["tab-prompt","panel-prompt"],["tab-data","panel-data"]];
 tabs.forEach(([t,p])=>$(t).addEventListener("click",()=>{ tabs.forEach(([t2,p2])=>{ $(t2).setAttribute("aria-selected",t2===t); $(p2).hidden=p2!==p; }); }));
 
+/* ---------- 空白状态：还没有分镜时只显示「题干」 ---------- */
+function setTransport(on){ ["btn-play","btn-restart","btn-prev","btn-next","btn-loop","btn-overlay","speed"].forEach(id=>{ $(id).disabled=!on; }); }
+function showEmpty(){
+  setPlaying(false); DATA=null; SHOTS=[]; TOTAL=0; curShot=-1; setTransport(false);
+  const asp=$("aspect-opt").value, vert=asp==="9:16"; VW=vert?900:1600; VH=vert?1600:900;
+  stage.setAttribute("viewBox",`0 0 ${VW} ${VH}`); stage.style.aspectRatio=`${VW}/${VH}`;
+  document.querySelector(".stage-box").classList.toggle("vertical",vert);
+  $("eyebrow").innerHTML="";
+  $("title").textContent="分镜预览台"; document.title="分镜预览台";
+  $("summary").innerHTML=`<span class="spec">还没有分镜</span>粘贴或打开剧本，按场次自动拆镜，再用人偶或你自己的角色形象预演走位、景别、运镜与灯光。`;
+  track.innerHTML=`<div class="seg" style="width:100%;justify-content:center;align-items:center;padding:0">导入剧本后，这里按时长排出每一镜</div>`;
+  $("ticks").innerHTML=""; track.setAttribute("aria-valuemax","0");
+  $("clock").innerHTML=`00.0 <small>/ 00.0 s</small>`; $("beat").textContent="";
+  $("shot-title").innerHTML=`镜头 <span class="tag">导入后显示当前镜头</span>`;
+  $("shot-kv").innerHTML=[["1","在下方「剧本 → 分镜」粘贴剧本，或打开 PDF / Word / TXT 文件"],["2","选择画面风格和画幅，点「拆分场次并生成预览」"],["3","上传角色的定妆照或立绘，人偶会换成你的角色"],["4","播放、逐镜检查，在「分镜数据」里微调，在「提示词导出」里复制"]].map(([k,v])=>`<dt>第 ${k} 步</dt><dd>${v}</dd>`).join("");
+  planEl.innerHTML=`<rect x="0" y="0" width="1000" height="600" fill="#141a18" stroke="#4a3a30" stroke-width="8" stroke-dasharray="18 12"/><text x="500" y="310" text-anchor="middle" font-size="26" fill="#8f978f" font-family="var(--f-body)">人物走位、机位与轴线会画在这里</text>`;
+  $("plan-note").textContent="";
+  $("tbody").innerHTML=`<tr><td colspan="7" style="color:var(--muted);cursor:default">导入剧本后，这里列出每一镜的时码、镜头、运镜、画面信息、留下的问题和声音。</td></tr>`;
+  $("out-table").textContent="导入剧本并生成分镜后，这里会出现信息清单表。";
+  $("out-camera").textContent="导入剧本并生成分镜后，这里会出现逐镜正文。";
+  renderEmpty();
+}
+function renderEmpty(){
+  const c="#3a4540", t="#8f978f", cx=VW/2, cy=VH/2;
+  let g=`<rect x="0" y="0" width="${VW}" height="${VH}" fill="#0b0e0d"/>`;
+  for(let i=1;i<3;i++){ g+=`<line x1="${VW*i/3}" y1="0" x2="${VW*i/3}" y2="${VH}" stroke="${c}" stroke-width="2" stroke-dasharray="10 14"/><line x1="0" y1="${VH*i/3}" x2="${VW}" y2="${VH*i/3}" stroke="${c}" stroke-width="2" stroke-dasharray="10 14"/>`; }
+  for(const [x,y,sx,sy] of [[60,60,1,1],[VW-60,60,-1,1],[60,VH-60,1,-1],[VW-60,VH-60,-1,-1]]) g+=`<path d="M ${x} ${y+sy*80} V ${y} H ${x+sx*80}" fill="none" stroke="#e3b34c" stroke-width="6"/>`;
+  g+=`<text x="${cx}" y="${cy-20}" text-anchor="middle" font-size="${VH>VW?52:60}" font-weight="700" fill="#e6e1d3" font-family="var(--f-display)">还没有分镜</text>`;
+  g+=`<text x="${cx}" y="${cy+50}" text-anchor="middle" font-size="${VH>VW?30:32}" fill="${t}" font-family="var(--f-body)">在下方粘贴或打开剧本，生成后在这里播放</text>`;
+  g+=`<text x="${cx}" y="${cy+110}" text-anchor="middle" font-size="24" fill="#5d6862" font-family="var(--f-mono)">画幅 ${VH>VW?"9:16":$("aspect-opt").value}</text>`;
+  stage.innerHTML=g;
+}
+
 /* ---------- 数据编辑 ---------- */
-const SAMPLE=$("storyboard-data").textContent;
 const DRAFT_KEY="storyboard-previewer-draft";
 function load(raw,{save}={}){
   const d=normalize(raw);
   DATA=d; SHOTS=d.shots; TOTAL=d.total; LINE=d.meta.line; curShot=-1;
+  setTransport(true);
   const ar=String(d.meta.aspect||"16:9").split(/[:：]/).map(Number), ratio=ar[0]/(ar[1]||1);
   if(ratio<1){ VW=900; VH=1600; } else { VW=1600; VH=900; }
   stage.setAttribute("viewBox",`0 0 ${VW} ${VH}`); stage.style.aspectRatio=`${VW}/${VH}`;
   document.querySelector(".stage-box").classList.toggle("vertical",VH>VW);
   const m=d.meta;
-  $("eyebrow").innerHTML=[`<b>${esc(PAL[m.line].name)} ${esc(m.line)}</b>`,m.place,m.time].filter(Boolean).map(x=>`<span>${x.startsWith("<b>")?x:esc(x)}</span>`).join("");
+  $("eyebrow").innerHTML=[`<b>${esc(styleName(m.line))}</b>`,m.place,m.time].filter(Boolean).map(x=>`<span>${x.startsWith("<b>")?x:esc(x)}</span>`).join("");
   $("title").textContent=m.title; document.title=m.title+" · 分镜动态预览";
   $("summary").innerHTML=`<span class="spec">${fmt(TOTAL).replace(/^0/,"")} 秒 · ${SHOTS.length} 镜 · ${esc(m.aspect||"16:9")} · ${esc(m.fps||24)}fps</span>${esc(m.summary||"")}`;
   buildTimeline(); buildTable(); setTime(0);
@@ -1131,37 +1010,38 @@ $("btn-apply").onclick=()=>{
 $("btn-copyjson").onclick=e=>copyText($("json").value,e.currentTarget);
 $("btn-import").onclick=()=>$("file").click();
 $("file").onchange=e=>{ const f=e.target.files[0]; if(!f) return; const r=new FileReader(); r.onload=()=>{ $("json").value=r.result; $("btn-apply").click(); }; r.readAsText(f); e.target.value=""; };
-$("btn-sample").onclick=()=>{ $("json").value=JSON.stringify(JSON.parse(SAMPLE),null,2); $("btn-apply").click(); };
+const BLANK_TEMPLATE={
+  meta:{title:"（片名 / 场次名）",line:"N",place:"（地点）",time:"（日 / 夜）",aspect:"16:9",fps:24,summary:"（一句话概述本场）"},
+  actors:{a:{name:"（人物 1）",body:"#5f707a",legs:"#2a3034",sash:"#c7362c",skin:"#e6cfb1",hair:"short"},
+          b:{name:"（人物 2）",body:"#82603f",legs:"#3a2c20",sash:"#d1a640",skin:"#d8b48f",hair:"long"}},
+  set:[{type:"window",x:160,w:330,y:230,h:250},{type:"door",id:"door",x:1450,w:190}],
+  plan:{w:1000,h:600,props:[{label:"（道具）",x:400,y:250,w:200,h:80}]},
+  shots:[{dur:2,view:"side",lens:"24mm",size:"全景",angle:"平视",cam:{move:"handheld",hh:1},
+    acts:{a:[{t:0,x:500,pose:"stand",face:1}],b:[{t:0,x:1000,pose:"stand",face:-1}]},
+    plan:{actors:{a:[[300,320]],b:[[600,320]]},cam:[450,560,0]},
+    beat:"（短标签）",info:"（这一镜交代的信息）",q:"（留下的问题）",action:"（动作描述）",audio:"（声音 / 对白）"}]
+};
+$("btn-sample").onclick=()=>{ $("json").value=JSON.stringify(BLANK_TEMPLATE,null,2); msg("已填入空白模板：把括号里的内容换成你的，再点「应用」。",true); };
 $("btn-draft").onclick=()=>{ try{ const d=localStorage.getItem(DRAFT_KEY); if(d){ $("json").value=JSON.stringify(JSON.parse(d),null,2); $("btn-apply").click(); } }catch(e){ msg("草稿读取失败。",false); } };
 try{ if(localStorage.getItem(DRAFT_KEY)) $("btn-draft").hidden=false; }catch(e){}
 
 /* =====================================================================
    剧本导入：拆分场次 → 快速拆镜（本地规则）/ Claude 拆镜 → 预览
    ===================================================================== */
-const SAMPLE_SCRIPT=`第一场　沈府西廊书房　夜　内
+const SCRIPT_HINT=`支持这样的格式（各段都可省略）：
 
-人物：沈蘅、护院头目
+第1场　地点　日/夜　内/外
+人物：人物A、人物B
 
-月光从窗格斜照进来，书案上点着一支蜡烛。
-沈蘅蹲在书案后，借着烛光翻看一封密信。
-门外传来沉重的脚步声，停在门口。
-沈蘅抬起头，望向门。
-护院头目一脚踹开门，闯了进来。
-护院头目拔刀。
-护院头目举刀劈向沈蘅，她闪身躲开，刀砍进书案。
-烛台被震倒，烛火熄灭。
-黑暗中，沈蘅贴着书案的阴影绕到窗下。
-护院头目在月光里四处张望。
-沈蘅从暗处冲出，一剑刺中他的手腕。
-刀脱手掉在地上。
-沈蘅把他推到柱子上，剑抵住他的喉咙。
-护院头目：（喘息）你……是谁派来的？
-沈蘅：信在哪？
-院中传来杂乱的脚步声，灯笼一盏盏亮起。`;
+△：画面动作写在这里。
+人物A：（情绪）台词。
+旁白：画外音。
+
+也可以直接打开剧本文件。`;
 
 const PROJECT_KEY="storyboard-previewer-project";
 let project=null;
-function defaultProject(){ return {text:SAMPLE_SCRIPT,cur:0,scenes:[{title:"示例 · 西廊书房·夜取信",text:SAMPLE_SCRIPT,board:JSON.parse(SAMPLE),source:"sample"}]}; }
+function defaultProject(){ return {text:"",cur:0,scenes:[],assets:{}}; }
 let warnedQuota=false;
 function saveProject(){
   try{ localStorage.setItem(PROJECT_KEY,JSON.stringify(project)); return true; }
@@ -1520,7 +1400,7 @@ function buildPrompt(scene,lineOpt){
   const cast=project.cast||castInfo(scene.text);
   const meName=project.me&&project.me!=="auto"?project.me:cast.lead;
   const castList=(scene.names||cast.names||[]).filter(n=>scene.text.includes(n)).join("、");
-  const lineRule=lineOpt==="auto"?`按剧本选择：A 皮影戏/影窗；B 现实线夜景；C 回忆/闪回（胶片暖金）；N 通用（日景、现代或其他题材）。`:`固定用 "${lineOpt}"。`;
+  const lineRule=lineOpt==="auto"?`按剧本选择：A 剪影（皮影、影窗）；B 夜景（暖灯与冷月光）；C 暖调胶片（回忆、闪回）；N 中性日景（日景、现代或其他题材）。`:`固定用 "${lineOpt}"。`;
   return `你是一位电影导演兼摄影指导。把下面这一场剧本拆成分镜，输出一份 JSON，交给"分镜动态预览台"用简化人偶播放。
 
 ## 分镜原则（按顺序执行）
@@ -1683,7 +1563,7 @@ $("btn-split").onclick=()=>{
   saveProject(); renderScenes();
   const first=project.scenes.findIndex(s=>s.board); if(first>=0) showScene(first);
   const metaN=sc.filter(s=>s.meta).length;
-  genMsg(`拆出 ${sc.length-metaN} 场${metaN?`（另有 ${metaN} 段人物资料，只用来识别人物）`:""}，已快速生成 ${ok} 场预览。${cast.lead?`「我」按 ${cast.lead} 处理。`:""}${aiReady?"想要更细的镜头设计，可以对单场点「Claude 拆镜」。":""}`,ok>0);
+  genMsg(`拆出 ${sc.length-metaN} 场${metaN?`（另有 ${metaN} 段人物资料，只用来识别人物）`:""}，已快速生成 ${ok} 场预览。${cast.lead&&/我(?!们)/.test(text)?`「我」按 ${cast.lead} 处理。`:""}${aiReady?"想要更细的镜头设计，可以对单场点「Claude 拆镜」。":""}`,ok>0);
   renderAssets();
   if(first>=0) document.querySelector(".stage-box").scrollIntoView({behavior:REDUCED?"auto":"smooth",block:"start"});
 };
@@ -1699,6 +1579,7 @@ $("me-opt").onchange=e=>{ project.me=e.target.value; saveProject(); genMsg("已�
 $("aspect-opt").onchange=e=>{
   const v=e.target.value, sc=project.scenes[project.cur];
   if(sc&&sc.board){ sc.board.meta=Object.assign({},sc.board.meta,{aspect:v}); saveProject(); showScene(project.cur); }
+  else if(!SHOTS.length) showEmpty();
   genMsg(`画幅改为 ${v}；当前场次已切换，之后生成的场次也会用这个画幅。`,true);
 };
 
@@ -1717,7 +1598,7 @@ function renderAssets(){
       <div class="ctl">${a?`<select data-n="${esc(n)}" data-k="mode" aria-label="${esc(n)} 的显示方式"><option value="standee" ${a.mode==="standee"?"selected":""}>立绘</option><option value="head" ${a.mode==="head"?"selected":""}>头像</option></select>
         <select data-n="${esc(n)}" data-k="facing" aria-label="${esc(n)} 的原图朝向"><option value="front" ${a.facing==="front"?"selected":""}>正面</option><option value="right" ${a.facing==="right"?"selected":""}>朝右</option><option value="left" ${a.facing==="left"?"selected":""}>朝左</option></select>
         <button type="button" data-n="${esc(n)}" data-a="del">移除</button>`:`<button type="button" data-n="${esc(n)}" data-a="up">上传</button>`}</div></li>`; }).join("")
-    || `<li class="hint" style="grid-column:1/-1">导入剧本后，这里会列出人物；也可以直接批量上传，文件名写人物名，如「金妮.png」。</li>`;
+    || `<li class="hint" style="grid-column:1/-1">导入剧本后，这里会列出人物；也可以直接批量上传，文件名写人物名，如「人物名.png」。</li>`;
 }
 async function toAsset(file){
   const url=URL.createObjectURL(file); const img=new Image();
@@ -1795,12 +1676,19 @@ async function pdfText(buf){
 }
 
 /* ---------- 启动 ---------- */
-try{ const p=JSON.parse(localStorage.getItem(PROJECT_KEY)||"null"); if(p&&Array.isArray(p.scenes)&&p.scenes.length) project=p; }catch(e){}
+try{ const p=JSON.parse(localStorage.getItem(PROJECT_KEY)||"null"); if(p&&Array.isArray(p.scenes)) project=p; }catch(e){}
 if(!project) project=defaultProject();
+project.scenes=project.scenes.filter(s=>s.source!=="sample");   // 旧版本存下的示例场次不再保留
+if(project.cur>=project.scenes.length) project.cur=0;
 project.assets=project.assets||{}; ASSETS=project.assets;
-$("script-input").value=project.text||"";
+$("script-input").placeholder=SCRIPT_HINT;
+$("script-input").value=project.text&&project.scenes.length?project.text:"";
 fillMe(); updateStat(); renderScenes(); renderAssets();
+// 由技能生成的页面会把分镜写进 storyboard-data；用户自己导入的场次保存在本机
+let embedded=null; try{ embedded=JSON.parse($("storyboard-data").textContent); }catch(e){}
 const startIdx=project.scenes[project.cur]&&project.scenes[project.cur].board?project.cur:project.scenes.findIndex(s=>s.board);
-if(startIdx>=0) showScene(startIdx); else load(JSON.parse(SAMPLE));
+if(embedded&&Array.isArray(embedded.shots)&&embedded.shots.length) load(embedded);
+else if(startIdx>=0) showScene(startIdx);
+else showEmpty();
 })();
 </script>

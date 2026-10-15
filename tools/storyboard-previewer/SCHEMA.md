@@ -26,8 +26,9 @@
 
 | 字段 | 说明 |
 | --- | --- |
-| `title` | 标题，如「西廊书房·夜取信」 |
-| `line` | 默认视觉线：`A` 影戏线 / `B` 现实线 / `C` 回忆线（对应 Seedance 导演技能的三条线）/ `N` 通用（日景、现代或其他题材），决定配色 |
+| `title` | 标题，如「第 3 场 · 天台对峙」 |
+| `line` | 默认画面风格（决定配色）：`A` 剪影 / `B` 夜景 / `C` 暖调胶片 / `N` 中性日景 |
+| `styleNames` | 可选，给风格起你自己的名字，如 `{"B": "主线", "C": "回忆"}`，页面上会显示这些名字 |
 | `place` `time` | 地点、时间，显示在标题上方 |
 | `aspect` | `16:9`（默认）、`9:16`（竖屏短剧，画框变为竖向）或 `2.39:1`（加遮幅） |
 | `fps` | 帧率，仅显示 |
@@ -36,7 +37,7 @@
 ## actors
 
 ```json
-"heng": { "name": "沈蘅", "body": "#5f707a", "legs": "#2a3034", "sash": "#c7362c",
+"a": { "name": "人物A", "body": "#5f707a", "legs": "#2a3034", "sash": "#c7362c",
           "skin": "#e6cfb1", "hair": "bun", "hairColor": "#151515",
           "beard": false, "robe": false, "weapon": "sword", "scale": 1 }
 ```
@@ -46,7 +47,7 @@
 - `robe: true` 画长袍下摆；`beard: true` 画胡须
 - `weapon`：`sword` 剑 / `blade` 刀 / `knife` 短刀 / `staff` 棍；省略则无兵器
 - `scale`：身形比例，1 约为 420 单位高
-- 影戏线（A）中人物自动画成皮影剪影并带签子
+- 剪影风格（A）中人物自动画成剪影并带签子
 
 ## set（侧视布景，世界坐标：宽 1600，地面在 y=760）
 
@@ -62,7 +63,7 @@
 
 ```json
 "plan": { "w": 1000, "h": 600,
-  "props": [ { "label": "书案", "x": 360, "y": 230, "w": 260, "h": 80, "kind": "window|door|candle" } ] }
+  "props": [ { "label": "桌子", "x": 360, "y": 230, "w": 260, "h": 80, "kind": "window|door|candle" } ] }
 ```
 
 ## shots
@@ -78,22 +79,22 @@
     "move": "handheld",             // handheld 手持定点 / push 推 / pull 拉 / pan 摇 / track 移跟 / tilt 俯仰 / crane 升降 / static 固定（需导演确认）
     "hh": 1,                        // 手持强度 0–3：几乎静止 / 轻微 / 贴身肩扛 / 近身跟拍
     "settle": 0.6,                  // 在本镜 60% 处稳住
-    "target": ["heng", "guard"],    // 构图对象（一个或多个人物 id）
+    "target": ["a", "b"],            // 构图对象（一个或多个人物 id）
     "dir": -1,                      // 方向：track/pan 中 -1 向画左；tilt/crane 中 1 向上
     "amount": 240, "dutch": 0       // 可选：运动幅度、倾斜角
   },
   "light": { "candle": true, "moon": true, "dark": 0.25 },   // 不写则沿用上一镜
   "props": { "door": { "open": true } },                      // 布景状态，向后沿用
   "acts": {                         // 人物关键帧（t 为本镜内 0–1，可省略则均分）
-    "heng": [ { "t": 0, "x": 1000, "pose": "crouch", "face": 1 },
+    "a": [ { "t": 0, "x": 1000, "pose": "crouch", "face": 1 },
               { "t": 1, "x": 860, "pose": "dodge", "face": 1, "weapon": "hand", "head": -10 } ]
   },
   "fx": [ { "t": 0.72, "kind": "impact", "x": 1040, "y": 612 },
-          { "t": 0.36, "kind": "spark", "at": "guard.hand" } ],
+          { "t": 0.36, "kind": "spark", "at": "b.hand" } ],
   "insert": { "kind": "candle", "out": 0.5, "tip": true },     // view 为 insert 时
-  "plan": { "actors": { "heng": [[600, 330], [520, 340]] }, "cam": [640, 560, -7] },
-  "beat": "劈案 · 闪开",             // 时间轴旁的短标签
-  "info": "刀劈进书案，她已闪开",     // 一镜一信息（主语＋动词）
+  "plan": { "actors": { "a": [[600, 330], [520, 340]] }, "cam": [640, 560, -7] },
+  "beat": "推开 · 后退",             // 时间轴旁的短标签
+  "info": "A 推开 B，B 后退两步",     // 一镜一信息（主语＋动词）
   "q": "下一刀呢？",                 // 留下的问题
   "action": "……",                    // 写进【CAMERA】的本镜动作正文
   "audio": "……"

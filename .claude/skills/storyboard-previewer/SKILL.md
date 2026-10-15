@@ -21,7 +21,7 @@ description: 把已确认的 AI 影片分镜（通常来自 seedance-live-action
    - 攻击按"意图—动作—结果—反应"拆镜：动作镜短，结果与反应镜长；用 `fx` 标出接触瞬间。
    - 手、刀、眼睛、烛火等因果物与转折用 `view: "insert"`；局势用全景，必要时用 `view: "plan"` 高机位俯视。
    - 为每个实景镜头填 `plan.cam` 与 `plan.actors`，让页面检查越轴；同一场人物的左右关系保持一致。
-   - 视觉线 `meta.line` / `shot.line` 与剧本标记一致（A 影戏线、B 现实线、C 回忆线）。
+   - 画面风格 `meta.line` / `shot.line` 按剧本选择（A 剪影、B 夜景、C 暖调胶片、N 中性日景）；剧本或用户有自己的叫法时写进 `meta.styleNames`。
 3. **生成页面。** 复制模板，只替换 `<script type="application/json" id="storyboard-data">` 里的 JSON（保持合法 JSON，不加注释），其余代码不改。用 Artifact 工具发布，并声明 `capabilities: {sample: {}}`（或把文件交给用户本地打开，本地只能用快速拆镜）。
 4. **交付后**，告诉导演可以在页面「分镜数据」里直接改数值重演，在「提示词导出」里复制信息清单表与【CAMERA】骨架；正式八模块仍按导演技能完整写出。
 
@@ -29,3 +29,4 @@ description: 把已确认的 AI 影片分镜（通常来自 seedance-live-action
 
 - 预览是走位与节奏的示意，人偶不代表最终造型、表演和画面质感。
 - 不在页面里写影片名、导演或摄影师姓名。
+- 预览台是空白模板：页面里不放任何示例剧本或示例人物。生成页面时只填用户自己的内容。
