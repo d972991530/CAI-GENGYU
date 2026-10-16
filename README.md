@@ -4,7 +4,7 @@
 
 ## 镜坊 · AI 影视工作台（新）
 
-`studio/` 目录是一个全新的一站式 AI 影视 / 短剧工作台：创意 → 剧本 → 画风 → 角色与场景 → 智能分镜 → 配图 / 视频 / 配音 → 成片。详见 [studio/README.md](studio/README.md)。
+`studio/` 目录是一个全新的一站式 AI 影视 / 短剧工作台：创意 → 剧本 → 画风 → 角色与场景 → 智能分镜 → 配图 / 视频 / 配音 → 成片。前端只访问同域 `/api`，所有模型调用（Gemini、fal）和 API Key 都在 `studio/server/` 后端。详见 [studio/README.md](studio/README.md)。
 
 # Run and deploy your AI Studio app
 

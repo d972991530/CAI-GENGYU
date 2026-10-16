@@ -1,5 +1,5 @@
-export type ProjectFormat = 'short-drama' | 'comic-drama' | 'film';
-export type Aspect = '9:16' | '16:9' | '1:1';
+import type { Aspect, ProjectFormat } from '../shared/types';
+export type { Aspect, ProjectFormat, Engines, PublicSettings, SettingsPatch } from '../shared/types';
 export type GenStatus = 'idle' | 'queued' | 'running' | 'done' | 'error';
 
 export interface Asset {
@@ -79,24 +79,4 @@ export interface Job {
   error?: string;
   startedAt?: number;
   finishedAt?: number;
-}
-
-export type TextEngine = 'gemini' | 'demo';
-export type ImageEngine = 'gemini' | 'qwen-image' | 'flux-schnell' | 'demo';
-export type VideoEngine = 'veo' | 'wan' | 'demo';
-export type TtsEngine = 'gemini' | 'demo';
-
-export interface Engines { text: TextEngine; image: ImageEngine; video: VideoEngine; tts: TtsEngine }
-
-export interface Settings {
-  engines: Engines;
-  /** Gemini API Key */
-  apiKey: string;
-  /** fal.ai API Key（开源模型云端推理） */
-  falKey: string;
-  textModel: string;
-  imageModel: string;
-  videoModel: string;
-  ttsModel: string;
-  concurrency: number;
 }

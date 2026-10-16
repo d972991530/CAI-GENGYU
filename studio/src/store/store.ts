@@ -1,54 +1,34 @@
 import { create } from 'zustand';
-import type { Job, Project, Settings } from '../types';
+import type { Job, Project, PublicSettings, SettingsPatch } from '../types';
+import { api, ApiError } from '../services/api';
 import { idb } from '../lib/db';
 import { uid } from '../lib/util';
 
-declare const __DEFAULT_GEMINI_KEY__: string;
+const CONCURRENCY_KEY = 'jingfang.concurrency';
+const loadConcurrency = () => { try { return Number(localStorage.getItem(CONCURRENCY_KEY)) || 2; } catch { return 2; } };
 
-const SETTINGS_KEY = 'jingfang.settings';
-const hasGemini = !!__DEFAULT_GEMINI_KEY__;
-const defaultSettings: Settings = {
-  engines: hasGemini
-    ? { text: 'gemini', image: 'gemini', video: 'veo', tts: 'gemini' }
-    : { text: 'demo', image: 'demo', video: 'demo', tts: 'demo' },
-  apiKey: __DEFAULT_GEMINI_KEY__,
-  falKey: '',
-  textModel: 'gemini-2.5-flash',
-  imageModel: 'gemini-2.5-flash-image',
-  videoModel: 'veo-3.1-fast-generate-preview',
-  ttsModel: 'gemini-2.5-flash-preview-tts',
-  concurrency: 2,
-};
-
-function loadSettings(): Settings {
-  try {
-    const raw = JSON.parse(localStorage.getItem(SETTINGS_KEY) ?? '{}');
-    // 兼容旧版的单一 provider 字段
-    if (raw.provider && !raw.engines) {
-      raw.engines = raw.provider === 'gemini'
-        ? { text: 'gemini', image: 'gemini', video: 'veo', tts: 'gemini' }
-        : defaultSettings.engines;
-      delete raw.provider;
-    }
-    return { ...defaultSettings, ...raw, engines: { ...defaultSettings.engines, ...raw.engines } };
-  } catch {
-    return defaultSettings;
-  }
-}
+/** 后端连接状态：offline 时只能使用演示引擎 */
+export type ServerStatus = 'loading' | 'ok' | 'offline' | 'unauthorized';
 
 export interface Toast { id: string; text: string; tone: 'info' | 'error' | 'ok' }
 
 interface State {
   ready: boolean;
   projects: Record<string, Project>;
-  settings: Settings;
+  /** 服务端设置（不含密钥明文）；后端不可用时为 null，全部走演示引擎 */
+  settings: PublicSettings | null;
+  serverStatus: ServerStatus;
+  serverError?: string;
+  concurrency: number;
   jobs: Job[];
   toasts: Toast[];
   load(): Promise<void>;
   createProject(p: Partial<Project>): string;
   patch(id: string, recipe: (p: Project) => void): void;
   removeProject(id: string): void;
-  setSettings(s: Partial<Settings>): void;
+  refreshSettings(): Promise<void>;
+  saveSettings(p: SettingsPatch): Promise<void>;
+  setConcurrency(n: number): void;
   toast(text: string, tone?: Toast['tone']): void;
 }
 
@@ -61,13 +41,34 @@ function scheduleSave(p: Project) {
 export const useStore = create<State>((set, get) => ({
   ready: false,
   projects: {},
-  settings: loadSettings(),
+  settings: null,
+  serverStatus: 'loading',
+  concurrency: loadConcurrency(),
   jobs: [],
   toasts: [],
 
   async load() {
     const list = await idb.all<Project>('projects');
     set({ projects: Object.fromEntries(list.map((p) => [p.id, p])), ready: true });
+    get().refreshSettings();
+  },
+
+  async refreshSettings() {
+    try {
+      set({ settings: await api.settings(), serverStatus: 'ok', serverError: undefined });
+    } catch (e) {
+      const status = e instanceof ApiError && e.status === 401 ? 'unauthorized' : 'offline';
+      set({ settings: null, serverStatus: status, serverError: (e as Error).message });
+    }
+  },
+
+  async saveSettings(p) {
+    set({ settings: await api.saveSettings(p), serverStatus: 'ok', serverError: undefined });
+  },
+
+  setConcurrency(n) {
+    try { localStorage.setItem(CONCURRENCY_KEY, String(n)); } catch { /* ignore */ }
+    set({ concurrency: n });
   },
 
   createProject(init) {
@@ -98,12 +99,6 @@ export const useStore = create<State>((set, get) => ({
     idb.del('projects', id);
   },
 
-  setSettings(s) {
-    const settings = { ...get().settings, ...s };
-    localStorage.setItem(SETTINGS_KEY, JSON.stringify(settings));
-    set({ settings });
-  },
-
   toast(text, tone = 'info') {
     const t = { id: uid(), text, tone };
     set({ toasts: [...get().toasts, t] });
@@ -117,8 +112,8 @@ const pending: { job: Job; run: Runner; resolve: () => void }[] = [];
 let active = 0;
 
 function pump() {
-  const { settings } = useStore.getState();
-  while (active < settings.concurrency && pending.length) {
+  const { concurrency } = useStore.getState();
+  while (active < concurrency && pending.length) {
     const item = pending.shift()!;
     active++;
     updateJob(item.job.id, { status: 'running', startedAt: Date.now() });

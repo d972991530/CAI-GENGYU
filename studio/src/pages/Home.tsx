@@ -17,6 +17,7 @@ const SAMPLE_IDEA = '被豪门赶出家门的设计师林夏，三年后带着�
 export default function Home({ onSettings }: { onSettings: () => void }) {
   const projects = useStore((s) => s.projects);
   const settings = useStore((s) => s.settings);
+  const status = useStore((s) => s.serverStatus);
   const removeProject = useStore((s) => s.removeProject);
   const [open, setOpen] = useState(false);
   const list = useMemo(() => Object.values(projects).sort((a, b) => b.updatedAt - a.updatedAt), [projects]);
@@ -27,9 +28,9 @@ export default function Home({ onSettings }: { onSettings: () => void }) {
         <nav className="flex items-center justify-between py-6">
           <Brand />
           <div className="flex items-center gap-2">
-            <span className={`hidden rounded-full border px-3 py-1 text-xs sm:inline ${isAllDemo(settings) ? 'border-amber/40 text-amber' : 'border-jade/40 text-jade'}`}>
-              {isAllDemo(settings) ? '● 演示模式' : `● ${engineSummary(settings)}`}
-            </span>
+            <button onClick={onSettings} className={`hidden cursor-pointer rounded-full border px-3 py-1 text-xs sm:inline ${status !== 'ok' && status !== 'loading' ? 'border-vermilion/40 text-vermilion' : isAllDemo(settings) ? 'border-amber/40 text-amber' : 'border-jade/40 text-jade'}`}>
+              {status === 'offline' ? '● 后端未连接 · 演示模式' : status === 'unauthorized' ? '● 需要访问口令' : isAllDemo(settings) ? '● 演示模式' : `● ${engineSummary(settings)}`}
+            </button>
             <Button variant="ghost" icon={<Settings2 className="size-4" />} onClick={onSettings}>设置</Button>
           </div>
         </nav>
