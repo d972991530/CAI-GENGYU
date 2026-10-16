@@ -1,0 +1,288 @@
+{
+  "project": {
+    "name": "STAGE 闯关预告",
+    "storyboard": "https://claude.ai/artifact/Wbj7dEXUXe2GyYtHFFSGJA",
+    "fps": 24,
+    "width": 1344,
+    "height": 768,
+    "duration": 132,
+    "song": "assets/song.wav",
+    "refs_dir": "refs",
+    "comfy_url": "http://127.0.0.1:8188",
+    "upload_subfolder_refs": "h3_refs",
+    "upload_subfolder_music": "h3_music",
+    "output_prefix": "stage"
+  },
+
+  "models": {
+    "fl2va_unet": "minimax_h3_fl2va_pruned_int8_convrot.safetensors",
+    "ref2va_unet": "minimax_h3_ref2va_pruned_int8_convrot.safetensors",
+    "text_encoder": "qwen3vl_32b_minimax_h3_nvfp4_awq.safetensors",
+    "video_vae": "minimax_h3_video_vae_fp16.safetensors",
+    "audio_vae": "minimax_h3_audio_vae_fp32.safetensors",
+    "turbo_lora": "minimax_h3_fl2v_turbo_8step_v1.0_comfyui_bf16.safetensors"
+  },
+
+  "sampling": {
+    "sampler": "res_multistep",
+    "scheduler": "simple",
+    "steps": 20,
+    "shift_video": 12.0,
+    "shift_audio": 3.0,
+    "turbo": false,
+    "turbo_steps": 8,
+    "ref_image_size": "match",
+    "music_conditioning": "auto"
+  },
+
+  "constraints": "Live-action footage, photorealistic skin and fabric, no subtitles, no captions, no watermarks, no logos, no extra people beyond those described, faces stay consistent with the references, no soft dissolves.",
+
+  "references": {
+    "A_c1": "members/A_c1.png", "B_c1": "members/B_c1.png", "C_c1": "members/C_c1.png",
+    "D_c1": "members/D_c1.png", "E_c1": "members/E_c1.png", "F_c1": "members/F_c1.png",
+    "G_c1": "members/G_c1.png", "H_c1": "members/H_c1.png",
+    "A_c2": "members/A_c2.png", "B_c2": "members/B_c2.png", "C_c2": "members/C_c2.png",
+    "D_c2": "members/D_c2.png", "E_c2": "members/E_c2.png", "F_c2": "members/F_c2.png",
+    "G_c2": "members/G_c2.png", "H_c2": "members/H_c2.png", "I_c2": "members/I_c2.png",
+    "J_c2": "members/J_c2.png", "K_c2": "members/K_c2.png", "L_c2": "members/L_c2.png",
+    "group_c1": "group/group_c1.png",
+    "group_c2": "group/group_c2.png",
+    "scene_white": "scenes/white_cyc.png",
+    "scene_black": "scenes/black_void.png",
+    "scene_capsule": "scenes/capsule.png",
+    "scene_arena": "scenes/blue_arena.png",
+    "end_frame": "keyframes/end_AB_L.png"
+  },
+
+  "units": [
+    {
+      "id": "U01", "chapter": "序章 · 白", "shots": [1, 2, 3, 4, 5, 6, 7],
+      "start": 0, "end": 14, "mode": "ref2va", "seed": 1001, "takes": 2,
+      "refs": ["A_c1", "B_c1", "scene_white"],
+      "header": "K-pop girl group performance film. Seamless pure white cyclorama studio as in {scene_white}, soft shadowless high-key light, minimalist and airy. Two dancers only: {A_c1} and {B_c1}, both in oversized white sweatshirts and baggy white sweatpants.",
+      "timeline": [
+        [0, 2, "Wide locked-off shot, the two stand with their backs to camera in the white void; on the first beat they both turn around."],
+        [2, 4, "Hard cut, medium shot, the camera rolls 90 degrees clockwise as {A_c1} whips her hair, the frame tipping sideways."],
+        [4, 5, "Hard cut, close-up of {A_c1}'s arm sweeping across the frame."],
+        [5, 7, "Hard cut, low-angle medium close-up slowly pushing in, both face the camera and make an 'L' hand sign, {B_c1} smiles."],
+        [7, 11, "Hard cut, extreme wide locked-off shot, the two perform a synchronized duet, small in a vast white space."],
+        [11, 13, "Hard cut, medium shot tracking sideways, {B_c1} does a high kick while {A_c1} circles around to the front."],
+        [13, 14, "Four rapid hard cuts of freeze poses, a quarter second each."]
+      ],
+      "camera": "Mostly locked-off camera, one 90-degree roll, hard cuts only.",
+      "audio": "Sparse synth intro with finger snaps, building over the last two seconds.",
+      "post": ["镜3 袖口白色弧线 MG", "镜7 若模型快切不准，剪辑里手动切四个定格"]
+    },
+    {
+      "id": "U02", "chapter": "STAGE 1 字卡", "shots": [8],
+      "start": 14, "end": 16, "mode": "fl2va", "seed": 1002, "takes": 2,
+      "refs": [], "music": "none",
+      "header": "Motion graphic title card on a pure white background, flat 2D design, crisp edges.",
+      "timeline": [
+        [0, 1.5, "Dozens of small glossy red dots fly in from the edges and assemble into the text \"Stage 1\" in a rounded dotted typeface, large translucent red circles drift behind."],
+        [1.5, 2, "A large black circle sweeps across and covers the whole frame."],
+        [2, 5, "Solid black frame holds."]
+      ],
+      "camera": "Static frame, graphics only, no people.",
+      "audio": "A single heavy drum hit lands at 1.5 seconds.",
+      "constraints": "The only text is \"Stage 1\", spelled exactly, clearly legible, no other text, no people.",
+      "post": ["只取前 2 秒；更稳的做法是在 AE 里做这张字卡，生成版当备选"]
+    },
+    {
+      "id": "U03", "chapter": "第一章 · 群像", "shots": [9, 10, 11, 12],
+      "start": 16, "end": 24, "mode": "ref2va", "seed": 1003, "takes": 2,
+      "refs": ["A_c1", "B_c1", "group_c1", "C_c1", "D_c1", "E_c1"],
+      "header": "K-pop girl group performance film, moody grey to black studio, strong rim light and hard top light. Twelve members as in {group_c1}, all in oversized white sweatshirts and baggy white sweatpants.",
+      "timeline": [
+        [0, 2, "Medium backlit locked shot on a grey gradient background, {A_c1} and {B_c1} turn around in rim light, faces mostly in shadow."],
+        [2, 4, "Hard cut, wide side-on locked shot, all twelve girls stand in a single line as dark silhouettes against a pale grey wall; {A_c1} and {B_c1} step out from the middle of the line."],
+        [4, 5, "Strobing hard cuts alternating the silhouette line with black frames."],
+        [5, 8, "Hard cut, black background with hard top light, close-up of {C_c1}, {D_c1} and {E_c1} in profile, staggered front to back, slowly raising their eyes, very slow push-in."]
+      ],
+      "camera": "Locked-off and very slow push-in, hard cuts only.",
+      "audio": "Verse begins, deep kick drum on every beat, airy vocal chops.",
+      "post": ["镜11 频闪：剪辑里每 2 帧插 1 黑帧"]
+    },
+    {
+      "id": "U04", "chapter": "第一章 · 个人卡", "shots": [13, 14, 15, 16, 17, 18],
+      "start": 24, "end": 36, "mode": "ref2va", "seed": 1004, "takes": 2,
+      "refs": ["F_c1", "C_c1", "D_c1", "E_c1", "scene_black"],
+      "header": "K-pop girl group concept film, pitch black void as in {scene_black}, single-source dramatic lighting, each member gets her own portrait moment, all in white sweatshirts.",
+      "timeline": [
+        [0, 2, "Top-down overhead locked shot looking straight down at {F_c1}, a long white satin ribbon spirals around her body."],
+        [2, 5, "Hard cut, {C_c1} stands in darkness, a green light source behind her flares into the lens, slow push from medium shot to close-up."],
+        [5, 7, "Extreme close-up of {C_c1} looking straight into the lens, a slow smile forms."],
+        [7, 9, "Hard cut, handheld close-up of {D_c1}'s hands playing cat's cradle with thin glowing white string."],
+        [9, 11, "Hard cut, medium shot, {D_c1} flicks her hand and the white string flies out of frame, turning into a thin glowing light trail."],
+        [11, 12, "Hard cut, close-up tracking sideways, the light trail lands on {E_c1}'s fingertip, she wears a white ring-shaped wrist device."]
+      ],
+      "camera": "Overhead, slow push-ins, slight handheld on hands, hard cuts only.",
+      "audio": "Verse continues, minimal beat, a glassy synth pluck on every new shot.",
+      "post": ["镜17 实物线转 MG 线需逐帧对位", "镜14 光晕可在后期加强"]
+    },
+    {
+      "id": "U05A", "chapter": "第一章 · 个人卡（水晶）", "shots": [19, 20, 21],
+      "start": 36, "end": 42, "mode": "ref2va", "seed": 1005, "takes": 2,
+      "refs": ["G_c1", "H_c1", "scene_black"],
+      "header": "K-pop girl group concept film, pitch black void as in {scene_black}, cool spotlight, white sweatshirts.",
+      "timeline": [
+        [0, 2, "Medium locked shot, {G_c1} tosses a small glowing ball upward, it leaves a trail of afterimages along its arc."],
+        [2, 4, "Hard cut, slow push-in, {G_c1} and {H_c1} bring their hands together and a diamond-shaped glowing crystal rises between them."],
+        [4, 5, "The crystal flares brighter and brighter until the entire frame burns to pure white."],
+        [5, 6, "Pure white frame holds."]
+      ],
+      "camera": "Locked-off then slow push-in, ends on a full white flash.",
+      "audio": "Pre-chorus riser, rising synth and white-noise swell peaking at 4.5 seconds.",
+      "post": ["镜21 闪白可在剪辑里补 6 帧纯白"]
+    },
+    {
+      "id": "U05B", "chapter": "第一章 · 换装进灰蓝", "shots": [22, 23, 24],
+      "start": 42, "end": 48, "mode": "ref2va", "seed": 1006, "takes": 2,
+      "refs": ["H_c2", "I_c2", "J_c2", "scene_capsule"],
+      "header": "K-pop girl group concept film, slate-blue retro-futuristic capsule set with curved white walls and round portholes as in {scene_capsule}. New outfits: grey-white cropped polo tops, pleated mini skirts, white knee socks and loafers.",
+      "timeline": [
+        [0, 2, "Medium shot trucking sideways, {H_c2} pushes a white roller along a curved console."],
+        [2, 4, "Hard cut, ground-level close-up tracking the roller as it rolls past the lens along the console edge."],
+        [4, 6, "Hard cut, whip pan with a speed ramp, {I_c2} and {J_c2} turn their heads into frame, streaks of foreground motion blur."]
+      ],
+      "camera": "Trucking, ground-level tracking, whip pan with speed ramp.",
+      "audio": "Pre-chorus continues, filtered drums, tension building.",
+      "post": []
+    },
+    {
+      "id": "U06", "chapter": "第一章 · 太空舱开门", "shots": [25, 26, 27, 28, 29],
+      "start": 48, "end": 60, "mode": "ref2va", "seed": 1007, "takes": 2,
+      "refs": ["K_c2", "L_c2", "group_c2", "scene_capsule"],
+      "header": "K-pop girl group performance film, slate-blue capsule set with curved white walls and round portholes as in {scene_capsule}. Twelve members as in {group_c2}, grey-white cropped polo tops, pleated mini skirts, white knee socks.",
+      "timeline": [
+        [0, 2, "Close-up, locked, {K_c2} grips a metal ladder rail with one hand, looking off-screen."],
+        [2, 3, "Hard cut, clean shot of the empty curved wall with round portholes."],
+        [3, 5, "Hard cut, medium shot that starts upside down, {L_c2} enters hanging inverted, the camera rolls 180 degrees back to upright."],
+        [5, 8, "Hard cut, slow push-in, {K_c2} leans against the wall beside a round porthole; the porthole turns from white to black like a door opening."],
+        [8, 12, "Hard cut, wide shot framed through the round porthole, all twelve girls start the chorus choreography in perfect sync on a glossy floor."]
+      ],
+      "camera": "180-degree roll, slow push-in, frame-within-frame through the porthole.",
+      "audio": "Chorus drops at 8 seconds, full beat, punchy bass and claps.",
+      "post": ["镜26 白色箭头/圆环路线 MG 叠在空墙镜头上"]
+    },
+    {
+      "id": "U07", "chapter": "第一章 · 群舞冲前", "shots": [30, 31, 32, 33],
+      "start": 60, "end": 70, "mode": "ref2va", "seed": 1008, "takes": 2,
+      "refs": ["A_c2", "B_c2", "C_c2", "D_c2", "group_c2", "scene_capsule"],
+      "header": "K-pop girl group performance film, slate-blue capsule set as in {scene_capsule}, twelve members as in {group_c2}, grey-white cropped polo tops and pleated mini skirts, high-energy chorus.",
+      "timeline": [
+        [0, 2, "Handheld camera rushing forward, {A_c2} charges toward the lens and whips her hair, motion blur."],
+        [2, 6, "Hard cut, handheld moving backward, the front row {A_c2}, {B_c2}, {C_c2} and {D_c2} advance in sync with the whole group dancing behind."],
+        [6, 8, "Hard cut, low-angle wide shot, all twelve hit a sharp freeze."],
+        [8, 10, "Hard cut, close-up, {B_c2} reaches out and grabs toward the lens."]
+      ],
+      "camera": "Handheld push and pull, low angle, hard cuts on the beat.",
+      "audio": "Chorus, strong four-on-the-floor kick, vocal hook.",
+      "post": []
+    },
+    {
+      "id": "U08", "chapter": "第一章 · 俯拍 + 过门", "shots": [34, 35, 36],
+      "start": 70, "end": 78, "mode": "ref2va", "seed": 1009, "takes": 2,
+      "refs": ["C_c2", "D_c2", "E_c2", "F_c2", "group_c2", "scene_capsule"],
+      "header": "K-pop girl group performance film, slate-blue capsule set as in {scene_capsule}, twelve members as in {group_c2}, grey-white cropped polo tops and pleated mini skirts.",
+      "timeline": [
+        [0, 3, "Overhead top-down shot slowly rotating, the twelve girls spread outward, their long shadows on the floor forming a radial pattern."],
+        [3, 6, "Hard cut, handheld orbit, {C_c2} in the center, the dancers behind her bend backward one after another in a wave."],
+        [6, 8, "Hard cut, wide locked shot of a white room with a large arch outlined in neon pink, {D_c2} and {E_c2} stand inside the arch, {F_c2} in the foreground side-on looking at the camera."]
+      ],
+      "camera": "Rotating overhead, handheld orbit, locked wide.",
+      "audio": "Chorus ends at 6 seconds, a short filtered breakdown.",
+      "post": []
+    },
+    {
+      "id": "U09", "chapter": "STAGE 2 字卡", "shots": [37],
+      "start": 78, "end": 80, "mode": "fl2va", "seed": 1010, "takes": 2,
+      "refs": [], "music": "none",
+      "header": "Motion graphic title card on a deep electric-blue background, flat 2D design, soft glow.",
+      "timeline": [
+        [0, 1.5, "Soft pink glowing light dots float in and assemble into the text \"Stage 2\" in a rounded dotted typeface."],
+        [1.5, 2, "The text pulses once and bursts into light."],
+        [2, 5, "Deep blue frame holds."]
+      ],
+      "camera": "Static frame, graphics only, no people.",
+      "audio": "A single heavy drum hit lands at 1.5 seconds.",
+      "constraints": "The only text is \"Stage 2\", spelled exactly, clearly legible, no other text, no people.",
+      "post": ["只取前 2 秒；同 U02，可改用 AE 字卡"]
+    },
+    {
+      "id": "U10", "chapter": "第二章 · 闯关", "shots": [38, 39, 40, 41, 42],
+      "start": 80, "end": 92, "mode": "ref2va", "seed": 1011, "takes": 2,
+      "refs": ["G_c2", "H_c2", "I_c2", "scene_arena"],
+      "header": "K-pop girl group concept film, deep blue circular arena as in {scene_arena}, glowing white lines and round numbered nodes on the floor like a game board. Grey-white cropped polo tops, pleated mini skirts, white knee socks and loafers.",
+      "timeline": [
+        [0, 3, "Wide shot pushing in to medium, {G_c2} stands at one end of a glowing white line on the floor, a path of glowing round nodes behind her."],
+        [3, 5, "Hard cut, close-up of a glowing round floor node marked with the number 3 lighting up."],
+        [5, 7, "Hard cut, ground-level locked shot, {H_c2}'s white loafer steps onto a node marked 4 and the node lights up."],
+        [7, 10, "Hard cut, handheld follow, {I_c2} spins into frame, background dancers out of focus."],
+        [10, 12, "Hard cut, locked close-up, {I_c2} stops and smiles at the lens."]
+      ],
+      "camera": "Push-in, ground-level locked, handheld follow.",
+      "audio": "Verse two, bouncy bass line, a game-like blip when the node lights at 5.5 seconds.",
+      "post": ["镜38 路径图 1→2→3 MG", "镜39/40 节点数字可在后期替换得更清楚"]
+    },
+    {
+      "id": "U11", "chapter": "第二章 · 闯关（踩点 + 撞色）", "shots": [43, 44, 45],
+      "start": 92, "end": 100, "mode": "ref2va", "seed": 1012, "takes": 2,
+      "refs": ["J_c2", "K_c2", "L_c2", "scene_arena"],
+      "header": "K-pop girl group concept film, deep blue circular arena as in {scene_arena}, glowing rings and nodes on the floor, grey-white cropped polo tops and pleated mini skirts.",
+      "timeline": [
+        [0, 3, "Medium high-angle shot, {J_c2} crouches low inside a glowing ring on the floor, pressing one palm onto a small floor device."],
+        [3, 5, "Hard cut, ground-level close-up, {J_c2}'s toe taps a glowing floor node."],
+        [5, 8, "Hard cut, medium locked two-shot, {K_c2} and {L_c2} side by side with palms pressed together, a hot pink side light cutting into the blue scene."]
+      ],
+      "camera": "High angle, ground-level close-up, locked two-shot.",
+      "audio": "Pre-chorus, rising synth riser.",
+      "post": []
+    },
+    {
+      "id": "U12", "chapter": "第二章 · 终章群舞 1", "shots": [46, 47, 48, 49, 50],
+      "start": 100, "end": 113, "mode": "ref2va", "seed": 1013, "takes": 2,
+      "refs": ["A_c2", "B_c2", "C_c2", "D_c2", "E_c2", "group_c2", "scene_arena"],
+      "header": "K-pop girl group performance film, deep blue circular arena with a glowing ring rail as in {scene_arena}, twelve members as in {group_c2}, grey-white cropped polo tops and pleated mini skirts, final chorus energy.",
+      "timeline": [
+        [0, 2, "High oblique wide shot of the circular arena, {A_c2} walks alone into the center."],
+        [2, 6, "Hard cut, wide locked shot, all twelve girls in a single line, the same move ripples from left to right one by one."],
+        [6, 8, "Hard cut, medium lateral tracking shot gliding past the front-row faces: {A_c2}, {B_c2}, {C_c2}, {D_c2}, {E_c2}."],
+        [8, 9, "A bright lens flare sweeps across the frame."],
+        [9, 13, "Hard cut, low-angle wide shot, the group reshapes into a triangle formation."]
+      ],
+      "camera": "High oblique wide, locked wide, lateral tracking, low angle.",
+      "audio": "Final chorus drops at 2 seconds, the biggest energy of the song.",
+      "post": []
+    },
+    {
+      "id": "U13", "chapter": "第二章 · 终章群舞 2", "shots": [51, 52, 53, 54, 55],
+      "start": 113, "end": 125, "mode": "ref2va", "seed": 1014, "takes": 2,
+      "refs": ["B_c2", "group_c2", "scene_arena"],
+      "header": "K-pop girl group performance film, deep blue circular arena as in {scene_arena}, twelve members as in {group_c2}, grey-white cropped polo tops, pleated mini skirts, white knee socks and loafers, climax.",
+      "timeline": [
+        [0, 3, "Medium shot tracking through the formation from behind, moving between dancers and arcing round to the front."],
+        [3, 5, "Hard cut, handheld rushing in, the front row advances on the lens, motion blur."],
+        [5, 7, "Hard cut, ground-level close-up, white knee socks and loafers stomp twice on the beat."],
+        [7, 10, "Hard cut, wide shot with a 15-degree dutch tilt, all twelve jump into the climax move together."],
+        [10, 12, "Hard cut, medium close-up, {B_c2} winks at the lens while the dancers behind her drop to the floor one after another."]
+      ],
+      "camera": "Tracking from behind, handheld rush, ground level, dutch angle.",
+      "audio": "Climax of the final chorus.",
+      "post": []
+    },
+    {
+      "id": "U14", "chapter": "收尾 · 首尾呼应", "shots": [56, 57],
+      "start": 125, "end": 132, "mode": "fl2va", "seed": 1015, "takes": 2,
+      "refs": [], "keyframes": {"last": "end_frame"}, "music": "anchor",
+      "header": "K-pop girl group performance film, deep blue circular arena with glowing rings, twelve members in grey-white cropped polo tops and pleated mini skirts.",
+      "timeline": [
+        [0, 3, "Wide shot starting on a tilted horizon and slowly rotating back to level, all twelve girls freeze in the final big formation."],
+        [3, 7, "Hard cut, locked close-up, the two girls from the final frame face the camera making an 'L' hand sign and hold still."]
+      ],
+      "camera": "Rotate to level, then a locked close-up that ends exactly on the given last frame.",
+      "audio": "The final chord rings out and decays.",
+      "post": ["结尾 0.3 秒切黑在剪辑里做", "尾帧 end_AB_L.png 需提前做好：A、B 第二套服装，在蓝色竞技场里比 L 手势"]
+    }
+  ]
+}

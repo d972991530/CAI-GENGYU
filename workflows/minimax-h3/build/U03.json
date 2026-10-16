@@ -1,0 +1,285 @@
+{
+  "1": {
+    "class_type": "UNETLoader",
+    "_meta": {
+      "title": "H3 DiT · Ref2VA"
+    },
+    "inputs": {
+      "unet_name": "minimax_h3_ref2va_pruned_int8_convrot.safetensors",
+      "weight_dtype": "default"
+    }
+  },
+  "2": {
+    "class_type": "CLIPLoader",
+    "_meta": {
+      "title": "Qwen3-VL 32B 文本/多模态编码器"
+    },
+    "inputs": {
+      "clip_name": "qwen3vl_32b_minimax_h3_nvfp4_awq.safetensors",
+      "type": "minimax",
+      "device": "default"
+    }
+  },
+  "3": {
+    "class_type": "VAELoader",
+    "_meta": {
+      "title": "视频 VAE"
+    },
+    "inputs": {
+      "vae_name": "minimax_h3_video_vae_fp16.safetensors"
+    }
+  },
+  "4": {
+    "class_type": "VAELoader",
+    "_meta": {
+      "title": "音频 VAE"
+    },
+    "inputs": {
+      "vae_name": "minimax_h3_audio_vae_fp32.safetensors"
+    }
+  },
+  "5": {
+    "class_type": "MiniMaxH3SigmaShift",
+    "_meta": {
+      "title": "ModelSamplingMiniMaxH3"
+    },
+    "inputs": {
+      "model": [
+        "1",
+        0
+      ],
+      "shift_video": 12.0,
+      "shift_audio": 3.0
+    }
+  },
+  "20": {
+    "class_type": "MiniMaxH3ReferenceToVideo",
+    "_meta": {
+      "title": "H3 Reference to Video"
+    },
+    "inputs": {
+      "clip": [
+        "2",
+        0
+      ],
+      "vae": [
+        "3",
+        0
+      ],
+      "audio_vae": [
+        "4",
+        0
+      ],
+      "prompt": "K-pop girl group performance film, moody grey to black studio, strong rim light and hard top light. Twelve members as in <Picture 3>, all in oversized white sweatshirts and baggy white sweatpants.\n\nTimeline:\n[0s-2s] Medium backlit locked shot on a grey gradient background, <Picture 1> and <Picture 2> turn around in rim light, faces mostly in shadow.\n[2s-4s] Hard cut, wide side-on locked shot, all twelve girls stand in a single line as dark silhouettes against a pale grey wall; <Picture 1> and <Picture 2> step out from the middle of the line.\n[4s-5s] Strobing hard cuts alternating the silhouette line with black frames.\n[5s-8s] Hard cut, black background with hard top light, close-up of <Picture 4>, <Picture 5> and <Picture 6> in profile, staggered front to back, slowly raising their eyes, very slow push-in.\n\nLocked-off and very slow push-in, hard cuts only.\n\nAudio: Verse begins, deep kick drum on every beat, airy vocal chops. <Audio 1> is the song for this section; land every move and every hard cut on its beat.\n\nLive-action footage, photorealistic skin and fabric, no subtitles, no captions, no watermarks, no logos, no extra people beyond those described, faces stay consistent with the references, no soft dissolves.",
+      "width": 1344,
+      "height": 768,
+      "length": 192,
+      "ref_image_size": "match",
+      "ref_images.ref_image_0": [
+        "100",
+        0
+      ],
+      "ref_images.ref_image_1": [
+        "101",
+        0
+      ],
+      "ref_images.ref_image_2": [
+        "102",
+        0
+      ],
+      "ref_images.ref_image_3": [
+        "103",
+        0
+      ],
+      "ref_images.ref_image_4": [
+        "104",
+        0
+      ],
+      "ref_images.ref_image_5": [
+        "105",
+        0
+      ],
+      "ref_audios.ref_audio_0": [
+        "120",
+        0
+      ]
+    }
+  },
+  "30": {
+    "class_type": "RandomNoise",
+    "inputs": {
+      "noise_seed": 1003
+    }
+  },
+  "31": {
+    "class_type": "KSamplerSelect",
+    "inputs": {
+      "sampler_name": "res_multistep"
+    }
+  },
+  "32": {
+    "class_type": "BasicScheduler",
+    "inputs": {
+      "model": [
+        "5",
+        0
+      ],
+      "scheduler": "simple",
+      "steps": 20,
+      "denoise": 1.0
+    }
+  },
+  "33": {
+    "class_type": "BasicGuider",
+    "inputs": {
+      "model": [
+        "5",
+        0
+      ],
+      "conditioning": [
+        "20",
+        0
+      ]
+    }
+  },
+  "34": {
+    "class_type": "SamplerCustomAdvanced",
+    "inputs": {
+      "noise": [
+        "30",
+        0
+      ],
+      "guider": [
+        "33",
+        0
+      ],
+      "sampler": [
+        "31",
+        0
+      ],
+      "sigmas": [
+        "32",
+        0
+      ],
+      "latent_image": [
+        "20",
+        1
+      ]
+    }
+  },
+  "40": {
+    "class_type": "VAEDecode",
+    "inputs": {
+      "samples": [
+        "34",
+        0
+      ],
+      "vae": [
+        "3",
+        0
+      ]
+    }
+  },
+  "41": {
+    "class_type": "VAEDecodeAudio",
+    "inputs": {
+      "samples": [
+        "34",
+        0
+      ],
+      "vae": [
+        "4",
+        0
+      ]
+    }
+  },
+  "42": {
+    "class_type": "CreateVideo",
+    "inputs": {
+      "images": [
+        "40",
+        0
+      ],
+      "audio": [
+        "41",
+        0
+      ],
+      "fps": 24.0
+    }
+  },
+  "43": {
+    "class_type": "SaveVideo",
+    "inputs": {
+      "video": [
+        "42",
+        0
+      ],
+      "filename_prefix": "stage/U03_t1",
+      "format": "auto",
+      "format.codec": "auto"
+    }
+  },
+  "100": {
+    "class_type": "LoadImage",
+    "_meta": {
+      "title": "REF <Picture 1> A_c1"
+    },
+    "inputs": {
+      "image": "h3_refs/members/A_c1.png"
+    }
+  },
+  "101": {
+    "class_type": "LoadImage",
+    "_meta": {
+      "title": "REF <Picture 2> B_c1"
+    },
+    "inputs": {
+      "image": "h3_refs/members/B_c1.png"
+    }
+  },
+  "102": {
+    "class_type": "LoadImage",
+    "_meta": {
+      "title": "REF <Picture 3> group_c1"
+    },
+    "inputs": {
+      "image": "h3_refs/group/group_c1.png"
+    }
+  },
+  "103": {
+    "class_type": "LoadImage",
+    "_meta": {
+      "title": "REF <Picture 4> C_c1"
+    },
+    "inputs": {
+      "image": "h3_refs/members/C_c1.png"
+    }
+  },
+  "104": {
+    "class_type": "LoadImage",
+    "_meta": {
+      "title": "REF <Picture 5> D_c1"
+    },
+    "inputs": {
+      "image": "h3_refs/members/D_c1.png"
+    }
+  },
+  "105": {
+    "class_type": "LoadImage",
+    "_meta": {
+      "title": "REF <Picture 6> E_c1"
+    },
+    "inputs": {
+      "image": "h3_refs/members/E_c1.png"
+    }
+  },
+  "120": {
+    "class_type": "LoadAudio",
+    "_meta": {
+      "title": "REF <Audio 1> 音乐切片"
+    },
+    "inputs": {
+      "audio": "h3_music/U03.wav"
+    }
+  }
+}

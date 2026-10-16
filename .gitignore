@@ -27,3 +27,11 @@ dist-ssr
 .claude/skills/script2manga/output/
 __pycache__/
 *.pyc
+
+# MiniMax H3 workflow runtime artifacts
+workflows/minimax-h3/renders/
+workflows/minimax-h3/out/
+workflows/minimax-h3/build/music/
+workflows/minimax-h3/build/trim/
+workflows/minimax-h3/assets/
+workflows/minimax-h3/refs/**/*.png
