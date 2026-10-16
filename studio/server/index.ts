@@ -6,6 +6,7 @@ import { config } from './config.ts';
 import { safeEqual } from './crypto.ts';
 import { getKey, getSettings, HttpError, publicSettings, updateSettings } from './settings.ts';
 import { getJob, initJobs, listJobs, resultFile, submitJob } from './jobs.ts';
+import { initPublicRefs, publicRefFile } from './publicRefs.ts';
 import { geminiText } from './providers/gemini.ts';
 import type { MediaRequest, SettingsPatch, TextRequest } from '../shared/types.ts';
 
@@ -44,6 +45,16 @@ async function api(req: http.IncomingMessage, res: http.ServerResponse, url: URL
   const method = req.method ?? 'GET';
 
   if (pathname === '/api/health') return send(res, 200, { ok: true, tokenRequired: !!config.token });
+
+  // 第三方平台拉取临时参考图（随机地址 + 过期删除，无需口令）
+  const pr = pathname.match(/^\/api\/public\/refs\/([\w.]+)$/);
+  if (pr && method === 'GET') {
+    const { file, mimeType } = publicRefFile(pr[1]);
+    res.writeHead(200, { 'Content-Type': mimeType, 'Cache-Control': 'no-store' });
+    fs.createReadStream(file).pipe(res);
+    return;
+  }
+
   if (!authorized(req)) throw new HttpError(401, '需要访问口令');
 
   if (pathname === '/api/settings') {
@@ -102,6 +113,7 @@ function serveStatic(res: http.ServerResponse, pathname: string) {
 }
 
 initJobs();
+initPublicRefs();
 
 const server = http.createServer(async (req, res) => {
   res.setHeader('X-Content-Type-Options', 'nosniff');

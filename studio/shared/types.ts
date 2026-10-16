@@ -3,17 +3,29 @@ export type ProjectFormat = 'short-drama' | 'comic-drama' | 'film';
 export type Aspect = '9:16' | '16:9' | '1:1';
 
 export type TextEngine = 'gemini' | 'demo';
-export type ImageEngine = 'gemini' | 'qwen-image' | 'flux-schnell' | 'demo';
+export type ImageEngine = 'seedream' | 'gemini' | 'qwen-image' | 'flux-schnell' | 'demo';
 export type VideoEngine = 'veo' | 'wan' | 'demo';
 export type TtsEngine = 'gemini' | 'demo';
 export interface Engines { text: TextEngine; image: ImageEngine; video: VideoEngine; tts: TtsEngine }
-export interface Models { text: string; image: string; video: string; tts: string }
+export interface Models {
+  text: string; image: string; video: string; tts: string;
+  /** 七七八AI 即梦（Seedream）模型 ID */
+  seedream: string;
+}
+export type KeyName = 'gemini' | 'fal' | 'lk888';
+export interface Options {
+  /** 即梦输出分辨率档位（两档价格不同） */
+  seedreamSize: '1K' | '2K';
+}
 
 /** 服务端返回给前端的设置（不含任何密钥明文） */
 export interface PublicSettings {
   engines: Engines;
   models: Models;
-  keys: { gemini: KeyState; fal: KeyState };
+  options: Options;
+  keys: Record<KeyName, KeyState>;
+  /** 是否配置了 PUBLIC_BASE_URL（参考图以公网 URL 方式提供给第三方平台） */
+  publicRefs: boolean;
   /** 服务端是否要求访问口令 */
   tokenRequired: boolean;
 }
@@ -23,8 +35,10 @@ export interface KeyState { set: boolean; hint?: string; source?: 'saved' | 'env
 export interface SettingsPatch {
   engines?: Partial<Engines>;
   models?: Partial<Models>;
+  options?: Partial<Options>;
   geminiKey?: string | null;
   falKey?: string | null;
+  lk888Key?: string | null;
 }
 
 export interface DraftEpisode { title: string; summary: string; script: string }
@@ -62,9 +76,13 @@ export interface JobRecord {
   status: JobStatus;
   error?: string;
   mimeType?: string;
+  /** 平台返回的费用（如有） */
+  cost?: number;
   createdAt: number;
   startedAt?: number;
   finishedAt?: number;
 }
 
 export const WAN_MAX_SECONDS = 5;
+/** 即梦最多 10 张参考图（首张免费，第 2 张起按张计费） */
+export const SEEDREAM_MAX_REFS = 10;

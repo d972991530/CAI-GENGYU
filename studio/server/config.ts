@@ -18,9 +18,14 @@ export const config = {
   bodyLimit: Number(env.BODY_LIMIT_MB ?? 40) * 1024 * 1024,
   /** 结果文件保留天数 */
   resultTtlDays: Number(env.RESULT_TTL_DAYS ?? 14),
-  envKeys: { gemini: env.GEMINI_API_KEY ?? '', fal: env.FAL_KEY ?? '' },
+  envKeys: { gemini: env.GEMINI_API_KEY ?? '', fal: env.FAL_KEY ?? '', lk888: env.LK888_API_KEY ?? '' },
+  /** 本服务的公网地址（如 https://studio.example.com）。设置后参考图以临时公网 URL 提供给第三方平台，否则以 data URI 内联 */
+  publicBaseUrl: (env.PUBLIC_BASE_URL ?? '').replace(/\/+$/, ''),
+  /** 临时公开参考图的有效期（分钟） */
+  publicRefTtlMin: Number(env.PUBLIC_REF_TTL_MIN ?? 60),
   upstream: {
     falQueue: env.FAL_QUEUE_URL ?? 'https://queue.fal.run',
     geminiBase: env.GEMINI_BASE_URL,
+    lk888: (env.LK888_BASE_URL ?? 'https://api.lk888.ai').replace(/\/+$/, ''),
   },
 };

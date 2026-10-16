@@ -2,7 +2,7 @@ import { useState } from 'react';
 import { ServerCrash, ShieldCheck, KeyRound, RefreshCw } from 'lucide-react';
 import { Button, Label, Modal } from './ui';
 import { useStore } from '../store/store';
-import type { Engines, Models } from '../../shared/types';
+import type { Engines, Models, Options } from '../../shared/types';
 import type { PublicSettings } from '../types';
 import { getToken, setToken } from '../services/api';
 
@@ -13,6 +13,7 @@ const TEXT: Opt<Engines['text']>[] = [
   { id: 'demo', name: '演示', hint: '离线规则生成' },
 ];
 const IMAGE: Opt<Engines['image']>[] = [
+  { id: 'seedream', name: '即梦 5.0 Pro', hint: '多图融合 · 最多 10 张参考图 · 1K/2K（七七八AI）' },
   { id: 'qwen-image', name: 'Qwen-Image', hint: '文生图、分镜配图（fal）', license: 'Apache 2.0' },
   { id: 'flux-schnell', name: 'FLUX.1-schnell', hint: '4 步快速文生图（fal）', license: 'Apache 2.0' },
   { id: 'gemini', name: 'Gemini Image', hint: '支持参考图保持一致' },
@@ -38,7 +39,7 @@ function EnginePicker<T extends string>({ label, value, options, onChange }: { l
   return (
     <div>
       <Label>{label}</Label>
-      <div className="grid grid-cols-2 gap-2 sm:grid-cols-4">
+      <div className="grid grid-cols-2 gap-2 sm:grid-cols-3">
         {options.map((o) => (
           <button key={o.id} onClick={() => onChange(o.id)}
             className={`cursor-pointer rounded-xl border p-2.5 text-left transition ${value === o.id ? 'border-amber bg-amber-soft' : 'border-line hover:border-dim'}`}>
@@ -86,13 +87,16 @@ export function SettingsModal({ open, onClose }: { open: boolean; onClose: () =>
   const [models, setModels] = useState<Models | undefined>(settings?.models);
   const [geminiKey, setGeminiKey] = useState('');
   const [falKey, setFalKey] = useState('');
-  const [clear, setClear] = useState({ gemini: false, fal: false });
+  const [lk888Key, setLk888Key] = useState('');
+  const [options, setOptions] = useState<Options>(settings?.options ?? { seedreamSize: '2K' });
+  const [clear, setClear] = useState({ gemini: false, fal: false, lk888: false });
   const [conc, setConc] = useState(concurrency);
   const [token, setTok] = useState(getToken());
   const [saving, setSaving] = useState(false);
   const eng = (p: Partial<Engines>) => setEngines((d) => ({ ...d, ...p }));
   const usesGemini = engines.text === 'gemini' || engines.image === 'gemini' || engines.video === 'veo' || engines.tts === 'gemini';
   const usesFal = engines.image === 'qwen-image' || engines.image === 'flux-schnell' || engines.video === 'wan';
+  const usesLk888 = engines.image === 'seedream';
   const online = status === 'ok' && settings;
 
   const save = async () => {
@@ -101,9 +105,10 @@ export function SettingsModal({ open, onClose }: { open: boolean; onClose: () =>
     setSaving(true);
     try {
       await saveSettings({
-        engines, models,
+        engines, models, options,
         geminiKey: clear.gemini ? null : geminiKey || undefined,
         falKey: clear.fal ? null : falKey || undefined,
+        lk888Key: clear.lk888 ? null : lk888Key || undefined,
       });
       toast('设置已保存到服务端', 'ok');
       onClose();
@@ -141,6 +146,33 @@ export function SettingsModal({ open, onClose }: { open: boolean; onClose: () =>
           <EnginePicker label="视频" value={engines.video} options={VIDEO} onChange={(v) => eng({ video: v })} />
           <EnginePicker label="配音" value={engines.tts} options={TTS} onChange={(v) => eng({ tts: v })} />
 
+          {usesLk888 && (
+            <div className="space-y-3 rounded-xl border border-line bg-ink-0 p-4">
+              <KeyField label="七七八AI API Key" state={settings?.keys.lk888} value={lk888Key} onChange={setLk888Key} placeholder="sk-…"
+                cleared={clear.lk888} onClear={() => setClear((c) => ({ ...c, lk888: true }))} />
+              <div className="grid grid-cols-[auto_1fr] items-end gap-3">
+                <div>
+                  <Label>分辨率档位</Label>
+                  <div className="inline-flex rounded-full border border-line p-1">
+                    {(['2K', '1K'] as const).map((s) => (
+                      <button key={s} onClick={() => setOptions({ ...options, seedreamSize: s })}
+                        className={`cursor-pointer rounded-full px-3 py-1 text-xs ${options.seedreamSize === s ? 'bg-paper font-semibold text-ink-0' : 'text-dim'}`}>{s}</button>
+                    ))}
+                  </div>
+                </div>
+                {models && (
+                  <div>
+                    <Label>模型 ID</Label>
+                    <input className="field font-mono text-xs" value={models.seedream} onChange={(ev) => setModels({ ...models, seedream: ev.target.value })} />
+                  </div>
+                )}
+              </div>
+              <p className="text-[11px] leading-relaxed text-faint">
+                由后端调用七七八AI（api.lk888.ai），按次计费，1K / 2K 价格不同。分镜配图会自动带上出镜角色的定妆图和场景图作为参考图（最多 10 张，首张免费、第 2 张起按张计费）。
+                {settings?.publicRefs ? ' 参考图将以临时公网地址提供给平台。' : ' 当前参考图以 data URI 内联发送；如平台不接受，请在服务器上设置 PUBLIC_BASE_URL。'}
+              </p>
+            </div>
+          )}
           {usesFal && (
             <div className="rounded-xl border border-line bg-ink-0 p-4">
               <KeyField label="fal API Key" state={settings?.keys.fal} value={falKey} onChange={setFalKey} placeholder="xxxxxxxx-xxxx:xxxxxxxx"

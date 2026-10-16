@@ -6,6 +6,7 @@ import { config } from './config.ts';
 import { getKey, getSettings, HttpError } from './settings.ts';
 import { geminiImage, geminiTts, geminiVideo, type MediaOut } from './providers/gemini.ts';
 import { falImage, falWanVideo } from './providers/fal.ts';
+import { seedreamImage } from './providers/lk888.ts';
 import type { JobRecord, MediaRequest } from '../shared/types.ts';
 
 interface Internal extends JobRecord { hash: string; file?: string }
@@ -60,7 +61,7 @@ function engineFor(req: MediaRequest) {
 }
 
 function labelFor(req: MediaRequest, engine: string) {
-  const name: Record<string, string> = { 'qwen-image': 'Qwen-Image', 'flux-schnell': 'FLUX.1-schnell', wan: 'Wan2.2-5B', veo: 'Veo', gemini: 'Gemini' };
+  const name: Record<string, string> = { seedream: '即梦 5.0 Pro', 'qwen-image': 'Qwen-Image', 'flux-schnell': 'FLUX.1-schnell', wan: 'Wan2.2-5B', veo: 'Veo', gemini: 'Gemini' };
   const kind = { image: '生图', video: '视频', tts: '配音' }[req.kind];
   return `${kind} · ${name[engine] ?? engine}`;
 }
@@ -76,8 +77,8 @@ function validate(req: MediaRequest) {
 export function submitJob(req: MediaRequest): { job: JobRecord; deduped: boolean } {
   validate(req);
   const engine = engineFor(req);
-  const needs = engine === 'qwen-image' || engine === 'flux-schnell' || engine === 'wan' ? 'fal' : 'gemini';
-  if (!getKey(needs)) throw new HttpError(400, `服务端未配置 ${needs === 'fal' ? 'fal' : 'Gemini'} API Key，请在「设置」中填写`);
+  const needs = engine === 'seedream' ? 'lk888' : engine === 'qwen-image' || engine === 'flux-schnell' || engine === 'wan' ? 'fal' : 'gemini';
+  if (!getKey(needs)) throw new HttpError(400, `服务端未配置 ${{ lk888: '七七八AI', fal: 'fal', gemini: 'Gemini' }[needs]} API Key，请在「设置」中填写`);
   const hash = crypto.createHash('sha256').update(engine + JSON.stringify(req)).digest('hex');
   // 重复提交防护：完全相同的请求仍在排队或运行时，直接返回已有任务
   for (const j of jobs.values()) {
@@ -91,9 +92,10 @@ export function submitJob(req: MediaRequest): { job: JobRecord; deduped: boolean
   return { job: pub(job), deduped: false };
 }
 
-async function execute(engine: string, req: MediaRequest): Promise<MediaOut> {
-  const { models } = getSettings();
+async function execute(engine: string, req: MediaRequest): Promise<MediaOut & { cost?: number }> {
+  const { models, options } = getSettings();
   if (req.kind === 'image') {
+    if (engine === 'seedream') return seedreamImage(getKey('lk888'), models.seedream, req.prompt, req.aspect, req.refs ?? [], options.seedreamSize);
     if (engine === 'gemini') return geminiImage(getKey('gemini'), models, req.prompt, req.aspect, req.refs ?? []);
     // 开源文生图模型不接收参考图，一致性依靠视觉提示词
     const prompt = req.prompt.replace(/\nKeep characters and location strictly consistent[^\n]*/, '');
@@ -118,7 +120,7 @@ function pump() {
       .then((out) => {
         const file = `${job.id}.${EXT[out.mimeType] ?? 'bin'}`;
         fs.writeFileSync(path.join(RESULTS(), file), out.data);
-        Object.assign(job, { status: 'done', file, mimeType: out.mimeType, finishedAt: Date.now() });
+        Object.assign(job, { status: 'done', file, mimeType: out.mimeType, cost: out.cost, finishedAt: Date.now() });
       })
       .catch((e: unknown) => {
         Object.assign(job, { status: 'error', error: e instanceof Error ? e.message : String(e), finishedAt: Date.now() });

@@ -20,12 +20,13 @@ STUDIO_TOKEN=换成你的口令 npm start      # http://<服务器>:8787
 ## 架构：所有模型 API 请求都在后端
 
 ```
-浏览器（镜坊 UI）  ──同源 /api──▶  镜坊后端 server/  ──▶  fal（Qwen-Image / FLUX.1-schnell / Wan2.2-5B）
+浏览器（镜坊 UI）  ──同源 /api──▶  镜坊后端 server/  ──▶  七七八AI（即梦 5.0 Pro）
+                                                      ├─▶  fal（Qwen-Image / FLUX.1-schnell / Wan2.2-5B）
                                                       └─▶  Gemini（剧本 / 生图 / Veo / TTS）
 ```
 
 - 前端只请求同域的 `/api`：开发时由 Vite 代理到后端，生产时后端直接托管前端页面，所以**不存在跨域问题**。前端代码里不包含任何模型 SDK 或第三方 API 地址。
-- **API Key 只在服务端**：在网页「设置」里填写后，由后端用 AES-256-GCM 加密保存到 `.data/settings.json`。接口只返回 `••••末四位`，不会把明文回传给前端。也可以用环境变量 `GEMINI_API_KEY` / `FAL_KEY` 提供 Key。
+- **API Key 只在服务端**：在网页「设置」里填写后，由后端用 AES-256-GCM 加密保存到 `.data/settings.json`。接口只返回 `••••末四位`，不会把明文回传给前端。也可以用环境变量 `GEMINI_API_KEY` / `FAL_KEY` / `LK888_API_KEY` 提供 Key。
 - **任务记录**：生图、视频、配音都在后端异步执行。任务记录保存在 `.data/jobs.json`，生成结果保存在 `.data/results/`（默认保留 14 天）。服务重启时，未完成的任务会被标记为中断。
 - **重复提交防护**：同一个请求还在排队或运行时，再次提交会直接返回已有任务，不会重复计费。
 - **访问口令**：设置 `STUDIO_TOKEN` 后，所有 `/api` 请求都必须带口令。公开部署时务必设置，否则任何人都能消耗你的额度。
@@ -43,6 +44,7 @@ STUDIO_TOKEN=换成你的口令 npm start      # http://<服务器>:8787
 | POST | `/api/jobs` | 提交生图 / 视频 / 配音任务 |
 | GET | `/api/jobs`、`/api/jobs/:id` | 任务记录与状态 |
 | GET | `/api/jobs/:id/result` | 下载生成结果 |
+| GET | `/api/public/refs/:name` | 临时公开参考图，供第三方平台拉取（随机地址、过期删除、无需口令；仅在设置 `PUBLIC_BASE_URL` 时使用） |
 
 ### 引擎
 
@@ -53,10 +55,14 @@ STUDIO_TOKEN=换成你的口令 npm start      # http://<服务器>:8787
 | 能力 | 可选引擎 |
 |---|---|
 | 剧本 / 分镜 | Gemini（`gemini-2.5-flash`，JSON 输出）· 演示 |
-| 生图 | **Qwen-Image**（`fal-ai/qwen-image`）· **FLUX.1-schnell**（`fal-ai/flux/schnell`）· Gemini Image（支持参考图）· 演示 |
+| 生图 | **即梦 5.0 Pro**（七七八AI `doubao-seedream-5-0-pro-260628`）· **Qwen-Image**（`fal-ai/qwen-image`）· **FLUX.1-schnell**（`fal-ai/flux/schnell`）· Gemini Image（支持参考图）· 演示 |
 | 视频 | **Wan2.2-5B**（`fal-ai/wan/v2.2-5b/text-to-video`、`/image-to-video`）· Veo 3.1 Fast · 演示 |
 | 配音 | Gemini TTS · 演示 |
 
+- **即梦 5.0 Pro（七七八AI）**：由后端调用 `https://api.lk888.ai/v1/media/generate` 创建任务，再轮询 `/v1/media/status`；以 `is_final` 判断是否结束，以 `state` 判断成功还是失败（失败时平台会自动退款）。
+  - 支持多图融合：分镜配图会按顺序带上出镜角色的定妆图和场景图（最多 10 张，首张免费、第 2 张起按张计费），并在提示词里说明「图 1 = 某角色」。
+  - 「设置」里可以切换 1K / 2K 分辨率档位（两档价格不同）和模型 ID；宽高比自动取项目画幅。任务完成后，平台返回的费用会记录在任务记录里。
+  - 参考图默认以 data URI 内联发送。如果平台只接受公网 URL，请在服务器上设置 `PUBLIC_BASE_URL`（本服务的公网地址），后端会把参考图放到临时公开地址（默认 60 分钟后删除）供平台拉取。
 - **开源模型（fal）**：Qwen-Image、FLUX.1-schnell、Wan2.2-5B 这三个模型都是 Apache 2.0 许可，由后端通过 fal 队列接口在云端运行。需要填写 fal API Key，并且账号里要有额度。
   - Qwen-Image / FLUX.1-schnell 是纯文生图模型，不读取参考图，角色一致性靠资产里的视觉提示词。
   - Wan2.2-5B 单镜 1–5 秒（24fps，17–121 帧），720p，支持 16:9 / 9:16 / 1:1。有分镜图时走图生视频，没有时走文生视频；超过 5 秒的镜头会被截短到 5 秒。
@@ -83,6 +89,8 @@ server/
   jobs.ts               任务队列：并发限制、去重、记录与结果持久化
   providers/gemini.ts   Gemini / Veo / TTS
   providers/fal.ts      fal 队列：Qwen-Image / FLUX.1-schnell / Wan2.2-5B
+  providers/lk888.ts    七七八AI：即梦 5.0 Pro
+  publicRefs.ts         临时公开参考图（可选）
 src/
   services/api.ts       前端唯一的网络出口（同域 /api）
   services/ai.ts        按引擎组合：演示 → 本地，其它 → 后端
