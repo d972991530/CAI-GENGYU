@@ -562,6 +562,18 @@ export class Game implements EnemyHost {
     if (it.icon) this.world.remove(it.icon);
   }
 
+  // 机关冷却：交互点保留在原处并显示倒计时，避免玩家以为机关“消失了”
+  async cooldown(id: string, where: string | [number, number], label: string, sec: number, ox = 0, oz = 0) {
+    const chapter = this.chapter;
+    const end = this.time + sec;
+    while (this.time < end && this.chapter === chapter) {
+      const n = Math.ceil(end - this.time);
+      this.addInteract(id, where, `${label}（${n} 秒）`, () => this.hud.message(`${label}，还要 ${n} 秒`), undefined, ox, oz);
+      await this.wait(Math.min(1, end - this.time));
+    }
+    if (this.chapter === chapter) this.removeInteract(id);
+  }
+
   // 等待交互（返回 Promise）
   interact(id: string, where: string | [number, number], label: string, icon?: string, ox = 0, oz = 0) {
     let used = false;

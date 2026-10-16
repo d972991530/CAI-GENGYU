@@ -88,14 +88,18 @@ export async function ch2(g: Game) {
     if (ok) { ore1.stun(3); g.hud.message('格挡成功！'); } else g.damagePlayer(25, ore1.pos, '矿蛊');
   })();
   const pullPower = async () => {
-    for (;;) {
+    let first = true;
+    while (g.chapter?.id === 2 && (ore1.alive || ore2.alive)) {
       await g.interact('power', 'power', '拉闸放电（铁轨通电 10 秒）', undefined, 0.6, 0);
-      await g.say('陈砚（喊）', '老周！引到铁轨上去！我这边拉闸！');
       const rails: [number, number][] = [];
       for (let c = 1; c <= 30; c++) rails.push([c, 22], [c, 23]);
       g.electrify(rails, 10);
+      g.hud.message('铁轨通电！把矿蛊引上铁轨');
+      if (first) { first = false; g.sayAsync([['陈砚（喊）', '老周！引到铁轨上去！我这边拉闸！']]); }
       if (!ore1.alive && !ore2.alive) return;
-      await g.wait(12);
+      // 放电 10 秒 + 充能 2 秒：配电箱一直留在原处并显示倒计时
+      await g.cooldown('power', 'power', '配电箱放电中，稍后可再次拉闸', 12, 0.6, 0);
+      if (g.chapter?.id === 2 && (ore1.alive || ore2.alive)) g.hud.message('配电箱充能完毕，可以再次拉闸');
     }
   };
   pullPower();

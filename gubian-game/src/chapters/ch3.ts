@@ -100,7 +100,7 @@ export async function ch3(g: Game) {
       g.hud.message('货柜砸中了新娘！');
       setTimeout(() => (bride.vulnerable = false), 3000);
     }
-    await g.wait(12);
+    if (bride.alive) await g.cooldown('crane', 'crane', '吊臂复位中', 12);
     craneReady = true;
     if (bride.alive) crane();
   });
