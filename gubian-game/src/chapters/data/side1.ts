@@ -1,0 +1,37 @@
+import type { ChapterData } from '../types';
+
+// 联动支线 第一幕 外滩·十六铺夜运（1971 · 上海）
+export const side1: ChapterData = {
+  id: 21,
+  side: 'side1',
+  title: "外滩 · 十六铺夜运",
+  place: "1971 · 上海十六铺 · 雨夜弄堂与码头货仓",
+  pov: 'tang',
+  mural: "tex:x_window",
+  par: 600,
+  map: [
+    '####################################',
+    '#&,,,,,,%#o..T..#b.b......b%,,,,,,R#',
+    '#,,,,,,,,#......#..........%,,,,,,R#',
+    '#&,,,,,,,#..T...2....b.....%,,,,,,R#',
+    '#,,,,,,,%#o.....#..........%,,,,b,R#',
+    '#,,,,,,,,########...b......%,,,,,,R#',
+    '#&,,,,,,,1.................3,,,,,,X#',
+    '#,,,,,,,%#..b.......b......%,,,,,,R#',
+    '#,,,,,,,,#.................%,b,,,,R#',
+    '#&,,,,,,,#...P.....P.......%,,,,,,R#',
+    '#,,,,,,,%#.................%,,,,,,R#',
+    '#,,,,,,,,#..b...b...b...b..%,,,b,,R#',
+    '#&,,,,,,,#.................%,,,,,,R#',
+    '#,,,,,,,,#...P.....P.......$,,,,,,R#',
+    '#,,,,,,,%#.................%,,,,,,R#',
+    '#,,@,,,,,#b.b.b.....b.b.b.b%,,,,,,R#',
+    '####################################',
+  ],
+  doors: [{"id": "1"}, {"id": "2"}, {"id": "3", "key": "red", "label": "码头铁门"}],
+  marks: {"startYaw": [0, 0], "alley": [4, 10], "a1": [5, 7], "a2": [3, 3], "a3": [7, 12], "door1": [8, 6], "wh": [12, 8], "w1": [15, 10], "w2": [22, 8], "w3": [24, 12], "w4": [13, 14], "w5": [21, 2], "crate": [22, 9], "office": [12, 2], "o1": [14, 2], "doc1": [13, 2], "redkey": [11, 2], "h1": [22, 14], "h2": [11, 12], "dock": [30, 6], "d1": [31, 2], "d2": [30, 10], "d3": [32, 13], "d4": [29, 4], "ship": [33, 6], "exit": [34, 6], "shotgun": [25, 14]},
+  items: [{"type": "ammo", "at": [2, 5]}, {"type": "herb", "at": [7, 14]}, {"type": "ammo", "at": [11, 9]}, {"type": "medkit", "at": [18, 1]}, {"type": "key_red", "at": [11, 2]}, {"type": "weapon_mg", "at": [25, 14]}, {"type": "mg_ammo", "at": [24, 2]}, {"type": "ammo", "at": [15, 4]}, {"type": "armor", "at": [30, 14], "secret": true}, {"type": "mg_ammo", "at": [29, 13], "secret": true}, {"type": "medkit", "at": [33, 1]}, {"type": "ammo", "at": [29, 9]}],
+  lights: [{"at": [4, 3], "color": 16728112, "intensity": 3, "flicker": 0.3, "y": 2.6}, {"at": [5, 9], "color": 16756832, "intensity": 3, "flicker": 0.6}, {"at": [3, 14], "color": 4243616, "intensity": 2.5, "flicker": 0.2}, {"at": [12, 2], "color": 16765066, "intensity": 3, "flicker": 0.1}, {"at": [14, 9], "color": 16765066, "intensity": 3, "flicker": 0.7}, {"at": [22, 9], "color": 16724000, "intensity": 3, "flicker": 0.2, "y": 1.2}, {"at": [20, 13], "color": 16765066, "intensity": 2.5, "flicker": 0.4}, {"at": [31, 4], "color": 10469631, "intensity": 3, "flicker": 0.2}, {"at": [31, 11], "color": 16756832, "intensity": 3, "flicker": 0.5}, {"at": [33, 6], "color": 16769184, "intensity": 4, "flicker": 0.1}],
+  theme: {"wall": "tex:x_brick", "wall2": "tex:x_shutter", "mural": "tex:x_window", "floor": "tex:x_concrete", "floorOut": "tex:x_stone", "ceiling": "tex:x_roof", "fog": 724242, "fogDensity": 0.045, "hemi": [4872832, 2103312, 0.85], "sky": "sky:f01", "zones": [{"rect": [10, 1, 15, 4], "wall": "tex:x_plaster", "floor": "tex:x_wood"}, {"rect": [28, 1, 34, 15], "wall": "tex:x_iron", "floor": "tex:x_wood"}]},
+  route: ["alley", "door1", "wh", "office", "dock", "exit"],
+};
