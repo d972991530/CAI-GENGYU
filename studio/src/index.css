@@ -1,0 +1,56 @@
+@import "tailwindcss";
+
+@theme {
+  --color-ink-0: #0e0c0a;
+  --color-ink-1: #16130f;
+  --color-ink-2: #1f1b16;
+  --color-ink-3: #2a251e;
+  --color-line: #332d25;
+  --color-paper: #efe7da;
+  --color-dim: #a39784;
+  --color-faint: #6d6456;
+  --color-amber: #f0a43a;
+  --color-amber-soft: #f0a43a22;
+  --color-vermilion: #e5563a;
+  --color-jade: #79b47a;
+  --font-sans: "Noto Sans SC", system-ui, sans-serif;
+  --font-serif: "Noto Serif SC", "Songti SC", serif;
+  --font-mono: ui-monospace, "JetBrains Mono", monospace;
+}
+
+html, body, #root { height: 100%; }
+body {
+  margin: 0;
+  background: var(--color-ink-0);
+  color: var(--color-paper);
+  font-family: var(--font-sans);
+  -webkit-font-smoothing: antialiased;
+}
+
+/* 胶片齿孔装饰 */
+.sprockets {
+  background-image: radial-gradient(circle at 50% 50%, var(--color-ink-0) 3px, transparent 3.5px);
+  background-size: 100% 14px;
+}
+.grain::after {
+  content: ""; position: absolute; inset: 0; pointer-events: none; opacity: .05;
+  background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='120' height='120'%3E%3Cfilter id='n'%3E%3CfeTurbulence baseFrequency='.9'/%3E%3C/filter%3E%3Crect width='120' height='120' filter='url(%23n)'/%3E%3C/svg%3E");
+}
+
+::-webkit-scrollbar { width: 8px; height: 8px; }
+::-webkit-scrollbar-thumb { background: var(--color-ink-3); border-radius: 8px; }
+::-webkit-scrollbar-track { background: transparent; }
+
+textarea, input, select { color-scheme: dark; }
+.field {
+  width: 100%; background: var(--color-ink-0); border: 1px solid var(--color-line); border-radius: 10px;
+  padding: 8px 12px; font-size: 14px; outline: none; transition: border-color .15s;
+}
+.field:focus { border-color: var(--color-amber); }
+
+@keyframes shimmer { 0% { background-position: -200% 0; } 100% { background-position: 200% 0; } }
+.shimmer {
+  background: linear-gradient(90deg, var(--color-ink-2) 0%, var(--color-ink-3) 50%, var(--color-ink-2) 100%);
+  background-size: 200% 100%; animation: shimmer 1.6s linear infinite;
+}
+@keyframes kenburns { from { transform: scale(1.02); } to { transform: scale(1.12) translateX(-2%); } }
