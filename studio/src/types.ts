@@ -81,9 +81,19 @@ export interface Job {
   finishedAt?: number;
 }
 
+export type TextEngine = 'gemini' | 'demo';
+export type ImageEngine = 'gemini' | 'qwen-image' | 'flux-schnell' | 'demo';
+export type VideoEngine = 'veo' | 'wan' | 'demo';
+export type TtsEngine = 'gemini' | 'demo';
+
+export interface Engines { text: TextEngine; image: ImageEngine; video: VideoEngine; tts: TtsEngine }
+
 export interface Settings {
-  provider: 'gemini' | 'demo';
+  engines: Engines;
+  /** Gemini API Key */
   apiKey: string;
+  /** fal.ai API Key（开源模型云端推理） */
+  falKey: string;
   textModel: string;
   imageModel: string;
   videoModel: string;

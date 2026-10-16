@@ -5,6 +5,7 @@ import { batch, generateShotAudio, generateShotImage, generateShotVideo } from '
 import { Button, Empty, Panel, SectionTitle, StatusPill } from '../components/ui';
 import { MediaImg, MediaVideo, useMediaUrl } from '../components/Media';
 import { putMedia } from '../lib/db';
+import { videoMaxSeconds } from '../services/ai';
 import { go } from '../lib/router';
 import type { Project, Shot } from '../types';
 import type { StepProps } from './Workspace';
@@ -12,6 +13,8 @@ import type { StepProps } from './Workspace';
 export default function ProducePage({ p, epId }: StepProps) {
   const ep = p.episodes.find((e) => e.id === epId);
   const [overwrite, setOverwrite] = useState(false);
+  const settings = useStore((s) => s.settings);
+  const maxSec = videoMaxSeconds(settings);
   if (!ep || !ep.shots.length) {
     return <Empty icon={<Clapperboard className="size-10" />} title="这一集还没有分镜" desc="先在「分镜」中生成分镜表。" action={<Button onClick={() => go(`/p/${p.id}/storyboard`)}>去分镜</Button>} />;
   }
@@ -36,6 +39,12 @@ export default function ProducePage({ p, epId }: StepProps) {
           批量时覆盖已有结果
         </label>
       </Panel>
+
+      {ep.shots.some((s) => s.duration > maxSec) && (
+        <div className="mb-4 rounded-xl border border-amber/30 bg-amber-soft px-4 py-3 text-sm text-amber">
+          当前视频引擎单镜最长 {maxSec} 秒，有 {ep.shots.filter((s) => s.duration > maxSec).length} 个镜头超出，生成时会按 {maxSec} 秒截短；可以回到「分镜」拆成多个镜头。
+        </div>
+      )}
 
       <div className={`grid gap-4 ${p.aspect === '9:16' ? 'grid-cols-2 sm:grid-cols-3 lg:grid-cols-4 2xl:grid-cols-6' : 'grid-cols-1 sm:grid-cols-2 xl:grid-cols-3'}`}>
         {ep.shots.map((s, i) => <ShotCard key={s.id} p={p} epId={ep.id} s={s} i={i} />)}

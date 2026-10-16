@@ -6,9 +6,13 @@ import { uid } from '../lib/util';
 declare const __DEFAULT_GEMINI_KEY__: string;
 
 const SETTINGS_KEY = 'jingfang.settings';
+const hasGemini = !!__DEFAULT_GEMINI_KEY__;
 const defaultSettings: Settings = {
-  provider: __DEFAULT_GEMINI_KEY__ ? 'gemini' : 'demo',
+  engines: hasGemini
+    ? { text: 'gemini', image: 'gemini', video: 'veo', tts: 'gemini' }
+    : { text: 'demo', image: 'demo', video: 'demo', tts: 'demo' },
   apiKey: __DEFAULT_GEMINI_KEY__,
+  falKey: '',
   textModel: 'gemini-2.5-flash',
   imageModel: 'gemini-2.5-flash-image',
   videoModel: 'veo-3.1-fast-generate-preview',
@@ -18,7 +22,15 @@ const defaultSettings: Settings = {
 
 function loadSettings(): Settings {
   try {
-    return { ...defaultSettings, ...JSON.parse(localStorage.getItem(SETTINGS_KEY) ?? '{}') };
+    const raw = JSON.parse(localStorage.getItem(SETTINGS_KEY) ?? '{}');
+    // 兼容旧版的单一 provider 字段
+    if (raw.provider && !raw.engines) {
+      raw.engines = raw.provider === 'gemini'
+        ? { text: 'gemini', image: 'gemini', video: 'veo', tts: 'gemini' }
+        : defaultSettings.engines;
+      delete raw.provider;
+    }
+    return { ...defaultSettings, ...raw, engines: { ...defaultSettings.engines, ...raw.engines } };
   } catch {
     return defaultSettings;
   }

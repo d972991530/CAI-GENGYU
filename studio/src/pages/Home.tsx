@@ -7,6 +7,8 @@ import { MediaImg } from '../components/Media';
 import { FORMATS, GENRES, STYLE_PRESETS } from '../lib/presets';
 import { coverKey, projectStats } from '../lib/cover';
 import { timeAgo } from '../lib/util';
+import { isAllDemo } from '../services/ai';
+import { engineSummary } from '../components/SettingsModal';
 import { go } from '../lib/router';
 import type { Aspect, ProjectFormat } from '../types';
 
@@ -25,8 +27,8 @@ export default function Home({ onSettings }: { onSettings: () => void }) {
         <nav className="flex items-center justify-between py-6">
           <Brand />
           <div className="flex items-center gap-2">
-            <span className={`hidden rounded-full border px-3 py-1 text-xs sm:inline ${settings.provider === 'gemini' && settings.apiKey ? 'border-jade/40 text-jade' : 'border-amber/40 text-amber'}`}>
-              {settings.provider === 'gemini' && settings.apiKey ? '● Gemini 已接入' : '● 演示模式'}
+            <span className={`hidden rounded-full border px-3 py-1 text-xs sm:inline ${isAllDemo(settings) ? 'border-amber/40 text-amber' : 'border-jade/40 text-jade'}`}>
+              {isAllDemo(settings) ? '● 演示模式' : `● ${engineSummary(settings)}`}
             </span>
             <Button variant="ghost" icon={<Settings2 className="size-4" />} onClick={onSettings}>设置</Button>
           </div>

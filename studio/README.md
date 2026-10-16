@@ -11,12 +11,19 @@ npm run dev        # http://localhost:5180
 ```
 
 - **演示模式**（默认）：完全离线，本地「模型」生成剧本、分镜，用 Canvas 渲染占位画面、推拉动效视频和配音占位音，可以免 Key 跑完整条流程。
-- **接入 Gemini**：右上角「设置」中填写 API Key（只存在本机浏览器），或在 `studio/.env.local` 写入 `GEMINI_API_KEY=...`。
-  模型名都可以在设置里改，默认：
-  - 剧本 / 分镜：`gemini-2.5-flash`（JSON 结构化输出）
-  - 生图：`gemini-2.5-flash-image`（多张参考图 → 保持角色 / 场景一致）
-  - 视频：`veo-3.1-fast-generate-preview`（分镜图作为首帧，图生视频）
-  - 配音：`gemini-2.5-flash-preview-tts`（每个角色单独设置音色）
+「设置」里可以给 **剧本 / 生图 / 视频 / 配音** 分别选择引擎，Key 只保存在本机浏览器：
+
+| 能力 | 可选引擎 |
+|---|---|
+| 剧本 / 分镜 | Gemini（`gemini-2.5-flash`，JSON 输出）· 演示 |
+| 生图 | **Qwen-Image**（`fal-ai/qwen-image`）· **FLUX.1-schnell**（`fal-ai/flux/schnell`）· Gemini Image（支持参考图）· 演示 |
+| 视频 | **Wan2.2-5B**（`fal-ai/wan/v2.2-5b/text-to-video`、`/image-to-video`）· Veo 3.1 Fast · 演示 |
+| 配音 | Gemini TTS · 演示 |
+
+- **开源模型（fal）**：Qwen-Image、FLUX.1-schnell、Wan2.2-5B 这三个模型都是 Apache 2.0 许可，通过 fal 队列接口在云端运行。需要填写 fal API Key，并且账号里要有额度。
+  - Qwen-Image / FLUX.1-schnell 是纯文生图模型，不读取参考图，角色一致性靠资产里的视觉提示词。
+  - Wan2.2-5B 单镜 1–5 秒（24fps，17–121 帧），720p，支持 16:9 / 9:16 / 1:1。有分镜图时走图生视频，没有时走文生视频；超过 5 秒的镜头会被截短到 5 秒。
+- **Gemini**：填写 Gemini API Key，或在 `studio/.env.local` 写入 `GEMINI_API_KEY=...`（这样会默认全部使用 Gemini）。
 
 ## 功能模块
 
@@ -45,4 +52,4 @@ src/
 ```
 
 所有数据只存在浏览器本地（IndexedDB），不需要后端。
-API Key 会在浏览器端直接调用 Gemini，适合个人本地使用；如果要公开部署，建议加一层服务端代理来保管 Key。
+API Key 会在浏览器端直接调用 Gemini / fal，适合个人本地使用；如果要公开部署，建议加一层服务端代理来保管 Key。

@@ -1,6 +1,7 @@
 import type { Aspect, ProjectFormat, Settings } from '../types';
 import { geminiProvider } from './gemini';
 import { demoProvider } from './demo';
+import { falImage, falWanVideo, WAN_MAX_SECONDS } from './fal';
 
 export interface DraftEpisode { title: string; summary: string; script: string }
 export interface DraftStory { title: string; logline: string; episodes: DraftEpisode[] }
@@ -28,9 +29,44 @@ export interface AIProvider {
   tts(text: string, voice: string): Promise<Blob>;
 }
 
+function need(key: string, name: string) {
+  if (!key) throw new Error(`请先在「设置」中填写 ${name} API Key`);
+}
+
+/** 按能力组合引擎：文本 / 生图 / 视频 / 配音可以分别选择 */
 export function getProvider(s: Settings): AIProvider {
-  if (s.provider === 'gemini' && s.apiKey) return geminiProvider(s);
-  return demoProvider;
+  const { engines: e } = s;
+  const gem = () => { need(s.apiKey, 'Gemini'); return geminiProvider(s); };
+  const fal = () => { need(s.falKey, 'fal'); return s.falKey; };
+  const text = () => (e.text === 'gemini' ? gem() : demoProvider);
+  return {
+    ideaToStory: (...a) => text().ideaToStory(...a),
+    novelToEpisodes: (...a) => text().novelToEpisodes(...a),
+    extractAssets: (...a) => text().extractAssets(...a),
+    storyboard: (...a) => text().storyboard(...a),
+    rewrite: (...a) => text().rewrite(...a),
+    async image(prompt, aspect, refs) {
+      if (e.image === 'gemini') return gem().image(prompt, aspect, refs);
+      // 开源文生图模型不接收参考图，一致性依靠资产里的视觉提示词
+      if (e.image === 'qwen-image' || e.image === 'flux-schnell') return falImage(fal(), e.image, prompt.replace(/\nKeep characters and location strictly consistent[^\n]*/, ''), aspect);
+      return demoProvider.image(prompt, aspect, refs);
+    },
+    async video(prompt, aspect, first, seconds = 5) {
+      if (e.video === 'veo') return gem().video(prompt, aspect, first, seconds);
+      if (e.video === 'wan') return falWanVideo(fal(), prompt, aspect, seconds, first);
+      return demoProvider.video(prompt, aspect, first, seconds);
+    },
+    tts: (...a) => (e.tts === 'gemini' ? gem() : demoProvider).tts(...a),
+  };
+}
+
+/** 当前视频引擎的单镜最大时长（秒），undefined 表示由模型决定 */
+export function videoMaxSeconds(s: Settings) {
+  return s.engines.video === 'wan' ? WAN_MAX_SECONDS : s.engines.video === 'veo' ? 8 : 4;
+}
+
+export function isAllDemo(s: Settings) {
+  return Object.values(s.engines).every((v) => v === 'demo');
 }
 
 // ---------- 共享提示词 ----------
