@@ -6,9 +6,8 @@
 
 | 文件 | 用途 |
 |---|---|
-| `h3_director_rv2v_78shots.json` | 改好的工作流，导入 RunningHub |
-| `stage_78shots.mmxpack.zip` | 导演包：原视频 + 78 个已分好的片段（不进仓库，由脚本生成） |
-| `build_director_rv2v.py` | 生成上面两个文件 |
+| `h3_director_rv2v_78shots.json` | 改好的工作流，78 个片段已写在导演台节点里，直接导入 RunningHub |
+| `build_director_rv2v.py` | 生成上面的工作流（加 `--pack` 另外生成导演包，见下文） |
 
 ```bash
 python3 build_director_rv2v.py --workflow 原工作流.json --source 原视频.mp4 --out-dir 输出目录
@@ -27,16 +26,22 @@ python3 build_director_rv2v.py --workflow 原工作流.json --source 原视频.m
 | 删除「尾链」三个节点（cleanGpu → RIFE → SaveImage） | 它们在成片保存后故意让任务报错，对出片没有作用 |
 | 清除节点里保存的个人云端预览地址 | 分享工作流时不带个人存储路径 |
 
-## 为什么要用导演包导入
+## 源视频怎么对上
 
-在节点里直接上传视频，插件会把时间轴重置成一整段（`_applyLoadedVideo → _setSingleSegment`），预置的 78 个切点就没了。导演包里的 `timeline.json` 带着视频路径和全部片段，导入时插件会把视频复制到 `input/minimax_director_packs/` 并保留分段。
+RunningHub 会把上传的文件重命名为「文件内容的 SHA-256 + 扩展名」。所以同一个视频不管从哪个上传口传上去，文件名都一样，可以提前写进导演台的时间轴。本项目的原视频是 `01f1ba17b08d358c79b879d6f5a534e43da0aa4a4ff7480e4d65eeacab824c91.mp4`，它本来就是从 RunningHub 下载的，通常已经在 input 目录里。
 
-这一点用插件自己的 `import_extracted_pack` 和分段函数核对过：导入后没有缺失素材，任务是 rv2v、分段模式，插件算出的 78 个片段范围与镜头表逐一相同。我没有在 RunningHub 上实际运行过。
+不要在导演台节点里直接上传视频：插件会把时间轴重置成一整段（`_applyLoadedVideo → _setSingleSegment`），78 个切点就没了。找不到视频时，用工作流左上角单独的「原视频上传口」传一次。
+
+## 为什么不用导演包
+
+第一版用的是导演包（`*.mmxpack.zip`，含 20 MB 视频）。插件服务端能正常解析它，用户 RunningHub 上的插件版本（约 2026-09-18，有 selflift / face_refine、没有 semantic_bridge）也一样；但在 RunningHub 上导入失败。导演包走插件自己的上传接口，最可能是平台网关拒绝了大文件请求。改成把时间轴直接写进工作流后，不再需要这次上传。`--pack` 仍可生成导演包，供本地 ComfyUI 使用。
+
+以上都用对应版本插件的 Python 代码核对过：时间轴为 rv2v、分段模式，视频路径能在 input 目录解析到，插件算出的 78 个片段范围与镜头表逐一相同。我没有在 RunningHub 上实际运行过。
 
 ## 使用步骤
 
-1. 导入 `h3_director_rv2v_78shots.json`。
-2. 导演台节点工具栏 →「导入导演包」→ 选 `stage_78shots.mmxpack.zip`。之后不要再在节点里上传视频。
+1. 导入 `h3_director_rv2v_78shots.json`，看导演台时间轴上是否出现原视频和 78 个片段。
+2. 如果提示找不到视频，用「原视频上传口」上传原视频（不要在导演台节点里上传）。
 3. 点选片段，往「图片 1–9」上传角色图。图片 1 是画面里最主要的人，多人时按从左到右的顺序往后传。
 4. 需要时改片段提示词，写明谁对应谁。
 5. 打开「选择运行」，只勾选传好图的片段；没勾选的片段导出时用原片画面补齐。

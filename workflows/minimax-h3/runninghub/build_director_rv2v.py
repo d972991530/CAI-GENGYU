@@ -1,17 +1,21 @@
 #!/usr/bin/env python3
 """在「MiniMax H3 导演台全能工作流」（AIMixer MiniMaxH3Director 插件）基础上做镜头换人。
 
-产出两样东西：
-1. 工作流：把导演台节点切到 rv2v（参考素材改视频），清理故意报错的尾链，修正 LoRA。
-2. 导演包（*.mmxpack.zip）：原视频 + 78 个已按切点分好的片段。在导演台工具栏「导入导演包」后，
-   每个片段都有自己的图片 1–9 上传口，传入角色图即可替换该片段里的人物。
+产出：工作流 JSON。导演台节点切到 rv2v（参考素材改视频）、分段模式，78 个片段直接写在节点里，
+每个片段都有自己的图片 1–9 上传口；同时清理故意报错的尾链、修正 LoRA。
+
+源视频按 RunningHub 的命名规则引用：RunningHub 把上传文件重命名为「文件内容的 SHA-256 + 扩展名」，
+所以同一个视频无论从哪个上传口传上去，文件名都一样，节点里可以提前写好。
 
 用法：
-  python3 build_director_rv2v.py --workflow 原工作流.json --source 原视频.mp4 --out-dir 输出目录
+  python3 build_director_rv2v.py --workflow 原工作流.json --source 原视频.mp4 --out-dir 输出目录 [--pack]
+  --pack 另外生成导演包（含视频，约 20 MB）。RunningHub 上导演包走插件自己的上传接口，大文件可能被拒，
+  所以默认不用它。
 """
 
 import argparse
 import copy
+import hashlib
 import json
 import os
 import subprocess
@@ -37,9 +41,9 @@ def segment_prompt(shot):
     return GLOBAL_PROMPT
 
 
-def build_timeline(shots, total_frames, src_w, src_h):
+def build_timeline(shots, total_frames, src_w, src_h, video_file="source_video/clip_1.mp4", subfolder="source_video"):
     video = {
-        "fileName": "clip_1.mp4", "videoFile": "source_video/clip_1.mp4", "subfolder": "source_video",
+        "fileName": os.path.basename(video_file), "videoFile": video_file, "subfolder": subfolder,
         "type": "input", "frames": [], "frameMap": [], "deletedSourceRanges": [],
         "width": src_w, "height": src_h, "duration": round(total_frames / FPS, 3),
         "nativeFps": FPS, "nativeFrameCount": total_frames, "sourceFrameCount": total_frames,
@@ -114,7 +118,15 @@ def node_title(n):
     return n.get("title") or ""
 
 
-def build_workflow(src_path, out_path, timeline_preview):
+def sha256_name(path):
+    h = hashlib.sha256()
+    with open(path, "rb") as f:
+        for chunk in iter(lambda: f.read(1 << 20), b""):
+            h.update(chunk)
+    return h.hexdigest() + os.path.splitext(path)[1].lower()
+
+
+def build_workflow(src_path, out_path, timeline, video_name):
     wf = json.load(open(src_path, encoding="utf-8"))
     remove = {n["id"] for n in wf["nodes"] if node_title(n).startswith(FAIL_CHAIN_TITLES)}
     wf["nodes"] = [n for n in wf["nodes"] if n["id"] not in remove]
@@ -142,24 +154,33 @@ def build_workflow(src_path, out_path, timeline_preview):
             v[0] = TASK_RV2V
             v[1] = GLOBAL_PROMPT
             v[6], v[7], v[8], v[9] = float(FPS), OUT_W, OUT_H, OUT_W
-            v[10] = timeline_preview["totalFrames"]
-            # 节点里不放源视频（路径要靠导演包导入生成），只预置 rv2v 的输出设置
-            empty = copy.deepcopy(timeline_preview)
-            empty.update(segments=[], videoClips=[], totalFrames=124,
-                         video={"fileName": "", "videoFile": "", "subfolder": "", "type": "input",
-                                "frames": [], "frameMap": []})
-            v[11] = json.dumps(empty, ensure_ascii=False)
+            v[10] = timeline["totalFrames"]
+            v[11] = json.dumps(timeline, ensure_ascii=False)
 
+    # 上传辅助节点：没接线、不会执行，只用来把原视频传到 RunningHub 的 input 目录
     nid = max(n["id"] for n in wf["nodes"]) + 1
+    tpl = json.load(open(os.path.join(HERE, "h3_motion_transfer_improved.json"), encoding="utf-8"))
+    loader = copy.deepcopy(next(n for n in tpl["nodes"] if n["type"] == "VHS_LoadVideo"))
+    for i in loader["inputs"]:
+        i.pop("link", None)
+    for o in loader["outputs"]:
+        o["links"] = None
+    loader.update(id=nid, pos=[-1240, -700], size=[300, 560], title="原视频上传口（只在找不到视频时用）",
+                  color="#223", bgcolor="#335")
+    loader["widgets_values"] = dict(loader["widgets_values"], video=video_name, force_rate=0, frame_load_cap=0,
+                                    videopreview={"hidden": False, "paused": False, "params": {}})
+    wf["nodes"].append(loader)
+
+    nid += 1
     wf["nodes"].append({
         "id": nid, "type": "MarkdownNote", "pos": [-320, -700], "size": [1120, 420], "flags": {}, "order": 0,
         "mode": 0, "inputs": [], "outputs": [], "properties": {}, "title": "镜头换人 · 使用步骤",
         "color": "#432", "bgcolor": "#653",
         "widgets_values": [
             "## 镜头换人（rv2v · 78 个镜头）\n\n"
-            "1. 在导演台节点工具栏点 **导入导演包**，选择 `stage_78shots.mmxpack.zip`。"
-            "导入后原视频和 78 个片段（与镜头切割包的编号一致）都已就位，**不要再在节点里重新上传视频**，"
-            "否则分段会被重置成一段。\n"
+            f"1. 原视频和 78 个片段（与镜头切割包的编号一致）已经写在导演台节点里，视频文件名是 `{video_name}`。"
+            "如果时间轴显示找不到视频，用左边的「原视频上传口」把原视频传一次即可（同一个文件传上去名字不变）。"
+            "**不要在导演台节点里重新上传视频**，否则 78 个分段会被重置成一段。\n"
             "2. 在时间轴上点选某个片段，往它的 **图片 1–9** 上传角色图：图片 1 是画面里最主要的人，"
             "多人时按从左到右的顺序继续往后传。不传图的片段等同于只做画面重绘（v2v）。\n"
             "3. 片段提示词已预置，可以按镜头补充谁对应谁。\n"
@@ -180,6 +201,7 @@ def main():
     ap.add_argument("--source", required=True, help="原视频（与镜头切割包同一个文件）")
     ap.add_argument("--shots", default=os.path.join(HERE, "shot_list.json"))
     ap.add_argument("--out-dir", default=HERE)
+    ap.add_argument("--pack", action="store_true", help="另外生成导演包（含视频）")
     args = ap.parse_args()
 
     shots = json.load(open(args.shots, encoding="utf-8"))
@@ -192,14 +214,18 @@ def main():
     if total != expected:
         raise SystemExit(f"原视频有 {total} 帧，镜头表覆盖 {expected} 帧，不是同一个视频？")
 
-    timeline = build_timeline(shots, total, int(probe["width"]), int(probe["height"]))
     os.makedirs(args.out_dir, exist_ok=True)
+    video_name = sha256_name(args.source)
+    timeline = build_timeline(shots, total, int(probe["width"]), int(probe["height"]),
+                              video_file=video_name, subfolder="")
     wf_out = os.path.join(args.out_dir, "h3_director_rv2v_78shots.json")
-    removed = build_workflow(args.workflow, wf_out, timeline)
-    pack_out = os.path.join(args.out_dir, "stage_78shots.mmxpack.zip")
-    build_pack(shots, args.source, pack_out, timeline)
-    print(f"工作流 → {wf_out}（删除节点 {removed}）")
-    print(f"导演包 → {pack_out}（{len(shots)} 个片段，{total} 帧）")
+    removed = build_workflow(args.workflow, wf_out, timeline, video_name)
+    print(f"工作流 → {wf_out}（{len(shots)} 个片段，{total} 帧，视频 {video_name}，删除节点 {removed}）")
+    if args.pack:
+        pack_out = os.path.join(args.out_dir, "stage_78shots.mmxpack.zip")
+        build_pack(shots, args.source, pack_out,
+                   build_timeline(shots, total, int(probe["width"]), int(probe["height"])))
+        print(f"导演包 → {pack_out}")
 
 
 if __name__ == "__main__":
