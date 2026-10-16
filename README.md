@@ -6,19 +6,25 @@
 
 `studio/` 目录是一个全新的一站式 AI 影视 / 短剧工作台：创意 → 剧本 → 画风 → 角色与场景 → 智能分镜 → 配图 / 视频 / 配音 → 成片。前端只访问同域 `/api`，所有模型调用（Gemini、fal）和 API Key 都在 `studio/server/` 后端。详见 [studio/README.md](studio/README.md)。
 
-# Run and deploy your AI Studio app
+# K-Cinema（根目录应用）
 
-This contains everything you need to run your app locally.
+## 架构：Gemini 请求全部在后端
 
-View your app in AI Studio: https://ai.studio/apps/drive/1UPQc-yInSWDrux_qYx0YsKr1Fuge4fhe
+```
+浏览器 ──同源 /api──▶ server/index.ts ──▶ Gemini（文本 / 生图 / Veo 视频）
+```
 
-## Run Locally
+- 前端（`services/geminiService.ts`）只请求同域的 `/api`，不包含 Gemini SDK、接口地址或 API Key，因此**没有跨域问题**，Key 也不会被打包进前端 JS。
+- `GEMINI_API_KEY` 只由后端读取（`.env.local`、`.env` 或环境变量）。
+- 视频预演耗时较长，后端以异步任务执行，前端轮询 `/api/previs/:id`。
+- 可选 `APP_TOKEN`：设置后所有 `/api` 请求都需要访问口令，前端会弹窗让你输入。
+- 可选 `GEMINI_BASE_URL`：走自建中转或代理时使用。
 
-**Prerequisites:**  Node.js
+## 本地运行
 
+**前置条件：** Node.js 22+
 
-1. Install dependencies:
-   `npm install`
-2. Set the `GEMINI_API_KEY` in [.env.local](.env.local) to your Gemini API key
-3. Run the app:
-   `npm run dev`
+1. 安装依赖：`npm install`
+2. 在 `.env.local` 中写入 `GEMINI_API_KEY=你的Key`（只给后端用）
+3. 开发：`npm run dev`（同时启动后端 :8788 和前端 :3000，打开 http://localhost:3000）
+4. 生产：`npm run build && npm start`（后端在 :8788 同时托管前端页面）

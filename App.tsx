@@ -162,10 +162,6 @@ const App: React.FC = () => {
   };
 
   const onRenderVideo = async () => {
-    const hasKey = await (window as any).aistudio.hasSelectedApiKey();
-    if (!hasKey) {
-      await (window as any).aistudio.openSelectKey();
-    }
     setIsGeneratingVideo(true);
     addLog(`启动动态预演 (Veo Engine)... 节奏: ${editingPace}, 转场: ${transitionPace}`);
     try {
@@ -180,7 +176,7 @@ const App: React.FC = () => {
       setPreviewVid(vid);
       addLog("动态预演合成完成。");
     } catch (e) {
-      addLog("视频引擎报错，请确保使用付费 API Key。");
+      addLog(`视频引擎报错：${(e as Error).message}`);
     } finally { setIsGeneratingVideo(false); }
   };
 
