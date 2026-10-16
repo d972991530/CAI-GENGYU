@@ -1,0 +1,264 @@
+{
+  "usage": "定妆照提示词。先用文生图出第一套服装（c1），再把 c1 图喂给图像编辑模型，用 edit_prompt 只换衣服得到 c2，同一个人的脸最稳。I–L 只有 c2，直接文生。",
+  "common": {
+    "size": [
+      1152,
+      1536
+    ],
+    "aspect": "3:4",
+    "style": "Professional K-pop concept photo, full-body character reference sheet photo, photorealistic, 85mm lens, sharp focus on the face, natural skin texture, even soft studio lighting, seamless light grey backdrop, no props",
+    "pose": "Standing straight facing the camera, arms relaxed at her sides, feet slightly apart, neutral friendly expression, entire body visible from head to shoes with a little space above the head",
+    "negative": "cropped head, cropped feet, multiple people, extra limbs, extra fingers, deformed hands, heavy makeup, harsh shadows, busy background, text, watermark, logo, cartoon, anime, 3d render, plastic skin, blurry, revealing outfit, provocative pose"
+  },
+  "costumes": {
+    "c1": "wearing an oversized white cropped sweatshirt, baggy white jogger sweatpants and chunky white sneakers, monochrome all-white streetwear",
+    "c2": "wearing a fitted grey-white cropped polo shirt with a white collar, a light grey pleated mini skirt, white knee-high socks and glossy white loafers, clean retro-futuristic school uniform style"
+  },
+  "members": [
+    {
+      "id": "A",
+      "role": "中心位 · 开场双人",
+      "look_zh": "高挑，杏眼，左眼下泪痣，黑长直配空气刘海",
+      "identity": "tall slim build, oval face, sharp almond-shaped eyes, a small beauty mark under her left eye, long straight jet-black hair falling past the chest with soft see-through bangs",
+      "signature": "a thin silver chain choker",
+      "seed": 2101,
+      "outputs": {
+        "c1": {
+          "file": "members/A_c1.png",
+          "prompt": "Professional K-pop concept photo, full-body character reference sheet photo, photorealistic, 85mm lens, sharp focus on the face, natural skin texture, even soft studio lighting, seamless light grey backdrop, no props. A fictional adult Korean woman in her early twenties, tall slim build, oval face, sharp almond-shaped eyes, a small beauty mark under her left eye, long straight jet-black hair falling past the chest with soft see-through bangs, with a thin silver chain choker, wearing an oversized white cropped sweatshirt, baggy white jogger sweatpants and chunky white sneakers, monochrome all-white streetwear. Standing straight facing the camera, arms relaxed at her sides, feet slightly apart, neutral friendly expression, entire body visible from head to shoes with a little space above the head."
+        },
+        "c2": {
+          "file": "members/A_c2.png",
+          "prompt": "Professional K-pop concept photo, full-body character reference sheet photo, photorealistic, 85mm lens, sharp focus on the face, natural skin texture, even soft studio lighting, seamless light grey backdrop, no props. A fictional adult Korean woman in her early twenties, tall slim build, oval face, sharp almond-shaped eyes, a small beauty mark under her left eye, long straight jet-black hair falling past the chest with soft see-through bangs, with a thin silver chain choker, wearing a fitted grey-white cropped polo shirt with a white collar, a light grey pleated mini skirt, white knee-high socks and glossy white loafers, clean retro-futuristic school uniform style. Standing straight facing the camera, arms relaxed at her sides, feet slightly apart, neutral friendly expression, entire body visible from head to shoes with a little space above the head.",
+          "edit_from": "members/A_c1.png",
+          "edit_prompt": "Keep this exact same person, same face, same hairstyle, same hair colour, same accessories, same pose, same backdrop and lighting. Change only the outfit to: a fitted grey-white cropped polo shirt with a white collar, a light grey pleated mini skirt, white knee-high socks and glossy white loafers."
+        }
+      }
+    },
+    {
+      "id": "B",
+      "role": "开场双人 · 结尾 wink",
+      "look_zh": "圆脸酒窝，铜棕色大波浪，深侧分",
+      "identity": "medium height, round soft face, big warm eyes, dimples when smiling, long wavy copper-auburn hair with a deep side part",
+      "signature": "small gold hoop earrings",
+      "seed": 2102,
+      "outputs": {
+        "c1": {
+          "file": "members/B_c1.png",
+          "prompt": "Professional K-pop concept photo, full-body character reference sheet photo, photorealistic, 85mm lens, sharp focus on the face, natural skin texture, even soft studio lighting, seamless light grey backdrop, no props. A fictional adult Korean woman in her early twenties, medium height, round soft face, big warm eyes, dimples when smiling, long wavy copper-auburn hair with a deep side part, with small gold hoop earrings, wearing an oversized white cropped sweatshirt, baggy white jogger sweatpants and chunky white sneakers, monochrome all-white streetwear. Standing straight facing the camera, arms relaxed at her sides, feet slightly apart, neutral friendly expression, entire body visible from head to shoes with a little space above the head."
+        },
+        "c2": {
+          "file": "members/B_c2.png",
+          "prompt": "Professional K-pop concept photo, full-body character reference sheet photo, photorealistic, 85mm lens, sharp focus on the face, natural skin texture, even soft studio lighting, seamless light grey backdrop, no props. A fictional adult Korean woman in her early twenties, medium height, round soft face, big warm eyes, dimples when smiling, long wavy copper-auburn hair with a deep side part, with small gold hoop earrings, wearing a fitted grey-white cropped polo shirt with a white collar, a light grey pleated mini skirt, white knee-high socks and glossy white loafers, clean retro-futuristic school uniform style. Standing straight facing the camera, arms relaxed at her sides, feet slightly apart, neutral friendly expression, entire body visible from head to shoes with a little space above the head.",
+          "edit_from": "members/B_c1.png",
+          "edit_prompt": "Keep this exact same person, same face, same hairstyle, same hair colour, same accessories, same pose, same backdrop and lighting. Change only the outfit to: a fitted grey-white cropped polo shirt with a white collar, a light grey pleated mini skirt, white knee-high socks and glossy white loafers."
+        }
+      }
+    },
+    {
+      "id": "C",
+      "role": "绿光特写 · 波浪下腰中心",
+      "look_zh": "高颧骨单眼皮，黑色中分直发别耳后",
+      "identity": "slender build, elegant long neck, high cheekbones, calm monolid eyes, long sleek black hair with a sharp centre part tucked behind the ears",
+      "signature": "pearl stud earrings",
+      "seed": 2103,
+      "outputs": {
+        "c1": {
+          "file": "members/C_c1.png",
+          "prompt": "Professional K-pop concept photo, full-body character reference sheet photo, photorealistic, 85mm lens, sharp focus on the face, natural skin texture, even soft studio lighting, seamless light grey backdrop, no props. A fictional adult Korean woman in her early twenties, slender build, elegant long neck, high cheekbones, calm monolid eyes, long sleek black hair with a sharp centre part tucked behind the ears, with pearl stud earrings, wearing an oversized white cropped sweatshirt, baggy white jogger sweatpants and chunky white sneakers, monochrome all-white streetwear. Standing straight facing the camera, arms relaxed at her sides, feet slightly apart, neutral friendly expression, entire body visible from head to shoes with a little space above the head."
+        },
+        "c2": {
+          "file": "members/C_c2.png",
+          "prompt": "Professional K-pop concept photo, full-body character reference sheet photo, photorealistic, 85mm lens, sharp focus on the face, natural skin texture, even soft studio lighting, seamless light grey backdrop, no props. A fictional adult Korean woman in her early twenties, slender build, elegant long neck, high cheekbones, calm monolid eyes, long sleek black hair with a sharp centre part tucked behind the ears, with pearl stud earrings, wearing a fitted grey-white cropped polo shirt with a white collar, a light grey pleated mini skirt, white knee-high socks and glossy white loafers, clean retro-futuristic school uniform style. Standing straight facing the camera, arms relaxed at her sides, feet slightly apart, neutral friendly expression, entire body visible from head to shoes with a little space above the head.",
+          "edit_from": "members/C_c1.png",
+          "edit_prompt": "Keep this exact same person, same face, same hairstyle, same hair colour, same accessories, same pose, same backdrop and lighting. Change only the outfit to: a fitted grey-white cropped polo shirt with a white collar, a light grey pleated mini skirt, white knee-high socks and glossy white loafers."
+        }
+      }
+    },
+    {
+      "id": "D",
+      "role": "翻花绳 · 拱门",
+      "look_zh": "娇小，灰棕色锁骨发配八字刘海",
+      "identity": "petite build, small delicate face, gentle doe eyes, shoulder-length ash-brown bob with curtain bangs",
+      "signature": "several thin silver rings on both hands",
+      "seed": 2104,
+      "outputs": {
+        "c1": {
+          "file": "members/D_c1.png",
+          "prompt": "Professional K-pop concept photo, full-body character reference sheet photo, photorealistic, 85mm lens, sharp focus on the face, natural skin texture, even soft studio lighting, seamless light grey backdrop, no props. A fictional adult Korean woman in her early twenties, petite build, small delicate face, gentle doe eyes, shoulder-length ash-brown bob with curtain bangs, with several thin silver rings on both hands, wearing an oversized white cropped sweatshirt, baggy white jogger sweatpants and chunky white sneakers, monochrome all-white streetwear. Standing straight facing the camera, arms relaxed at her sides, feet slightly apart, neutral friendly expression, entire body visible from head to shoes with a little space above the head."
+        },
+        "c2": {
+          "file": "members/D_c2.png",
+          "prompt": "Professional K-pop concept photo, full-body character reference sheet photo, photorealistic, 85mm lens, sharp focus on the face, natural skin texture, even soft studio lighting, seamless light grey backdrop, no props. A fictional adult Korean woman in her early twenties, petite build, small delicate face, gentle doe eyes, shoulder-length ash-brown bob with curtain bangs, with several thin silver rings on both hands, wearing a fitted grey-white cropped polo shirt with a white collar, a light grey pleated mini skirt, white knee-high socks and glossy white loafers, clean retro-futuristic school uniform style. Standing straight facing the camera, arms relaxed at her sides, feet slightly apart, neutral friendly expression, entire body visible from head to shoes with a little space above the head.",
+          "edit_from": "members/D_c1.png",
+          "edit_prompt": "Keep this exact same person, same face, same hairstyle, same hair colour, same accessories, same pose, same backdrop and lighting. Change only the outfit to: a fitted grey-white cropped polo shirt with a white collar, a light grey pleated mini skirt, white knee-high socks and glossy white loafers."
+        }
+      }
+    },
+    {
+      "id": "E",
+      "role": "手腕道具 · 拱门",
+      "look_zh": "运动型，深棕色高马尾",
+      "identity": "athletic build, defined jawline, bright confident eyes, dark brown hair in a high sleek ponytail",
+      "signature": "a white ring-shaped wrist device on her left wrist",
+      "seed": 2105,
+      "outputs": {
+        "c1": {
+          "file": "members/E_c1.png",
+          "prompt": "Professional K-pop concept photo, full-body character reference sheet photo, photorealistic, 85mm lens, sharp focus on the face, natural skin texture, even soft studio lighting, seamless light grey backdrop, no props. A fictional adult Korean woman in her early twenties, athletic build, defined jawline, bright confident eyes, dark brown hair in a high sleek ponytail, with a white ring-shaped wrist device on her left wrist, wearing an oversized white cropped sweatshirt, baggy white jogger sweatpants and chunky white sneakers, monochrome all-white streetwear. Standing straight facing the camera, arms relaxed at her sides, feet slightly apart, neutral friendly expression, entire body visible from head to shoes with a little space above the head."
+        },
+        "c2": {
+          "file": "members/E_c2.png",
+          "prompt": "Professional K-pop concept photo, full-body character reference sheet photo, photorealistic, 85mm lens, sharp focus on the face, natural skin texture, even soft studio lighting, seamless light grey backdrop, no props. A fictional adult Korean woman in her early twenties, athletic build, defined jawline, bright confident eyes, dark brown hair in a high sleek ponytail, with a white ring-shaped wrist device on her left wrist, wearing a fitted grey-white cropped polo shirt with a white collar, a light grey pleated mini skirt, white knee-high socks and glossy white loafers, clean retro-futuristic school uniform style. Standing straight facing the camera, arms relaxed at her sides, feet slightly apart, neutral friendly expression, entire body visible from head to shoes with a little space above the head.",
+          "edit_from": "members/E_c1.png",
+          "edit_prompt": "Keep this exact same person, same face, same hairstyle, same hair colour, same accessories, same pose, same backdrop and lighting. Change only the outfit to: a fitted grey-white cropped polo shirt with a white collar, a light grey pleated mini skirt, white knee-high socks and glossy white loafers."
+        }
+      }
+    },
+    {
+      "id": "F",
+      "role": "丝带俯拍 · 拱门前景",
+      "look_zh": "心形脸，及腰黑长发，半扎白缎带",
+      "identity": "tall build, heart-shaped face, soft dreamy eyes, very long straight black hair down to the waist, half-up with a white satin ribbon bow",
+      "signature": "a white satin hair ribbon",
+      "seed": 2106,
+      "outputs": {
+        "c1": {
+          "file": "members/F_c1.png",
+          "prompt": "Professional K-pop concept photo, full-body character reference sheet photo, photorealistic, 85mm lens, sharp focus on the face, natural skin texture, even soft studio lighting, seamless light grey backdrop, no props. A fictional adult Korean woman in her early twenties, tall build, heart-shaped face, soft dreamy eyes, very long straight black hair down to the waist, half-up with a white satin ribbon bow, with a white satin hair ribbon, wearing an oversized white cropped sweatshirt, baggy white jogger sweatpants and chunky white sneakers, monochrome all-white streetwear. Standing straight facing the camera, arms relaxed at her sides, feet slightly apart, neutral friendly expression, entire body visible from head to shoes with a little space above the head."
+        },
+        "c2": {
+          "file": "members/F_c2.png",
+          "prompt": "Professional K-pop concept photo, full-body character reference sheet photo, photorealistic, 85mm lens, sharp focus on the face, natural skin texture, even soft studio lighting, seamless light grey backdrop, no props. A fictional adult Korean woman in her early twenties, tall build, heart-shaped face, soft dreamy eyes, very long straight black hair down to the waist, half-up with a white satin ribbon bow, with a white satin hair ribbon, wearing a fitted grey-white cropped polo shirt with a white collar, a light grey pleated mini skirt, white knee-high socks and glossy white loafers, clean retro-futuristic school uniform style. Standing straight facing the camera, arms relaxed at her sides, feet slightly apart, neutral friendly expression, entire body visible from head to shoes with a little space above the head.",
+          "edit_from": "members/F_c1.png",
+          "edit_prompt": "Keep this exact same person, same face, same hairstyle, same hair colour, same accessories, same pose, same backdrop and lighting. Change only the outfit to: a fitted grey-white cropped polo shirt with a white collar, a light grey pleated mini skirt, white knee-high socks and glossy white loafers."
+        }
+      }
+    },
+    {
+      "id": "G",
+      "role": "发光小球 · 闯关路径",
+      "look_zh": "眼尾上扬，鼻梁小雀斑，蜂蜜金层次长发",
+      "identity": "medium height, playful upturned eyes, light freckles across the nose, long layered honey-blonde hair",
+      "signature": "a single silver ear cuff on her right ear",
+      "seed": 2107,
+      "outputs": {
+        "c1": {
+          "file": "members/G_c1.png",
+          "prompt": "Professional K-pop concept photo, full-body character reference sheet photo, photorealistic, 85mm lens, sharp focus on the face, natural skin texture, even soft studio lighting, seamless light grey backdrop, no props. A fictional adult Korean woman in her early twenties, medium height, playful upturned eyes, light freckles across the nose, long layered honey-blonde hair, with a single silver ear cuff on her right ear, wearing an oversized white cropped sweatshirt, baggy white jogger sweatpants and chunky white sneakers, monochrome all-white streetwear. Standing straight facing the camera, arms relaxed at her sides, feet slightly apart, neutral friendly expression, entire body visible from head to shoes with a little space above the head."
+        },
+        "c2": {
+          "file": "members/G_c2.png",
+          "prompt": "Professional K-pop concept photo, full-body character reference sheet photo, photorealistic, 85mm lens, sharp focus on the face, natural skin texture, even soft studio lighting, seamless light grey backdrop, no props. A fictional adult Korean woman in her early twenties, medium height, playful upturned eyes, light freckles across the nose, long layered honey-blonde hair, with a single silver ear cuff on her right ear, wearing a fitted grey-white cropped polo shirt with a white collar, a light grey pleated mini skirt, white knee-high socks and glossy white loafers, clean retro-futuristic school uniform style. Standing straight facing the camera, arms relaxed at her sides, feet slightly apart, neutral friendly expression, entire body visible from head to shoes with a little space above the head.",
+          "edit_from": "members/G_c1.png",
+          "edit_prompt": "Keep this exact same person, same face, same hairstyle, same hair colour, same accessories, same pose, same backdrop and lighting. Change only the outfit to: a fitted grey-white cropped polo shirt with a white collar, a light grey pleated mini skirt, white knee-high socks and glossy white loafers."
+        }
+      }
+    },
+    {
+      "id": "H",
+      "role": "水晶 · 推滚轮 · 踩节点",
+      "look_zh": "娇小圆脸，深棕色双低丸子头",
+      "identity": "petite build, round face, soft round eyes, dark brown hair styled in two low buns with loose face-framing strands",
+      "signature": "small white star hair clips",
+      "seed": 2108,
+      "outputs": {
+        "c1": {
+          "file": "members/H_c1.png",
+          "prompt": "Professional K-pop concept photo, full-body character reference sheet photo, photorealistic, 85mm lens, sharp focus on the face, natural skin texture, even soft studio lighting, seamless light grey backdrop, no props. A fictional adult Korean woman in her early twenties, petite build, round face, soft round eyes, dark brown hair styled in two low buns with loose face-framing strands, with small white star hair clips, wearing an oversized white cropped sweatshirt, baggy white jogger sweatpants and chunky white sneakers, monochrome all-white streetwear. Standing straight facing the camera, arms relaxed at her sides, feet slightly apart, neutral friendly expression, entire body visible from head to shoes with a little space above the head."
+        },
+        "c2": {
+          "file": "members/H_c2.png",
+          "prompt": "Professional K-pop concept photo, full-body character reference sheet photo, photorealistic, 85mm lens, sharp focus on the face, natural skin texture, even soft studio lighting, seamless light grey backdrop, no props. A fictional adult Korean woman in her early twenties, petite build, round face, soft round eyes, dark brown hair styled in two low buns with loose face-framing strands, with small white star hair clips, wearing a fitted grey-white cropped polo shirt with a white collar, a light grey pleated mini skirt, white knee-high socks and glossy white loafers, clean retro-futuristic school uniform style. Standing straight facing the camera, arms relaxed at her sides, feet slightly apart, neutral friendly expression, entire body visible from head to shoes with a little space above the head.",
+          "edit_from": "members/H_c1.png",
+          "edit_prompt": "Keep this exact same person, same face, same hairstyle, same hair colour, same accessories, same pose, same backdrop and lighting. Change only the outfit to: a fitted grey-white cropped polo shirt with a white collar, a light grey pleated mini skirt, white knee-high socks and glossy white loafers."
+        }
+      }
+    },
+    {
+      "id": "I",
+      "role": "旋转入画 · 回眸笑",
+      "look_zh": "笑容明亮，栗橙色微卷长发",
+      "identity": "medium height, bright cheerful face, wide smile, long chestnut-ginger hair with soft loose waves",
+      "signature": "a thin red string bracelet",
+      "seed": 2109,
+      "outputs": {
+        "c2": {
+          "file": "members/I_c2.png",
+          "prompt": "Professional K-pop concept photo, full-body character reference sheet photo, photorealistic, 85mm lens, sharp focus on the face, natural skin texture, even soft studio lighting, seamless light grey backdrop, no props. A fictional adult Korean woman in her early twenties, medium height, bright cheerful face, wide smile, long chestnut-ginger hair with soft loose waves, with a thin red string bracelet, wearing a fitted grey-white cropped polo shirt with a white collar, a light grey pleated mini skirt, white knee-high socks and glossy white loafers, clean retro-futuristic school uniform style. Standing straight facing the camera, arms relaxed at her sides, feet slightly apart, neutral friendly expression, entire body visible from head to shoes with a little space above the head."
+        }
+      }
+    },
+    {
+      "id": "J",
+      "role": "伏地圆环 · 脚尖点地",
+      "look_zh": "猫眼，黑色齐下颌短发配空气刘海",
+      "identity": "lean dancer build, cat-like eyes, defined brows, jaw-length glossy black hair with see-through bangs",
+      "signature": "small black stud earrings",
+      "seed": 2110,
+      "outputs": {
+        "c2": {
+          "file": "members/J_c2.png",
+          "prompt": "Professional K-pop concept photo, full-body character reference sheet photo, photorealistic, 85mm lens, sharp focus on the face, natural skin texture, even soft studio lighting, seamless light grey backdrop, no props. A fictional adult Korean woman in her early twenties, lean dancer build, cat-like eyes, defined brows, jaw-length glossy black hair with see-through bangs, with small black stud earrings, wearing a fitted grey-white cropped polo shirt with a white collar, a light grey pleated mini skirt, white knee-high socks and glossy white loafers, clean retro-futuristic school uniform style. Standing straight facing the camera, arms relaxed at her sides, feet slightly apart, neutral friendly expression, entire body visible from head to shoes with a little space above the head."
+        }
+      }
+    },
+    {
+      "id": "K",
+      "role": "扶梯 · 圆孔开门 · 撞色双人",
+      "look_zh": "高冷，铂银色长直发",
+      "identity": "tall slim build, cool composed expression, fine features, long straight platinum-silver hair",
+      "signature": "a silver bar necklace",
+      "seed": 2111,
+      "outputs": {
+        "c2": {
+          "file": "members/K_c2.png",
+          "prompt": "Professional K-pop concept photo, full-body character reference sheet photo, photorealistic, 85mm lens, sharp focus on the face, natural skin texture, even soft studio lighting, seamless light grey backdrop, no props. A fictional adult Korean woman in her early twenties, tall slim build, cool composed expression, fine features, long straight platinum-silver hair, with a silver bar necklace, wearing a fitted grey-white cropped polo shirt with a white collar, a light grey pleated mini skirt, white knee-high socks and glossy white loafers, clean retro-futuristic school uniform style. Standing straight facing the camera, arms relaxed at her sides, feet slightly apart, neutral friendly expression, entire body visible from head to shoes with a little space above the head."
+        }
+      }
+    },
+    {
+      "id": "L",
+      "role": "倒挂入画 · 撞色双人",
+      "look_zh": "甜美鹅蛋脸，深棕长发内层挑染粉色",
+      "identity": "medium height, sweet oval face, lively eyes, long dark brown hair with a hidden pastel-pink underlayer that shows when she moves",
+      "signature": "a pink hair tie on her wrist",
+      "seed": 2112,
+      "outputs": {
+        "c2": {
+          "file": "members/L_c2.png",
+          "prompt": "Professional K-pop concept photo, full-body character reference sheet photo, photorealistic, 85mm lens, sharp focus on the face, natural skin texture, even soft studio lighting, seamless light grey backdrop, no props. A fictional adult Korean woman in her early twenties, medium height, sweet oval face, lively eyes, long dark brown hair with a hidden pastel-pink underlayer that shows when she moves, with a pink hair tie on her wrist, wearing a fitted grey-white cropped polo shirt with a white collar, a light grey pleated mini skirt, white knee-high socks and glossy white loafers, clean retro-futuristic school uniform style. Standing straight facing the camera, arms relaxed at her sides, feet slightly apart, neutral friendly expression, entire body visible from head to shoes with a little space above the head."
+        }
+      }
+    }
+  ],
+  "group": {
+    "c1": {
+      "file": "group/group_c1.png",
+      "size": [
+        2688,
+        1536
+      ],
+      "prompt": "Professional K-pop group concept photo, twelve fictional adult Korean women in their early twenties standing in one straight line, full bodies visible, evenly spaced, facing the camera, seamless light grey backdrop, even soft studio lighting, photorealistic. All of them wearing an oversized white cropped sweatshirt, baggy white jogger sweatpants and chunky white sneakers, monochrome all-white streetwear. From left to right — A: oval face, sharp almond-shaped eyes, a small beauty mark under her left eye, long straight jet-black hair falling past the chest with soft see-through bangs; B: round soft face, big warm eyes, dimples when smiling, long wavy copper-auburn hair with a deep side part; C: elegant long neck, high cheekbones, calm monolid eyes, long sleek black hair with a sharp centre part tucked behind the ears; D: small delicate face, gentle doe eyes, shoulder-length ash-brown bob with curtain bangs; E: defined jawline, bright confident eyes, dark brown hair in a high sleek ponytail; F: heart-shaped face, soft dreamy eyes, very long straight black hair down to the waist, half-up with a white satin ribbon bow; G: playful upturned eyes, light freckles across the nose, long layered honey-blonde hair; H: round face, soft round eyes, dark brown hair styled in two low buns with loose face-framing strands; I: bright cheerful face, wide smile, long chestnut-ginger hair with soft loose waves; J: cat-like eyes, defined brows, jaw-length glossy black hair with see-through bangs; K: cool composed expression, fine features, long straight platinum-silver hair; L: sweet oval face, lively eyes, long dark brown hair with a hidden pastel-pink underlayer that shows when she moves.",
+      "tip": "直接文生 12 人很难每个人都准，更稳的做法是把 12 张定妆照排进一张宽图，再用图像编辑模型统一光线和地面阴影。"
+    },
+    "c2": {
+      "file": "group/group_c2.png",
+      "size": [
+        2688,
+        1536
+      ],
+      "prompt": "Professional K-pop group concept photo, twelve fictional adult Korean women in their early twenties standing in one straight line, full bodies visible, evenly spaced, facing the camera, seamless light grey backdrop, even soft studio lighting, photorealistic. All of them wearing a fitted grey-white cropped polo shirt with a white collar, a light grey pleated mini skirt, white knee-high socks and glossy white loafers, clean retro-futuristic school uniform style. From left to right — A: oval face, sharp almond-shaped eyes, a small beauty mark under her left eye, long straight jet-black hair falling past the chest with soft see-through bangs; B: round soft face, big warm eyes, dimples when smiling, long wavy copper-auburn hair with a deep side part; C: elegant long neck, high cheekbones, calm monolid eyes, long sleek black hair with a sharp centre part tucked behind the ears; D: small delicate face, gentle doe eyes, shoulder-length ash-brown bob with curtain bangs; E: defined jawline, bright confident eyes, dark brown hair in a high sleek ponytail; F: heart-shaped face, soft dreamy eyes, very long straight black hair down to the waist, half-up with a white satin ribbon bow; G: playful upturned eyes, light freckles across the nose, long layered honey-blonde hair; H: round face, soft round eyes, dark brown hair styled in two low buns with loose face-framing strands; I: bright cheerful face, wide smile, long chestnut-ginger hair with soft loose waves; J: cat-like eyes, defined brows, jaw-length glossy black hair with see-through bangs; K: cool composed expression, fine features, long straight platinum-silver hair; L: sweet oval face, lively eyes, long dark brown hair with a hidden pastel-pink underlayer that shows when she moves.",
+      "tip": "直接文生 12 人很难每个人都准，更稳的做法是把 12 张定妆照排进一张宽图，再用图像编辑模型统一光线和地面阴影。"
+    }
+  },
+  "end_frame": {
+    "file": "keyframes/end_AB_L.png",
+    "size": [
+      1344,
+      768
+    ],
+    "prompt": "Cinematic K-pop music video still, 16:9, deep electric-blue circular arena with glowing white rings and lines in the soft-focus background, close-up of two fictional adult Korean women side by side facing the camera, both making an 'L' hand sign near the face, confident smiles. Left: tall slim build, oval face, sharp almond-shaped eyes, a small beauty mark under her left eye, long straight jet-black hair falling past the chest with soft see-through bangs, with a thin silver chain choker. Right: medium height, round soft face, big warm eyes, dimples when smiling, long wavy copper-auburn hair with a deep side part, with small gold hoop earrings. Both wearing a fitted grey-white cropped polo shirt with a white collar, a light grey pleated mini skirt, white knee-high socks and glossy white loafers, clean retro-futuristic school uniform style. Cool blue key light with a soft white rim light, photorealistic, shallow depth of field.",
+    "tip": "用 A_c2、B_c2 当参考图做图像编辑或多图参考生成，脸会更准；出图后裁成正好 1344×768。"
+  }
+}

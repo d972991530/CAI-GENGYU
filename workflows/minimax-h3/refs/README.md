@@ -1,6 +1,6 @@
 # 参考素材清单
 
-路径与 `shots.json` 的 `references` 一一对应。建议用同一个出图模型、同一套设定批量生成，保证 12 人长相稳定。
+路径与 `shots.json` 的 `references` 一一对应。建议用同一个出图模型、同一套设定批量生成，保证 12 人长相稳定。每张图的完整提示词见 [PROMPTS.md](PROMPTS.md)（机器可读版：`character_prompts.json`）。
 
 | 文件 | 内容 | 建议规格 |
 |---|---|---|
