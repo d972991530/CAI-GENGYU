@@ -1,0 +1,10 @@
+{
+  "name": "director-desk",
+  "private": true,
+  "version": "0.1.0",
+  "description": "导演工作台：剧本时间线驱动的自动剪辑（无视频识别大模型）",
+  "type": "commonjs",
+  "scripts": {
+    "test": "node test/core.test.js"
+  }
+}

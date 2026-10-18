@@ -1,0 +1,148 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>导演工作台 Director Desk</title>
+  <link rel="stylesheet" href="css/app.css">
+</head>
+<body>
+  <header class="top">
+    <div class="brand">DIRECTOR DESK <span>导演工作台 · 剧本时间线 × 素材 × 自动剪辑</span></div>
+    <div class="engine" id="engine">纯算法引擎 · 不调用视频识别模型</div>
+  </header>
+
+  <nav class="toolbar">
+    <button data-act="new">新建</button>
+    <button data-act="open">打开工程</button>
+    <button data-act="save">保存工程</button>
+    <span class="sep"></span>
+    <button data-act="importMedia">导入素材</button>
+    <button data-act="editScript" class="accent2">导入 / 编辑剧本时间线</button>
+    <button data-act="analyze">分析素材</button>
+    <button data-act="solve" class="primary">生成剪辑</button>
+    <button data-act="play">预览成片</button>
+    <div class="menu">
+      <button data-act="exportMenu" class="primary">导出 ▾</button>
+      <div class="menu-list" id="exportMenu" hidden>
+        <button data-exp="fcpxml">FCPXML（达芬奇 / Final Cut）</button>
+        <button data-exp="edl">EDL（Premiere / 通用）</button>
+        <button data-exp="sh">ffmpeg 渲染脚本 .sh（macOS / Linux）</button>
+        <button data-exp="bat">ffmpeg 渲染脚本 .bat（Windows）</button>
+        <button data-exp="csv">剪辑表 CSV</button>
+        <button data-exp="script">剧本时间线 .txt</button>
+      </div>
+    </div>
+    <span class="grow"></span>
+    <label class="chk"><input type="checkbox" id="autoSolve" checked> 参数实时重算</label>
+    <button data-act="cancel">取消任务</button>
+  </nav>
+
+  <main class="grid">
+    <section class="panel left">
+      <div class="tabs" data-tabs="left">
+        <button data-tab="media" class="on">素材库</button>
+        <button data-tab="shots">镜头池</button>
+        <button data-tab="script">剧本段落</button>
+      </div>
+      <div class="tab-body" data-body="media">
+        <div class="drop" id="drop">把视频拖到这里，或点“导入素材”。<br>同名 .txt / .srt 会作为该素材的内容描述（如 AI 生成时的提示词）。</div>
+        <div id="mediaList" class="list"></div>
+      </div>
+      <div class="tab-body" data-body="shots" hidden>
+        <div class="hint">镜头 = 素材经切分后的最小单元。可手动指定线索、锁定到剧本段落或排除。</div>
+        <div id="shotList" class="list"></div>
+      </div>
+      <div class="tab-body" data-body="script" hidden>
+        <div id="segList" class="list"></div>
+      </div>
+    </section>
+
+    <section class="panel center">
+      <div class="panel-title"><span id="viewerTitle">预览 · 时间轴定位</span><span id="viewerInfo" class="muted"></span></div>
+      <div class="viewer" id="viewer">
+        <video id="vA" playsinline></video>
+        <video id="vB" playsinline></video>
+        <canvas id="overlay"></canvas>
+      </div>
+      <div class="transport">
+        <button id="btnPrev" title="上一个剪辑点">⏮</button>
+        <button id="btnPlay" class="primary">▶ 播放 / 暂停</button>
+        <button id="btnNext" title="下一个剪辑点">⏭</button>
+        <span id="tcNow" class="tc">00:00.000</span><span class="muted">/</span><span id="tcTotal" class="tc muted">00:00.000</span>
+        <span class="grow"></span>
+        <label class="chk"><input type="checkbox" id="burnIn" checked> 叠加段落标注</label>
+        <span class="muted">音量</span><input type="range" id="volume" min="0" max="1" step="0.01" value="0.8">
+      </div>
+    </section>
+
+    <section class="panel right">
+      <div class="tabs" data-tabs="right">
+        <button data-tab="params" class="on">参数调节台</button>
+        <button data-tab="diag">结构诊断</button>
+        <button data-tab="match">匹配明细</button>
+      </div>
+      <div class="tab-body" data-body="params"><div id="params"></div></div>
+      <div class="tab-body" data-body="diag" hidden><div id="diag"></div></div>
+      <div class="tab-body" data-body="match" hidden><div id="match"></div></div>
+    </section>
+  </main>
+
+  <section class="panel timeline">
+    <div class="panel-title">
+      <span>输出时间轴 · 点击标尺定位，拖动片段排序，拖动边缘修剪，点剧本段落跳转</span>
+      <span id="tlInfo" class="muted"></span>
+    </div>
+    <div class="tl-scroll" id="tlScroll"><canvas id="tlCanvas"></canvas><div id="tlSpacer" class="tl-spacer"></div></div>
+    <div class="tl-tools">
+      <button data-act="split">在播放头分割</button>
+      <button data-act="delete">删除片段</button>
+      <button data-act="up">前移</button>
+      <button data-act="down">后移</button>
+      <button data-act="undo">撤销</button>
+      <button data-act="redo">重做</button>
+      <span id="manualFlag" class="flag" hidden>已手动编辑 · 参数改动不会覆盖，点“生成剪辑”重新求解</span>
+      <span class="grow"></span>
+      <span class="muted">时间轴缩放</span><input type="range" id="zoom" min="0" max="1" step="0.001" value="0.3">
+    </div>
+  </section>
+
+  <footer class="log">
+    <div class="progress"><span id="taskName">就绪</span><div class="bar"><i id="bar"></i></div><span id="pct"></span></div>
+    <div id="log" class="log-lines"></div>
+  </footer>
+
+  <dialog id="scriptDlg">
+    <form method="dialog" class="dlg">
+      <h3>剧本结构时间线</h3>
+      <p class="muted">每行一个段落：<code>编号 | 标题 | 开始-结束 | 描述 [@强度0~1]</code>。编号首字母 = 叙事线。<code># 线:</code> <code># 幕:</code> <code># 伏笔: 名称 | ○埋 ●收</code> 为可选指令。导入后按剧本线性对位；清空剧本则走非线性自动编排。</p>
+      <textarea id="scriptText" spellcheck="false"></textarea>
+      <div id="scriptMsg" class="muted"></div>
+      <div class="dlg-btns">
+        <button type="button" id="scriptFile">从文件读取…</button>
+        <button type="button" id="scriptSample">载入示例格式（谢小娥）</button>
+        <button type="button" id="scriptClear">清空（改用非线性）</button>
+        <span class="grow"></span>
+        <button value="cancel">取消</button>
+        <button type="button" id="scriptApply" class="primary">应用</button>
+      </div>
+    </form>
+  </dialog>
+
+  <input type="file" id="fileMedia" accept="video/*,.mp4,.mov,.mkv,.webm,.m4v,.txt,.srt,.json" multiple hidden>
+  <input type="file" id="fileProject" accept=".json,.ddproj" hidden>
+  <input type="file" id="fileScript" accept=".txt,.json,.md" hidden>
+
+  <script src="js/core/util.js"></script>
+  <script src="js/core/text.js"></script>
+  <script src="js/core/script.js"></script>
+  <script src="js/core/hungarian.js"></script>
+  <script src="js/core/features.js"></script>
+  <script src="js/core/solver.js"></script>
+  <script src="js/core/export.js"></script>
+  <script src="js/media/analyzer.js"></script>
+  <script src="js/ui/timeline.js"></script>
+  <script src="js/ui/player.js"></script>
+  <script src="js/ui/app.js"></script>
+</body>
+</html>
