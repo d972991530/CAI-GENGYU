@@ -1,0 +1,126 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>换角预览台 Recast</title>
+  <link rel="stylesheet" href="css/app.css">
+  <link rel="stylesheet" href="css/recast.css">
+</head>
+<body class="recast">
+  <header class="top">
+    <div class="brand">RECAST <span>换角预览台 · 直接在原片上替换人物与场景</span></div>
+    <a class="engine" href="index.html">← 返回导演工作台</a>
+  </header>
+
+  <nav class="toolbar">
+    <button data-act="openFilm" class="accent2">打开原片</button>
+    <button data-act="importShots">导入旧镜头表 / 任务包</button>
+    <button data-act="detect">自动分镜</button>
+    <span class="sep"></span>
+    <button data-act="trackShot" class="primary">追踪本镜</button>
+    <button data-act="trackAll">追踪全部</button>
+    <span class="sep"></span>
+    <button data-act="openProj">打开工程</button>
+    <button data-act="saveProj">保存工程</button>
+    <div class="menu">
+      <button data-act="exportMenu" class="primary">导出 ▾</button>
+      <div class="menu-list" id="exportMenu" hidden>
+        <button data-exp="previs">整片替换预演视频（.webm，浏览器内直接合成）</button>
+        <button data-exp="local">本地 ComfyUI 生成任务包（可选，高质量）</button>
+        <button data-exp="shots">镜头表 shots.json</button>
+      </div>
+    </div>
+    <span class="grow"></span>
+    <button data-act="cancel">取消任务</button>
+  </nav>
+
+  <main class="rc-grid">
+    <!-- 左：卡司 / 场景 / 调色 -->
+    <section class="panel rc-left">
+      <div class="panel-title"><span>卡司与场景（全局）</span></div>
+      <div class="tab-body" id="castBox"></div>
+    </section>
+
+    <!-- 中：舞台 -->
+    <section class="panel rc-center">
+      <div class="rc-tools">
+        <div class="seg" id="viewSeg">
+          <button data-view="orig">原片</button>
+          <button data-view="track">追踪检查</button>
+          <button data-view="final" class="on">替换效果</button>
+          <button data-view="compare">左右对比</button>
+        </div>
+        <span class="sep"></span>
+        <div class="seg" id="toolSeg">
+          <button data-tool="boxA" class="on" title="在画面上拖出 A 的框：在当前帧设一个关键帧">框选 A</button>
+          <button data-tool="boxB" title="在画面上拖出 B 的框">框选 B</button>
+          <button data-tool="neg" title="点在容易混淆的背景上（如同色的墙），追踪和遮罩会排除这些颜色">负点</button>
+        </div>
+        <button id="btnClearKf" title="删除当前帧附近的关键帧">删关键帧</button>
+        <span class="grow"></span>
+        <span id="shotTitle" class="muted"></span>
+      </div>
+      <div class="stage" id="stage">
+        <canvas id="out"></canvas>
+        <canvas id="ui"></canvas>
+        <div class="stage-empty" id="stageEmpty">打开原片（或先导入旧镜头表）开始。<br>不需要任何云服务，全部在本机浏览器里计算。</div>
+      </div>
+      <canvas id="confStrip" class="conf-strip" title="追踪置信度：红色 = 丢失/遮挡，◆ = 关键帧。点击定位"></canvas>
+      <div class="transport">
+        <button id="btnPlayShot" class="primary">▶ 本镜循环</button>
+        <button id="btnPlayFilm">▶ 整片播放</button>
+        <button id="btnPrevF" title="上一帧 (←)">◀︎|</button>
+        <button id="btnNextF" title="下一帧 (→)">|▶︎</button>
+        <input type="range" id="scrub" min="0" max="1" step="0.001" value="0">
+        <span class="tc" id="tc">00:00.000</span>
+        <span class="muted">音量</span><input type="range" id="vol" min="0" max="1" step="0.01" value="0.7" style="width:80px">
+      </div>
+      <div class="rc-shotctl" id="shotCtl"></div>
+    </section>
+
+    <!-- 右：镜头列表 -->
+    <section class="panel rc-right">
+      <div class="panel-title"><span>镜头</span><span id="shotStats" class="muted"></span></div>
+      <div class="chips" id="filters"></div>
+      <div class="tab-body" id="shotList"></div>
+    </section>
+  </main>
+
+  <section class="panel rc-film">
+    <div class="film-strip" id="filmStrip"></div>
+  </section>
+
+  <footer class="log">
+    <div class="progress"><span id="taskName">就绪</span><div class="bar"><i id="bar"></i></div><span id="pct"></span></div>
+    <div id="log" class="log-lines"></div>
+  </footer>
+
+  <dialog id="localDlg">
+    <form method="dialog" class="dlg">
+      <h3>本地 ComfyUI 生成任务包（可选）</h3>
+      <p class="muted">预演在浏览器里已经能直接出片。想要“真正换成另一个人”的成片，需要生成模型——这里改为调用你<b>自己电脑上</b>的 ComfyUI（免费、离线、无需任何云平台账号）。
+        用 <code>tools/recast_local.py</code> 运行任务包：它会直接从原片按时间码切出每个镜头、提交本地 ComfyUI、取回结果，再<b>按原帧位置拼回原片</b>并保留原声。</p>
+      <div class="lrow"><label>ComfyUI 地址</label><input id="lc_url" type="text"></div>
+      <div class="lrow"><label>工作流（API 格式 JSON）</label><span><input type="file" id="lc_wf" accept=".json"> <span id="lc_wfname" class="muted"></span></span></div>
+      <div class="lrow"><label>点坐标画布 宽×高</label><span><input id="lc_cw" type="number" style="width:80px"> × <input id="lc_ch" type="number" style="width:80px"> <span class="muted">工作流的帧率</span> <input id="lc_fps" type="number" style="width:60px"></span></div>
+      <table class="maptbl"><thead><tr><th>输入</th><th>节点 ID</th><th>字段名</th></tr></thead><tbody id="lc_map"></tbody></table>
+      <p class="muted">节点 ID 在 ComfyUI 里开启“节点 ID 徽章”后可见；工作流用菜单“导出（API）”保存。留空的行不写入。填了“参考图 B / 点 B”就单轮双人替换，否则分两轮（先 A 后 B）。</p>
+      <div class="dlg-btns"><span class="grow"></span><button value="cancel">取消</button><button type="button" id="lc_go" class="primary">导出任务包</button></div>
+    </form>
+  </dialog>
+
+  <video id="player" playsinline preload="auto" class="hidden-video"></video>
+  <input type="file" id="fileFilm" accept="video/*" hidden>
+  <input type="file" id="fileShots" accept=".json" hidden>
+  <input type="file" id="fileProj" accept=".json" hidden>
+  <input type="file" id="fileImg" accept="image/png,image/jpeg,image/webp" hidden>
+
+  <script src="js/core/util.js"></script>
+  <script src="js/core/features.js"></script>
+  <script src="js/recast/track.js"></script>
+  <script src="js/recast/frames.js"></script>
+  <script src="js/recast/render.js"></script>
+  <script src="js/recast/app.js"></script>
+</body>
+</html>

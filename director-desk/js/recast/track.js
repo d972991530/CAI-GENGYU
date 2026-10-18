@@ -327,10 +327,14 @@
     // 先验：偏向静止、偏向与上一帧相同的运动（防止瓷砖墙、百叶等周期纹理造成的跳变）
     const pdx = prev ? prev.dx / a.f : 0, pdy = prev ? prev.dy / a.f : 0;
     const W = a.w, H = a.h, mx = Math.floor(W * 0.1) + R, my = Math.floor(H * 0.1) + R;
-    const skip = (x, y) => (exclude || []).some((e) => x * a.f >= e.x && x * a.f < e.x + e.w && y * a.f >= e.y && y * a.f < e.y + e.h);
+    // 人物框外扩 25%（挥舞的手臂、甩动的衣襟常常出框）
+    const ex = (exclude || []).map((e) => ({ x: e.x - e.w * 0.25, y: e.y - e.h * 0.25, w: e.w * 1.5, h: e.h * 1.5 }));
+    const skip = (x, y) => ex.some((e) => x * a.f >= e.x && x * a.f < e.x + e.w && y * a.f >= e.y && y * a.f < e.y + e.h);
     const valid = [];
-    for (let y = my; y < H - my; y += 1) for (let x = mx; x < W - mx; x += 1) if (!skip(x, y)) valid.push(y * W + x);
-    if (valid.length < 20) return { dx: 0, dy: 0, err: 0 };
+    let total = 0;
+    for (let y = my; y < H - my; y += 1) for (let x = mx; x < W - mx; x += 1) { total++; if (!skip(x, y)) valid.push(y * W + x); }
+    // 可用背景太少（人物占满画面）：判不出，返回 0 并标记
+    if (valid.length < 20 || valid.length < total * 0.2) return { dx: 0, dy: 0, err: 0, unknown: true };
     let best = { dx: 0, dy: 0, err: Infinity };
     for (let dy = -R; dy <= R; dy++) for (let dx = -R; dx <= R; dx++) {
       let s = 0;
@@ -356,7 +360,7 @@
     if (!n) return null;
     const w = frames[0].w, h = frames[0].h;
     const binsArr = frames.map((f) => RC.binImage(f));
-    const grays = frames.map((f) => RC.gray(f, 4));
+    const grays = frames.map((f) => RC.gray(f, 2));
     const ids = Object.keys(roles).filter((r) => roles[r] && roles[r].keyframes && roles[r].keyframes.length);
     const out = { gm: [{ dx: 0, dy: 0 }], roles: {} };
     for (const r of ids) out.roles[r] = { boxes: new Array(n).fill(null), conf: new Array(n).fill(0), masks: new Array(n).fill(null), lost: new Array(n).fill(false) };
@@ -441,7 +445,7 @@
       const gm = [{ dx: 0, dy: 0 }];
       for (let fi = 1; fi < n; fi++) {
         const ex = ids.map((r) => out.roles[r].boxes[fi]).filter(Boolean);
-        gm.push(RC.globalMotion(grays[fi - 1], grays[fi], 6, ex, gm[fi - 1]));
+        gm.push(RC.globalMotion(grays[fi - 1], grays[fi], 8, ex, gm[fi - 1]));
       }
       return gm;
     };
@@ -459,7 +463,7 @@
     const mags = [];
     for (let fi = 1; fi < n; fi++) {
       const ex = ids.map((r) => out.roles[r].boxes[fi]).filter(Boolean);
-      const m = RC.globalMotion(grays[fi - 1], grays[fi], 6, ex, out.gm[fi - 1]);
+      const m = RC.globalMotion(grays[fi - 1], grays[fi], 8, ex, out.gm[fi - 1]);
       out.gm.push({ dx: m.dx, dy: m.dy });
       cx += m.dx; cy += m.dy;
       drift = Math.max(drift, Math.hypot(cx, cy));

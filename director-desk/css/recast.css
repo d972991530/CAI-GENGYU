@@ -1,0 +1,83 @@
+/* 换角预览台专用样式（基础变量与组件沿用 app.css） */
+:root { --roleA: #ff6f61; --roleB: #7cc8ff; --keep: #5f6c72; }
+body.recast { grid-template-rows: auto auto minmax(420px, 1fr) auto auto; }
+.top a.engine { color: var(--accent); text-decoration: none; }
+.rc-grid { display: grid; grid-template-columns: minmax(270px, 22%) 1fr minmax(260px, 21%); gap: 8px; padding: 0 10px; min-height: 0; }
+.rc-left .tab-body, .rc-right .tab-body { padding: 0 0 12px; }
+
+.cast { border-bottom: 1px solid #1c2c3f; padding: 10px; display: grid; gap: 6px; }
+.cast-head { display: flex; align-items: center; gap: 8px; }
+.tag { font-weight: 800; font-size: 11px; color: #111; border-radius: 3px; padding: 1px 6px; }
+.tag.A { background: var(--roleA); } .tag.B { background: var(--roleB); }
+.ref { display: grid; grid-template-columns: 96px 1fr; gap: 8px; align-items: start; }
+.ref-drop { width: 96px; height: 128px; border: 1px dashed #456; border-radius: 6px; display: flex; align-items: center; justify-content: center; text-align: center; color: var(--muted); font-size: 11px; cursor: pointer; overflow: hidden;
+  background: repeating-conic-gradient(#1c2a3a 0 25%, #142030 0 50%) 0 0 / 12px 12px; }
+.ref-drop canvas { max-width: 100%; max-height: 100%; }
+.ref-drop.over { border-color: var(--accent2); }
+.fld { display: grid; gap: 2px; }
+.fld > span { font-size: 11px; color: var(--muted); }
+.fld input[type=text], .fld textarea, .fld select { width: 100%; }
+.fld textarea { height: 44px; resize: vertical; font-size: 12px; }
+.mini-row { display: grid; grid-template-columns: 70px 1fr 36px; gap: 6px; align-items: center; font-size: 12px; color: var(--muted); }
+.mini-row output { text-align: right; font-family: ui-monospace, Menlo, Consolas, monospace; color: var(--text); }
+.sect-title { font-size: 12px; color: var(--accent); font-weight: 700; margin: 2px 0; display: flex; justify-content: space-between; align-items: center; }
+
+.rc-center { min-width: 0; }
+.rc-tools { display: flex; gap: 6px; align-items: center; padding: 6px 8px; border-bottom: 1px solid var(--line); flex-wrap: wrap; }
+.rc-tools .sep { width: 1px; height: 20px; background: var(--line); }
+.seg { display: inline-flex; border: 1px solid var(--line); border-radius: 5px; overflow: hidden; }
+.seg button { border: 0; border-radius: 0; padding: 5px 10px; background: transparent; color: var(--muted); }
+.seg button.on { background: #1e3953; color: var(--text); }
+#toolSeg button[data-tool=boxA].on { background: var(--roleA); color: #111; }
+#toolSeg button[data-tool=boxB].on { background: var(--roleB); color: #111; }
+#toolSeg button[data-tool=neg].on { background: #ddd; color: #111; }
+.stage { position: relative; flex: 1; min-height: 240px; background: #000; display: flex; align-items: center; justify-content: center; overflow: hidden; }
+.stage canvas { max-width: 100%; max-height: 100%; display: block; }
+.stage #ui { position: absolute; cursor: crosshair; }
+.stage-empty { position: absolute; color: var(--muted); text-align: center; line-height: 1.8; pointer-events: none; }
+.conf-strip { width: 100%; height: 34px; display: block; background: #0f1a27; cursor: pointer; }
+.transport input[type=range]#scrub { flex: 1; }
+.rc-shotctl { border-top: 1px solid var(--line); padding: 6px 10px; display: grid; gap: 6px; max-height: 210px; overflow: auto; }
+.role-row { display: flex; gap: 10px; align-items: center; flex-wrap: wrap; font-size: 12px; }
+.role-row label { display: inline-flex; gap: 4px; align-items: center; color: var(--muted); }
+.role-row input[type=range] { width: 80px; }
+.role-row .stat { color: var(--muted); }
+.shot-desc { font-size: 12px; color: var(--muted); }
+details.prompt summary { cursor: pointer; font-size: 12px; color: var(--muted); }
+details.prompt textarea { width: 100%; height: 60px; font-size: 12px; margin-top: 4px; }
+
+.chips { display: flex; gap: 4px; flex-wrap: wrap; padding: 6px 8px; border-bottom: 1px solid var(--line); }
+.chip { border: 1px solid var(--line); background: transparent; border-radius: 99px; padding: 2px 9px; font-size: 11px; color: var(--muted); }
+.chip.on { background: var(--text); color: var(--bg); }
+.shot-card { display: grid; grid-template-columns: 80px 1fr; gap: 6px 8px; padding: 6px 8px; border-bottom: 1px solid #1c2c3f; cursor: pointer; font-size: 12px; }
+.shot-card:hover { background: #172738; }
+.shot-card.sel { background: #1d3a50; }
+.shot-card img, .shot-card .noimg { width: 80px; height: 45px; object-fit: cover; background: #000; border-radius: 3px; display: block; }
+.shot-card .id { font-weight: 700; }
+.shot-card .badges { display: flex; gap: 3px; flex-wrap: wrap; margin-top: 2px; }
+.badge { font-size: 10px; border-radius: 3px; padding: 0 4px; border: 1px solid var(--line); color: var(--muted); }
+.badge.A { border-color: var(--roleA); color: var(--roleA); } .badge.B { border-color: var(--roleB); color: var(--roleB); }
+.badge.ok { border-color: var(--accent); color: var(--accent); } .badge.warn { border-color: var(--accent2); color: var(--accent2); }
+
+.rc-film { margin: 8px 10px 0; padding: 6px 8px; }
+.film-strip { position: relative; display: flex; height: 26px; gap: 1px; background: var(--line); border-radius: 3px; overflow: hidden; }
+.film-strip button { border: 0; border-radius: 0; padding: 0; min-width: 2px; background: var(--keep); }
+.film-strip button.A { background: var(--roleA); } .film-strip button.B { background: var(--roleB); }
+.film-strip button.AB { background: linear-gradient(var(--roleA) 50%, var(--roleB) 50%); }
+.film-strip button.pending { opacity: .45; }
+.film-strip button.sel { outline: 2px solid #fff; outline-offset: -2px; }
+.film-strip .ph { position: absolute; top: 0; bottom: 0; width: 2px; background: var(--playhead); pointer-events: none; }
+
+.hidden-video { position: fixed; width: 2px; height: 2px; opacity: 0; pointer-events: none; left: 0; top: 0; }
+.lrow { display: grid; grid-template-columns: 160px 1fr; gap: 8px; align-items: center; font-size: 13px; }
+.maptbl { width: 100%; border-collapse: collapse; font-size: 12px; }
+.maptbl th { text-align: left; color: var(--muted); font-weight: 400; border-bottom: 1px solid var(--line); padding: 3px; }
+.maptbl td { padding: 2px 3px; border-bottom: 1px solid #1c2c3f; }
+.maptbl input { width: 100%; }
+
+@media (max-width: 1100px) {
+  body.recast { overflow: auto; grid-template-rows: auto auto auto auto auto; }
+  .rc-grid { grid-template-columns: 1fr; }
+  .rc-left, .rc-right { max-height: 460px; }
+  .stage { min-height: 260px; }
+}
