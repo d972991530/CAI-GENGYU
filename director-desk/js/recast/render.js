@@ -215,6 +215,16 @@
       const alpha = new Uint8Array(rw * rh);
       for (let i = 0; i < alpha.length; i++) alpha[i] = md[i * 4 + 3];
       const img = this.ctx.getImageData(x0, y0, rw, rh);
+      // 按像素自身的前景概率再加权：遮罩边缘里混进来的墙面、同色背景不会被染色
+      const P = shot.track.roles[r].P;
+      if (P) {
+        const d = img.data;
+        for (let i = 0, p = 0; i < alpha.length; i++, p += 4) {
+          if (!alpha[i]) continue;
+          const w = SC.clamp((P[RC.binOf(d[p], d[p + 1], d[p + 2])] - (shot.track.plate ? 0.42 : 0.5)) / 0.2, 0, 1);
+          alpha[i] = alpha[i] * w;
+        }
+      }
       RC.applyRecolor(img.data, alpha, map, cast.strength == null ? 0.85 : cast.strength, cast.keepShade == null ? 0.35 : cast.keepShade);
       this.ctx.putImageData(img, x0, y0);
     }

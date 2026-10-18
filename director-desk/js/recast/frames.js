@@ -106,14 +106,36 @@
     const out = new Array(20);
     for (let k = 0; k < 12; k++) out[k] = hue[k] / n;
     for (let k = 0; k < 8; k++) out[12 + k] = lum[k] / n;
+    // 空间结构：8×6 亮度块均值（标准化），用于“同一调色风格下”的切点判别
+    const gx = 8, gy = 6, gs = new Float64Array(gx * gy), gc = new Float64Array(gx * gy);
+    for (let y = 0; y < img.h; y++) for (let x = 0; x < img.w; x++) {
+      const p = (y * img.w + x) * 4, k = Math.floor((y * gy) / img.h) * gx + Math.floor((x * gx) / img.w);
+      gs[k] += 0.299 * d[p] + 0.587 * d[p + 1] + 0.114 * d[p + 2]; gc[k]++;
+    }
+    let m = 0;
+    for (let k = 0; k < gs.length; k++) { gs[k] /= gc[k] || 1; m += gs[k] / gs.length; }
+    let sd = 0;
+    for (let k = 0; k < gs.length; k++) sd += (gs[k] - m) ** 2;
+    sd = Math.sqrt(sd / gs.length) || 1;
+    for (let k = 0; k < gs.length; k++) out.push((gs[k] - m) / sd);
     return out;
   }
   RC.histOf = histOf;
 
+  /** 切点距离：色彩直方图（前 20 维）与空间结构相关（后 48 维）各占一半。
+   *  打戏常统一调色，单靠颜色分不开相邻镜头；构图的整体变化才是切点的强信号。 */
+  RC.cutDist = function (a, b) {
+    const hd = SC.histDist(a, b);
+    if (a.length < 68 || b.length < 68) return hd;
+    let c = 0;
+    for (let k = 20; k < 68; k++) c += a[k] * b[k];
+    return 0.5 * hd + 0.5 * ((1 - c / 48) / 2);
+  };
+
   /** 整片分镜：6fps 粗扫找候选切点 → 每个候选二分到单帧精度。返回 [{start,end}] */
   RC.detectShots = async function (src, opts) {
     opts = opts || {};
-    const fps = opts.fps || 30, scan = opts.scanFps || 6, th = opts.threshold || 0.3, minShot = opts.minShot || 0.25;
+    const fps = opts.fps || 30, scan = opts.scanFps || 6, th = opts.threshold || 0.18, minShot = opts.minShot || 0.25;
     const W = 64, H = 36, dur = src.duration;
     const samples = { t: [], hist: [] };
     const n = Math.floor(dur * scan);
@@ -124,7 +146,8 @@
       samples.hist.push(histOf(await src.frameAt(t, W, H)));
       if (opts.onProgress && k % 6 === 0) opts.onProgress(0.75 * k / n);
     }
-    const cuts = SC.detectCuts(samples, th, { adaptiveK: 2.0 });
+    // 打戏几乎不用叠化，快速甩镜反而会被误判成渐变，这里关掉渐变检测
+    const cuts = SC.detectCuts(samples, th, { adaptiveK: 1.6, dist: RC.cutDist, dissolve: false });
     const refined = [];
     for (let i = 0; i < cuts.length; i++) {
       if (opts.signal && opts.signal.cancelled) throw new Error('已取消');
@@ -135,7 +158,7 @@
         while (b - a > 1 / fps + 1e-4) {
           const m = (a + b) / 2;
           const hm = histOf(await src.frameAt(m, W, H));
-          if (SC.histDist(ha, hm) > SC.histDist(hm, hb)) { b = m; hb = hm; } else { a = m; ha = hm; }
+          if (RC.cutDist(ha, hm) > RC.cutDist(hm, hb)) { b = m; hb = hm; } else { a = m; ha = hm; }
         }
         // 切点对齐到帧边界
         refined.push(Math.round(b * fps) / fps);

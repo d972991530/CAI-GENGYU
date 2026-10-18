@@ -31,8 +31,11 @@
         <button data-exp="bat">ffmpeg 渲染脚本 .bat（Windows）</button>
         <button data-exp="csv">剪辑表 CSV</button>
         <button data-exp="script">剧本时间线 .txt</button>
+        <button data-exp="sbSketch">分镜板 · 线稿风（PNG）</button>
+        <button data-exp="sbFrame">分镜板 · 实拍帧（PNG）</button>
       </div>
     </div>
+    <a class="btn-link" href="recast.html" title="追踪原片人物，直接替换角色与场景；自动标注景别 / 运动并生成分镜板">换角预览台 →</a>
     <span class="grow"></span>
     <label class="chk"><input type="checkbox" id="autoSolve" checked> 参数实时重算</label>
     <button data-act="cancel">取消任务</button>
@@ -138,11 +141,13 @@
   <script src="js/core/script.js"></script>
   <script src="js/core/hungarian.js"></script>
   <script src="js/core/features.js"></script>
+  <script src="js/core/grammar.js"></script>
   <script src="js/core/solver.js"></script>
   <script src="js/core/export.js"></script>
   <script src="js/media/analyzer.js"></script>
   <script src="js/ui/timeline.js"></script>
   <script src="js/ui/player.js"></script>
+  <script src="js/ui/storyboard.js"></script>
   <script src="js/ui/app.js"></script>
 </body>
 </html>

@@ -28,8 +28,9 @@
     opts = opts || {};
     const t = samples.t, H = samples.hist, n = t.length;
     if (n < 2) return [];
+    const dist = opts.dist || SC.histDist;
     const diff = new Array(n).fill(0);
-    for (let i = 1; i < n; i++) diff[i] = SC.histDist(H[i - 1], H[i]);
+    for (let i = 1; i < n; i++) diff[i] = dist(H[i - 1], H[i]);
     const k = opts.adaptiveK || 2.2;
     const cuts = [];
     for (let i = 1; i < n; i++) {
@@ -38,8 +39,8 @@
     }
     // 渐变（叠化/淡入淡出）：4 帧跨度上的直接距离超过阈值，且中间没有硬切
     const W = 4;
-    for (let i = W; i < n; i++) {
-      const span = SC.histDist(H[i - W], H[i]);
+    for (let i = W; opts.dissolve !== false && i < n; i++) {
+      const span = dist(H[i - W], H[i]);
       let maxStep = 0;
       for (let j = i - W + 1; j <= i; j++) maxStep = Math.max(maxStep, diff[j]);
       if (span >= threshold * 1.3 && maxStep < threshold && maxStep < span * 0.6) {

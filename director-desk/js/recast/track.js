@@ -150,7 +150,7 @@
       bw = bw + a * (SC.clamp(W, bw * (1 - lim), bw * (1 + lim)) - bw);
       bh = bh + a * (SC.clamp(H, bh * (1 - lim), bh * (1 + lim)) - bh);
       const minS = opts.minSize || 6;
-      bw = SC.clamp(bw, minS, w * 1.2); bh = SC.clamp(bh, minS, h * 1.2);
+      bw = SC.clamp(bw, minS, Math.min(w * 1.2, opts.maxW || Infinity)); bh = SC.clamp(bh, minS, Math.min(h * 1.2, opts.maxH || Infinity));
     }
     return { box: { x: cx - bw / 2, y: cy - bh / 2, w: bw, h: bh }, conf };
   };
@@ -239,6 +239,24 @@
     return out;
   }
 
+  /** 填洞：从包围框边缘泛洪“外部”，没被泛洪到的 0 即被人物包住的洞（平坦衣料、反光），补成 1 */
+  function fillHoles(m, W, H) {
+    const out = new Uint8Array(m), seen = new Uint8Array(W * H), st = [];
+    const push = (p) => { if (!m[p] && !seen[p]) { seen[p] = 1; st.push(p); } };
+    for (let x = 0; x < W; x++) { push(x); push((H - 1) * W + x); }
+    for (let y = 0; y < H; y++) { push(y * W); push(y * W + W - 1); }
+    while (st.length) {
+      const p = st.pop(), x = p % W;
+      if (x > 0) push(p - 1);
+      if (x < W - 1) push(p + 1);
+      if (p >= W) push(p - W);
+      if (p < W * (H - 1)) push(p + W);
+    }
+    for (let p = 0; p < out.length; p++) if (!m[p] && !seen[p]) out[p] = 1;
+    return out;
+  }
+  RC.fillHoles = fillHoles;
+
   /** 由颜色后验得到人物遮罩。返回 { x, y, w, h, m: Uint8Array(0/1) }（工作分辨率坐标） */
   RC.extractMask = function (bins, w, h, P, box, opts) {
     opts = opts || {};
@@ -283,6 +301,7 @@
     const maxA = Math.max(0, ...comps.map((c) => c.area));
     const keep = new Set(comps.filter((c) => c.central > 0 || c.area >= maxA * 0.15).filter((c) => c.area >= 4).map((c) => c.id));
     for (let i = 0; i < m.length; i++) m[i] = keep.has(lab[i]) ? 1 : 0;
+    m = fillHoles(m, W, H);
     let area = 0;
     for (let i = 0; i < m.length; i++) area += m[i];
     return { x: r.x0, y: r.y0, w: W, h: H, m, area };
@@ -373,6 +392,32 @@
       const others = (fi) => ids.filter((o) => o !== r).map((o) => out.roles[o].boxes[fi]).filter(Boolean);
       let model = RC.colorModel(binsArr[startFi], w, h, box, { neg: role.neg, pos: role.pos, exclude: others(startFi) });
       const base = model;
+      // 记录关键帧颜色模型（渲染时按像素前景概率加权遮罩，抑制同色背景的渗色）
+      if (!out.roles[r].P) {
+        out.roles[r].P = Array.from(base.P, (v) => +v.toFixed(3));
+        // 颜色可分性：框外环带里被误判为前景（P>0.7）的比例。越高说明人物与背景同色
+        const mg = Math.max(4, Math.max(box.w, box.h) * 0.5);
+        const R = clampBox({ x: box.x - mg, y: box.y - mg, w: box.w + 2 * mg, h: box.h + 2 * mg }, w, h);
+        let fp = 0, tot = 0;
+        for (let y = R.y0; y < R.y1; y += 2) for (let x = R.x0; x < R.x1; x += 2) {
+          if (inBox(box, x, y)) continue;
+          tot++;
+          if (base.P[binsArr[startFi][y * w + x]] > 0.7) fp++;
+        }
+        out.roles[r].colorFP = tot ? +(fp / tot).toFixed(3) : 0;
+        // 主体衣着色调：取框中心区域的平均饱和度 / 明度（浅色低饱和 = 白、灰、米色衣服，最容易与浅墙混淆）
+        const f = frames[startFi].data;
+        let ss = 0, vv = 0, cnt = 0;
+        for (let y = Math.max(0, Math.round(box.y + box.h * 0.3)); y < Math.min(h, box.y + box.h * 0.7); y++) {
+          for (let x = Math.max(0, Math.round(box.x + box.w * 0.3)); x < Math.min(w, box.x + box.w * 0.7); x++) {
+            const p = (y * w + x) * 4, mx = Math.max(f[p], f[p + 1], f[p + 2]), mn = Math.min(f[p], f[p + 1], f[p + 2]);
+            ss += mx ? (mx - mn) / mx : 0; vv += mx / 255; cnt++;
+          }
+        }
+        out.roles[r].tone = cnt ? { s: +(ss / cnt).toFixed(3), v: +(vv / cnt).toFixed(3) } : null;
+        out.roles[r].lightNeutral = cnt ? ss / cnt < 0.6 && vv / cnt > 0.55 : false; // 浅色衣物（含被调色染上色偏的白衣）
+      }
+      const cap = { maxW: kfBox.w * 1.6, maxH: kfBox.h * 1.4 }; // 低对比场景里框不许无限长大
       const refHist = RC.boxHist(binsArr[startFi], w, h, box); // 关键帧外观，用于重新检测比对
       let vel = { x: 0, y: 0 };
       let confAvg = null, coast = 0;
@@ -384,14 +429,14 @@
           const cam = camPre[step > 0 ? fi : fi + 1] || { dx: 0, dy: 0 };
           const cdx = step > 0 ? cam.dx : -cam.dx, cdy = step > 0 ? cam.dy : -cam.dy;
           box = { x: box.x + cdx, y: box.y + cdy, w: box.w, h: box.h };
-          let res = RC.camshift(binsArr[fi], w, h, model.P, box, { vel, suppress: others(fi)[0], minSize: 6 });
+          let res = RC.camshift(binsArr[fi], w, h, model.P, box, Object.assign({ vel, suppress: others(fi)[0], minSize: 6 }, cap));
           // 丢失后（或置信骤降时）全画面重新检测，明显更好就跳过去
           if (confAvg != null && (coast > 0 || res.conf < 0.45 * confAvg)) {
             const pred = { x: box.x + box.w / 2 + vel.x, y: box.y + box.h / 2 + vel.y };
             const rd = RC.redetect(binsArr[fi], w, h, model.P, box, others(fi)[0], refHist, pred);
             const curBc = RC.bhatta(RC.boxHist(binsArr[fi], w, h, res.box), refHist);
             if (rd && rd.bc > Math.max(0.55, curBc + 0.08) && rd.conf > 0.5 * confAvg) {
-              const re = RC.camshift(binsArr[fi], w, h, model.P, rd.box, { suppress: others(fi)[0], minSize: 6 });
+              const re = RC.camshift(binsArr[fi], w, h, model.P, rd.box, Object.assign({ suppress: others(fi)[0], minSize: 6 }, cap));
               if (re.conf > res.conf) { res = re; vel = { x: 0, y: 0 }; coast = 0; box = rd.box; }
             }
           }
@@ -431,7 +476,7 @@
     };
 
     const trackAll = () => {
-    for (const r of ids) {
+      for (const r of ids) {
         const kfs = roles[r].keyframes.slice().sort((a, b) => a.fi - b.fi);
         // 第一个关键帧之前：向前（倒放）追踪
         if (kfs[0].fi > 0) runDir(r, kfs[0].fi, 0, -1, kfs[0].box);
@@ -470,7 +515,26 @@
       mags.push(Math.abs(m.dx) + Math.abs(m.dy));
     }
     // 固定机位：多数帧不动，且累计漂移小于画宽 4%（容忍轻微抖动与偶发误判）
-    out.static = n < 2 || (SC.median(mags) === 0 && drift < w * 0.04);
+    // 固定机位：≥80% 的帧完全没有镜头运动（手持的细微晃动不算固定）。累计漂移不可靠——人物挥臂出框会造成成段的假运动
+    // 只对“颜色与背景混淆”的角色加运动约束；颜色可靠的角色（如黑皮衣 vs 青墙）保持颜色遮罩
+    const weak = ids.filter((r) => {
+      const mode = roles[r].motion || 'auto';
+      return mode === 'on' || (mode === 'auto' && out.roles[r].lightNeutral && out.roles[r].colorFP > 0.05);
+    });
+    for (const r of ids) out.roles[r].motionRefined = weak.includes(r);
+    if (opts.motionRefine !== false && n > 2 && weak.length) {
+      RC.motionRefine(frames, binsArr, weak.map((r) => out.roles[r].masks), weak.map((r) => out.roles[r].P), out.gm);
+    }
+    out.static = n < 2 || mags.filter((m) => m === 0).length / mags.length >= 0.8;
+    // 长基线复核：相隔约 1 秒的两帧直接比，慢速摇镜每帧位移不足一档，逐帧比较看不出来
+    if (out.static && n > 8) {
+      const L = Math.min(n - 1, opts.fps || 15);
+      for (let i = 0; i + L < n; i += Math.max(1, Math.floor(L / 2))) {
+        const ex = ids.flatMap((r) => [out.roles[r].boxes[i], out.roles[r].boxes[i + L]]).filter(Boolean);
+        const m = RC.globalMotion(grays[i], grays[i + L], 8, ex, null);
+        if (!m.unknown && Math.abs(m.dx) + Math.abs(m.dy) >= 4) { out.static = false; out.slowPan = true; break; }
+      }
+    }
     return out;
   };
 
@@ -513,7 +577,98 @@
     }
     let holes = 0;
     for (let p = 0; p < hole.length; p++) holes += hole[p];
-    return { w, h, data: out, holeRatio: holes / (w * h) };
+    // 残差：未被遮挡像素与背景板的平均差。镜头其实在动 / 光线在变时残差大，背景板不可用
+    let res = 0, rc = 0;
+    for (let k = 0; k < K; k++) {
+      const d = frames[idx[k]].data;
+      for (let p = 0; p < w * h; p += 7) {
+        if (covered[k][p]) continue;
+        res += (Math.abs(d[p * 4] - out[p * 4]) + Math.abs(d[p * 4 + 1] - out[p * 4 + 1]) + Math.abs(d[p * 4 + 2] - out[p * 4 + 2])) / 3;
+        rc++;
+      }
+    }
+    return { w, h, data: out, holeRatio: holes / (w * h), residual: rc ? res / rc : 0 };
+  };
+
+  /** 运动约束：颜色有歧义的像素（与背景同色，如偏青调色下的白衣 vs 淡青墙）只有在前后几帧里动过才算人物。
+   *  颜色特征明确的像素（P ≥ strong）不受影响。比较时按估计的镜头位移对齐。 */
+  RC.motionRefine = function (frames, binsArr, roleMasks, roleP, gm, opts) {
+    opts = opts || {};
+    const strong = opts.strong || 1.01, thr = opts.thr || 16, ks = [-3, -1, 1, 3];
+    const n = frames.length, w = frames[0].w, h = frames[0].h;
+    const gray = frames.map((f) => { const g2 = new Float32Array(w * h); for (let p = 0; p < w * h; p++) g2[p] = 0.299 * f.data[p * 4] + 0.587 * f.data[p * 4 + 1] + 0.114 * f.data[p * 4 + 2]; return g2; });
+    const cum = [0], cumY = [0];
+    for (let i = 1; i < n; i++) { cum.push(cum[i - 1] + (gm[i] ? gm[i].dx : 0)); cumY.push(cumY[i - 1] + (gm[i] ? gm[i].dy : 0)); }
+    const motionAt = (fi, X, Y) => {
+      let mot = 0;
+      const p = Y * w + X;
+      for (const k of ks) {
+        const j = fi + k;
+        if (j < 0 || j >= n) continue;
+        const xx = Math.round(X + cum[j] - cum[fi]), yy = Math.round(Y + cumY[j] - cumY[fi]);
+        if (xx < 0 || yy < 0 || xx >= w || yy >= h) continue;
+        const d = Math.abs(gray[fi][p] - gray[j][yy * w + xx]);
+        if (d > mot) mot = d;
+      }
+      return mot;
+    };
+    for (let fi = 0; fi < n; fi++) {
+      // 背景自身的“运动”水平（慢摇、压缩噪声、闪烁）：人物框外稀疏采样取 75 分位，人物运动须明显超过它
+      const boxes = roleMasks.map((ms) => ms[fi]).filter(Boolean);
+      const bg = [];
+      for (let y = 2; y < h; y += 6) for (let x = 2; x < w; x += 6) {
+        if (boxes.some((b) => x >= b.x - 4 && x < b.x + b.w + 4 && y >= b.y - 4 && y < b.y + b.h + 4)) continue;
+        bg.push(motionAt(fi, x, y));
+      }
+      bg.sort((a, b) => a - b);
+      const thrF = Math.max(thr, bg.length > 20 ? bg[Math.floor(bg.length * 0.75)] * 1.8 : thr);
+      for (let r = 0; r < roleMasks.length; r++) {
+        const mk = roleMasks[r][fi], P = roleP[r];
+        if (!mk || !P) continue;
+        const keep = new Uint8Array(mk.m.length);
+        for (let y = 0; y < mk.h; y++) for (let x = 0; x < mk.w; x++) {
+          const i = y * mk.w + x;
+          if (!mk.m[i]) continue;
+          const X = mk.x + x, Y = mk.y + y, p = Y * w + X;
+          if (P[binsArr[fi][p]] >= strong) { keep[i] = 1; continue; }
+          if (motionAt(fi, X, Y) > thrF) keep[i] = 1;
+        }
+        // 运动像素向外生长（人物内部的平坦衣料自身不显示运动），再与原遮罩取交
+        let k2 = keep;
+        const grow = Math.max(4, Math.round(Math.min(mk.w, mk.h) * 0.18));
+        for (let it = 0; it < grow; it++) k2 = morph(k2, mk.w, mk.h, true);
+        let m2 = new Uint8Array(mk.m.length), a2 = 0, a1 = 0;
+        for (let i = 0; i < mk.m.length; i++) { a1 += mk.m[i]; if (mk.m[i] && k2[i]) { m2[i] = 1; a2++; } }
+        // 人物静止时运动线索消失：剩下不到 30% 就保留颜色遮罩，避免整个人“闪没”
+        if (a2 < a1 * 0.3) continue;
+        m2 = fillHoles(morph(morph(m2, mk.w, mk.h, false), mk.w, mk.h, true), mk.w, mk.h);
+        mk.m = m2;
+        mk.area = m2.reduce((a, b) => a + b, 0);
+      }
+    }
+  };
+
+  /** 固定机位：用干净背景板做背景减除，修正颜色遮罩——与背景几乎相同的像素（同色墙面、地面）剔除 */
+  RC.refineWithPlate = function (frames, maskSets, plate, thr) {
+    thr = thr || 42;
+    const w = plate.w, pd = plate.data;
+    for (let fi = 0; fi < frames.length; fi++) {
+      const d = frames[fi].data;
+      for (const mk of maskSets[fi] || []) {
+        if (!mk) continue;
+        let area = 0;
+        for (let y = 0; y < mk.h; y++) for (let x = 0; x < mk.w; x++) {
+          const i = y * mk.w + x;
+          if (!mk.m[i]) continue;
+          const p = ((mk.y + y) * w + mk.x + x) * 4;
+          const diff = Math.abs(d[p] - pd[p]) + Math.abs(d[p + 1] - pd[p + 1]) + Math.abs(d[p + 2] - pd[p + 2]);
+          if (diff < thr) mk.m[i] = 0; else area++;
+        }
+        // 去掉减除后留下的零星噪点
+        mk.m = morph(morph(mk.m, mk.w, mk.h, false), mk.w, mk.h, true);
+        mk.area = mk.m.reduce((a, b) => a + b, 0);
+      }
+    }
   };
 
   /* ------------------------------------------------------------ 换装调色 */

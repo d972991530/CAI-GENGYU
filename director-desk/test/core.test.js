@@ -2,7 +2,7 @@
 'use strict';
 const assert = require('assert');
 const path = require('path');
-for (const f of ['util', 'text', 'script', 'hungarian', 'features', 'solver', 'export'])
+for (const f of ['util', 'text', 'script', 'hungarian', 'features', 'grammar', 'solver', 'export'])
   require(path.join(__dirname, '../js/core', f + '.js'));
 require(path.join(__dirname, '../js/media/analyzer.js')); // 只用到其中的纯函数 audioFeatures
 const SC = globalThis.SC;
@@ -204,6 +204,25 @@ test('情绪曲线：高潮段平均能量高于建置段', () => {
   const e = clips.map((c) => sh.get(c.shotId).energy);
   const third = Math.floor(e.length / 3);
   assert.ok(SC.mean(e.slice(-third)) > SC.mean(e.slice(0, third)));
+});
+
+console.log('镜头语言');
+test('线性：剧本写“特写”的段落优先匹配标注为特写的镜头', () => {
+  const sc = SC.parseScript('# 线: A | 影\nA1 | 怒视 | 00:00-00:03 | 特写，眼神锁定\nA2 | 对峙 | 00:03-00:06 | 远景，两人对峙');
+  const media = [lineClip('take_1.mp4', 'A', 3, 0.05), lineClip('take_2.mp4', 'A', 3, 0.05)];
+  media[0].note = '远景'; media[1].note = '特写';
+  const r = SC.solve({ script: sc, media });
+  const bySeg = Object.fromEntries(r.items.filter((i) => i.type === 'clip').map((i) => [i.seg, i.name]));
+  assert.strictEqual(bySeg.A1, 'take_2.mp4'); assert.strictEqual(bySeg.A2, 'take_1.mp4');
+});
+test('非线性：镜头语法权重让同景别同主体的镜头不相邻（防跳切）', () => {
+  const media = [];
+  const sizes = ['中景', '中景', '中景', '远景', '远景', '特写'];
+  sizes.forEach((z, i) => { const m = lineClip('g' + i + '.mp4', 'A', 3, 0.05); m.note = z; media.push(m); });
+  // 源顺序是 中中中远远特：只按源顺序会连出 3 处跳切
+  const run = (w) => SC.solve({ media, params: { wGrammar: w, wSizeArc: 0, orderKeep: 0.6, continuity: 0, crossCut: 0, clusters: 1, curve: [0.5, 0.5, 0.5, 0.5] } }).report.grammar.filter((g) => g.kind === 'jump').length;
+  assert.ok(run(0) >= 2, 'baseline ' + run(0));
+  assert.ok(run(4) < run(0), 'with ' + run(4) + ' vs without ' + run(0));
 });
 
 console.log('音频');

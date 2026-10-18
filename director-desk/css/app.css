@@ -157,3 +157,8 @@ dialog::backdrop { background: #000a; }
   .center .viewer { min-height: 240px; }
   .left, .right { max-height: 420px; }
 }
+
+.btn-link { color: var(--accent); text-decoration: none; border: 1px solid #2c8a79; border-radius: 4px; padding: 5px 10px; white-space: nowrap; }
+.btn-link:hover { background: #1f5f55; }
+.shot-row .lang { display: flex; gap: 4px; flex-wrap: wrap; }
+.shot-row .lang select { max-width: 92px; font-size: 11px; padding: 2px 3px; }

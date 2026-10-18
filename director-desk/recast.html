@@ -27,6 +27,8 @@
       <button data-act="exportMenu" class="primary">导出 ▾</button>
       <div class="menu-list" id="exportMenu" hidden>
         <button data-exp="previs">整片替换预演视频（.webm，浏览器内直接合成）</button>
+        <button data-exp="sketch">分镜板 · 线稿风（Fight Beat 式，PNG）</button>
+        <button data-exp="frame">分镜板 · 实拍帧（PNG）</button>
         <button data-exp="local">本地 ComfyUI 生成任务包（可选，高质量）</button>
         <button data-exp="shots">镜头表 shots.json</button>
       </div>
@@ -118,6 +120,8 @@
 
   <script src="js/core/util.js"></script>
   <script src="js/core/features.js"></script>
+  <script src="js/core/grammar.js"></script>
+  <script src="js/ui/storyboard.js"></script>
   <script src="js/recast/track.js"></script>
   <script src="js/recast/frames.js"></script>
   <script src="js/recast/render.js"></script>

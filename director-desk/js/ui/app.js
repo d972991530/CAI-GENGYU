@@ -126,7 +126,13 @@
       if (!m) { log('描述文件没有对应素材：' + f.name, 'err'); continue; }
       let txt = await f.text();
       if (/\.srt$/i.test(f.name)) txt = txt.replace(/^\d+\s*$/gm, '').replace(/^[\d:,.\s\->]+$/gm, '').replace(/\n{2,}/g, '\n').trim();
-      if (/\.json$/i.test(f.name)) { try { const j = JSON.parse(txt); txt = j.prompt || j.description || j.text || txt; } catch (e) { /* 原样 */ } }
+      if (/\.json$/i.test(f.name)) {
+        try {
+          const j = JSON.parse(txt);
+          if (j.lang) m.lang = j.lang; // 镜头语言标注（景别 / 角度 / 运动 / 方向）
+          txt = j.prompt || j.description || j.desc || j.text || (j.lang ? '' : txt);
+        } catch (e) { /* 原样 */ }
+      }
       m.note = (m.note ? m.note + '\n' : '') + txt.slice(0, 2000);
       log('读入描述：' + f.name + ' → ' + m.name);
     }
@@ -301,6 +307,7 @@
       { k: 'wEnergy', label: '能量↔剧情强度', min: 0, max: 3, step: 0.05 },
       { k: 'wDialog', label: '对白↔台词', min: 0, max: 3, step: 0.05 },
       { k: 'wOrder', label: '素材顺序', min: 0, max: 3, step: 0.05 },
+      { k: 'wLang', label: '景别/运动↔剧本', min: 0, max: 3, step: 0.05 },
       { k: 'minScore', label: '置信阈值', min: 0, max: 1, step: 0.01 },
       { k: 'spread', label: '铺开度', min: 0, max: 2, step: 0.05 },
       { k: 'ripple', t: 'check', label: '闭合空缺（不保留缺素材的时长）' },
@@ -313,6 +320,8 @@
       { k: 'continuity', label: '跳切 ← 衔接 → 顺接', min: -1, max: 1, step: 0.01 },
       { k: 'orderKeep', label: '保持源顺序', min: 0, max: 2, step: 0.05 },
       { k: 'variety', label: '去重复', min: 0, max: 1, step: 0.01 },
+      { k: 'wGrammar', label: '镜头语法（防跳切/越轴）', min: 0, max: 3, step: 0.05 },
+      { k: 'wSizeArc', label: '景别随情绪推近', min: 0, max: 3, step: 0.05 },
       { k: 'clusters', label: '视觉分组数', min: 0, max: 6, step: 1, fmt: (v) => (v ? v : '自动') },
       { k: 'beam', label: '搜索宽度', min: 1, max: 64, step: 1 },
     ] },
@@ -458,6 +467,7 @@
               u ? h('span', { style: 'color:var(--accent)' }, ' · 用于 ' + Array.from(new Set(u)).join(',')) : ps ? h('span', { style: 'color:var(--accent2)' }, ' · 未使用') : '')),
           h('div', { class: 'ctl' },
             h('select', { onchange: (e) => setOv({ line: e.target.value || null }) }, lineOptions(ov.line)),
+            langSelects(ov, ps, setOv),
             segOpts.length ? h('select', { onchange: (e) => setOv({ pin: e.target.value || null }) },
               [h('option', { value: '' }, '锁定段落：自动')].concat(segOpts.map(([v, l]) => h('option', { value: v, selected: ov.pin === v }, l)))) : null,
             h('label', { class: 'chk' }, h('input', { type: 'checkbox', checked: !!ov.exclude, onchange: (e) => setOv({ exclude: e.target.checked }) }), '排除'),
@@ -466,6 +476,16 @@
     }
     if (count > 600) box.append(h('div', { class: 'hint' }, '仅显示前 600 个镜头'));
     if (!count) box.append(h('div', { class: 'hint' }, '导入素材后这里会列出切分得到的镜头。'));
+  }
+
+  /** 镜头语言下拉（景别 / 角度 / 运动 / 主体方向）：手动值写入 overrides，空 = 自动（文件名、描述、换角台导入） */
+  function langSelects(ov, ps, setOv) {
+    const G = SC.grammar, cur = ov.lang || {}, auto = (ps && ps.lang) || {};
+    const one = (k, list, label) => h('select', { title: label + (auto[k] && !cur[k] ? '（自动：' + ((list.find((x) => x.id === auto[k]) || {}).zh || auto[k]) + '）' : ''),
+      onchange: (e) => setOv({ lang: Object.assign({}, cur, { [k]: e.target.value || undefined }) }) },
+      [h('option', { value: '' }, label + (auto[k] && !cur[k] ? '·' + ((list.find((x) => x.id === auto[k]) || {}).zh || '') : ''))].concat(list.map((x) => h('option', { value: x.id, selected: cur[k] === x.id, title: x.desc }, x.zh))));
+    const dirs = ['R', 'L', 'U', 'D', 'IN', 'OUT'].map((d) => ({ id: d, zh: G.DIRS[d] + ' 方向', desc: '' }));
+    return h('span', { class: 'lang' }, one('size', G.SIZES, '景别'), one('angle', G.ANGLES, '角度'), one('move', G.MOVES, '运动'), one('subjDir', dirs, '主体'));
   }
 
   function previewSource(m, t) {
@@ -550,6 +570,13 @@
       box.append(h('div', { class: 'dsec' }, '未使用镜头 ' + S.result.unused.length + ' 个'));
       box.append(h('div', { class: 'muted' }, '低于置信阈值或超出段落容量。可在“镜头池”里锁定到指定段落，或调低“置信阈值”。'));
     }
+    if (R.grammar) {
+      const KIND = { jump: '跳切', axis: '越轴', leap: '景别跨度' };
+      box.append(h('div', { class: 'dsec' }, '镜头语法（' + R.langCount + '/' + R.cuts + ' 个镜头有景别/运动标注）'));
+      if (!R.langCount) box.append(h('div', { class: 'muted' }, '在“镜头池”里给镜头标景别 / 运动，或在文件名、描述里写“特写 / 推近 / 跟拍”等术语；换角预览台追踪后会自动标注。'));
+      else if (!R.grammar.length) box.append(h('div', { class: 'st-ok' }, '相邻镜头没有跳切、越轴或景别硬跳。'));
+      for (const g2 of R.grammar.slice(0, 30)) box.append(h('div', { class: 'mrow', onclick: () => seek(g2.rec) }, h('span', { class: 'st-broken' }, KIND[g2.kind] || '提示'), ' ', SC.fmtTime(g2.rec, true), ' · ', g2.text));
+    }
     if (S.script && S.script.warnings && S.script.warnings.length) {
       box.append(h('div', { class: 'dsec' }, '剧本解析警告'));
       S.script.warnings.forEach((w) => box.append(h('div', { class: 'muted' }, w)));
@@ -568,7 +595,7 @@
       Object.entries(groups).forEach(([gk, n]) => box.append(h('div', { class: 'share' }, h('span', { class: 'chip', style: 'background:' + tl.lineColor(gk) }, gk), h('span', {}, n + ' 个镜头'), h('span', {}))));
       return;
     }
-    const NAMES = { id: '编号', text: '文本', line: '线索', dur: '时长', energy: '能量', dialog: '对白', order: '顺序' };
+    const NAMES = { id: '编号', text: '文本', line: '线索', dur: '时长', energy: '能量', dialog: '对白', order: '顺序', lang: '镜头语言' };
     for (const r of res.segRows) {
       const l = S.script.lines.find((x) => x.id === r.line);
       box.append(h('div', { class: 'mrow', onclick: () => gotoSeg(r.seg) },
@@ -693,12 +720,42 @@
     if (kind === 'sh') download(n + '_render.sh', SC.exportFFmpeg(ctx, 'sh'));
     if (kind === 'bat') download(n + '_render.bat', SC.exportFFmpeg(ctx, 'bat'));
     if (kind === 'script') { if (!S.script) return log('没有剧本可导出', 'err'); download(n + '_剧本时间线.txt', SC.serializeScript(S.script)); }
+    if (kind === 'sbSketch' || kind === 'sbFrame') { exportStoryboard(kind === 'sbSketch' ? 'sketch' : 'frame'); return; }
     if (kind === 'csv') {
       const rows = [['序号', '类型', '段落', '线索', '素材', '源入点', '源出点', '成片入点', '成片出点', '时长', '置信']];
       S.items.forEach((it, i) => rows.push([i + 1, it.type === 'gap' ? '空缺' : '镜头', it.seg || '', it.line || '', it.name || '', it.type === 'clip' ? it.srcIn.toFixed(3) : '', it.type === 'clip' ? it.srcOut.toFixed(3) : '', it.rec.toFixed(3), (it.rec + it.len).toFixed(3), it.len.toFixed(3), it.score == null ? '' : it.score]));
       download(n + '_剪辑表.csv', '﻿' + rows.map((r) => r.map((v) => '"' + String(v).replace(/"/g, '""') + '"').join(',')).join('\r\n'), 'text/csv;charset=utf-8');
     }
     log('已导出 ' + kind.toUpperCase() + (kind === 'sh' || kind === 'bat' ? '：把脚本放到素材所在目录运行即可渲染 MP4（需要 ffmpeg）' : ''), 'ok');
+  }
+
+  /** 由当前成片时间轴生成分镜板：每个剪辑一格，标题来自镜头语言，副标题为剧本段落 */
+  async function exportStoryboard(style) {
+    const G = SC.grammar;
+    const clips = S.items.filter((i) => i.type === 'clip');
+    if (!clips.length) return log('时间轴为空', 'err');
+    const panels = [];
+    for (let i = 0; i < clips.length; i++) {
+      const c = clips[i];
+      const sh = S.shotsById.get(c.shotId);
+      const L = (sh && sh.lang) || {};
+      const m = mediaById(c.mediaId);
+      const src = m && SC.thumbAt(m, (c.srcIn + c.srcOut) / 2);
+      const frame = style === 'frame' && src ? await new Promise((res) => { const im = new Image(); im.onload = () => res(im); im.onerror = () => res(null); im.src = src; }) : null;
+      const seg = c.seg && S.script ? S.script.segments[S.script.segIndex.get(c.seg)] : null;
+      const dirX = { R: 1, L: -1, UR: 1, DR: 1, UL: -1, DL: -1 }[L.subjDir || L.dir] || 0;
+      // 线稿：按景别估人物大小；有主体方向就画运动箭头
+      const hRel = { EWS: 0.18, LS: 0.35, FS: 0.6, MS: 0.95, CU: 1.25, ECU: 1.4 }[L.size] || 0.5;
+      const figures = style === 'sketch' ? [{ x: 0.42, y: Math.min(1.02, 0.68 + hRel * 0.3), h: hRel, from: [0.42, 0.7], to: [0.42 + dirX * 0.3, 0.7] }] : [];
+      if (style === 'sketch' && (L.size === 'LS' || L.size === 'FS' || L.size === 'EWS')) figures.push({ x: 0.72, y: 0.7, h: hRel * 0.95 });
+      panels.push({ n: i + 1, caption: G.caption(L) || (seg ? seg.title : c.name), sub: (seg ? seg.id + ' ' + seg.title : c.name) + ' · ' + c.len.toFixed(1) + 's', frame, figures, size: L.size, camMove: L.move, camDir: L.camDir, impact: seg ? /斩|砍|劈|刺|击|撞|反击|格挡/.test(seg.title + seg.desc) : false });
+    }
+    const chunk = 16;
+    for (let p = 0; p < panels.length; p += chunk) {
+      const cv = SC.storyboard.render({ title: 'SEQ. – ' + (S.title || 'Edit'), subtitle: '由成片时间轴与镜头语言生成', panels: panels.slice(p, p + chunk), style, cols: 4, footer: 'CONTINUOUS ACTION' });
+      SC.storyboard.download(cv, safeName() + '_分镜板_' + (p / chunk + 1) + '.png');
+    }
+    log('分镜板已导出：' + panels.length + ' 格', 'ok');
   }
 
   /* ------------------------------------------------------------------ 工具栏 / 快捷键 */

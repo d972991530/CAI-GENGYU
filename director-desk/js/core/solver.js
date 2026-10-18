@@ -18,7 +18,8 @@
   SC.DEFAULT_PARAMS = {
     mode: 'auto',
     threshold: 0.3, minShot: 0.6,
-    wId: 3, wText: 1.2, wLine: 1.5, wDur: 0.6, wEnergy: 0.8, wDialog: 0.4, wOrder: 0.8,
+    wId: 3, wText: 1.2, wLine: 1.5, wDur: 0.6, wEnergy: 0.8, wDialog: 0.4, wOrder: 0.8, wLang: 0.6,
+    wGrammar: 0.6, wSizeArc: 0.4,
     minScore: 0.2, spread: 0.5, ripple: false,
     target: 0, asl: 3, pacing: 0.5, crossCut: 0.5, continuity: 0.3, orderKeep: 0.7, variety: 0.4,
     curve: [0.3, 0.5, 0.75, 0.95], actSplit: [0.22, 0.36, 0.24, 0.18], beam: 24, clusters: 0,
@@ -26,6 +27,14 @@
   };
 
   /* ---------------------------------------------------------------- 预处理 */
+
+  /** 镜头语言：手动标注 > 素材级标注 > 分析/导入所得 > 文件名与描述里的术语 */
+  function langOf(ov, ml, sl, text) {
+    const G = SC.grammar;
+    const parsed = G ? G.parseTags(text) : {};
+    const out = Object.assign({}, parsed, sl || {}, ml || {}, ov || {});
+    return out.size || out.move || out.angle ? out : null;
+  }
 
   /** 素材 → 求解器镜头列表，计算能量、顺序、线索归属概率 */
   SC.prepareShots = function (mediaList, script, overrides) {
@@ -48,6 +57,7 @@
           in: sh.in, out: sh.out, dur: sh.out - sh.in,
           text: SC.baseName(m.name).replace(/[_\-.]+/g, ' ') + ' ' + (m.note || '') + ' ' + (ov.note || ''),
           idHint, pin: ov.pin || null, lineTag,
+          lang: langOf(ov.lang, m.lang, sh.lang, m.name + ' ' + (m.note || '')),
           feat: sh.feat, prof: sh.prof, vis: SC.visVector(sh.feat),
         });
       });
@@ -158,7 +168,18 @@
     const simScale = 1 / Math.max(maxSim, 0.25);
     const segPos = new Map(segs.map((s, i) => [s.id, i]));
 
-    const wSum = P.wText + P.wLine + P.wDur + P.wEnergy + P.wDialog + P.wOrder || 1;
+    const G = SC.grammar;
+    // 剧本段落里写到的镜头术语（如“近景”“推近”）
+    const segLang = new Map(segs.map((sg) => [sg.id, G ? G.parseTags(sg.title + ' ' + (sg.desc || '')) : {}]));
+    const langFit = (shot, seg) => {
+      const want = segLang.get(seg.id), have = shot.lang;
+      if (!want || !have || (!want.size && !want.move)) return 0.5;
+      let sc = 0, n = 0;
+      if (want.size && have.size) { sc += Math.max(0, 1 - Math.abs(G.sizeRank(want.size) - G.sizeRank(have.size)) * 0.5); n++; }
+      if (want.move && have.move) { sc += want.move === have.move ? 1 : 0.2; n++; }
+      return n ? sc / n : 0.5;
+    };
+    const wSum = P.wText + P.wLine + P.wDur + P.wEnergy + P.wDialog + P.wOrder + P.wLang || 1;
     const breakdown = (shot, si, seg, exp) => {
       const li = lineIds.indexOf(seg.line);
       const lineP = L > 1 ? (shot.lineProb[li] - 1 / L) * (L / (L - 1)) : 0;
@@ -171,11 +192,13 @@
         energy: hasF ? 1 - Math.abs(shot.energy - seg.estIntensity) : 0.5,
         dialog: hasF && shot.feat.hasAudio ? 1 - Math.abs(Math.min(1, shot.speech * 1.5) - seg.estDialogue) : 0.5,
         order: shots.orderReliable ? 1 - Math.abs(shot.rank - segRank.get(seg.id)) : 0.5,
+        lang: langFit(shot, seg),
       };
     };
-    const scoreOf = (b) => (P.wText * b.text + P.wLine * b.line + P.wDur * b.dur + P.wEnergy * b.energy + P.wDialog * b.dialog + P.wOrder * b.order) / wSum + (P.wId * b.id) / 2;
+    const base = (b) => (P.wText * b.text + P.wLine * b.line + P.wDur * b.dur + P.wEnergy * b.energy + P.wDialog * b.dialog + P.wOrder * b.order + P.wLang * b.lang) / wSum;
+    const scoreOf = (b) => base(b) + (P.wId * b.id) / 2;
     // 展示用置信度 0..1：编号命中/冲突按固定幅度加减，不随权重放大
-    const confOf = (b) => SC.clamp((P.wText * b.text + P.wLine * b.line + P.wDur * b.dur + P.wEnergy * b.energy + P.wDialog * b.dialog + P.wOrder * b.order) / wSum + 0.35 * b.id, 0, 1);
+    const confOf = (b) => SC.clamp(base(b) + 0.35 * b.id, 0, 1);
 
     const n = shots.length, S = slots.length;
     const cost = [];
@@ -364,6 +387,12 @@
               c += P.continuity >= 0 ? P.continuity * d : -P.continuity * (1 - d);
             }
             c += P.orderKeep * skipped * 0.8;
+            // 剪辑语法：防跳切、防越轴、景别不硬跳；景别随情绪推近（高潮用近景，建置用远景）
+            if (SC.grammar) {
+              const G = SC.grammar;
+              if (prev && prev.lang && s.lang) c += P.wGrammar * G.transition(Object.assign({ group: prev.group, dir: prev.lang.subjDir || prev.lang.dir }, prev.lang), Object.assign({ group: s.group, dir: s.lang.subjDir || s.lang.dir }, s.lang)).cost;
+              if (s.lang && s.lang.size) c += P.wSizeArc * Math.abs(G.sizeRank(s.lang.size) - G.idealSizeRank(SC.curveAt(P, pos))) / 3;
+            }
             if (prev && s.group === st.lastG) c += st.run + 1 > R ? (st.run + 1 - R) * 0.5 : 0;
             else if (prev) c += st.run < R ? (R - st.run) * 0.12 * P.crossCut : 0;
             next.push({ from: st, i, cost: st.cost + c, len: lenAt(s, pos) });
@@ -447,6 +476,12 @@
       tgt.push(target); act.push(sh.energy);
     }
     rep.energyFit = corr(tgt, act);
+    // 剪辑语法检查（有镜头语言标注的相邻镜头）
+    if (SC.grammar) {
+      const seq = clips.map((c) => { const sh = shotsById.get(c.shotId); const L = sh && sh.lang; return L ? Object.assign({ group: c.line, dir: L.subjDir || L.dir }, L) : {}; });
+      rep.grammar = SC.grammar.check(seq).map((g) => Object.assign(g, { rec: clips[g.i].rec }));
+      rep.langCount = seq.filter((x) => x.size || x.move).length;
+    }
     if (script) {
       const covered = new Map();
       clips.forEach((c) => { if (c.seg) covered.set(c.seg, (covered.get(c.seg) || 0) + c.len); });
