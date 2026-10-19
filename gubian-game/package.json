@@ -1,0 +1,85 @@
+{
+  "name": "gubian-yangtze",
+  "productName": "蛊变：长江启示录",
+  "version": "0.2.0",
+  "description": "《蛊变：长江启示录》第一章「云梦号」—— 第一人称丧尸惊悚射击游戏（Windows / Android）",
+  "private": true,
+  "type": "module",
+  "main": "electron/main.cjs",
+  "author": "CAI-GENGYU",
+  "scripts": {
+    "dev": "vite --mode desktop",
+    "dev:mobile": "vite --mode mobile",
+    "build": "tsc --noEmit && vite build --mode desktop && vite build --mode mobile",
+    "build:desktop": "vite build --mode desktop",
+    "build:mobile": "vite build --mode mobile",
+    "validate": "node --experimental-strip-types tools/validate.mts",
+    "electron": "npm run build:desktop && electron .",
+    "dist:win": "npm run build:desktop && electron-builder --win --x64 --publish never",
+    "android:init": "npm run build:mobile && npx cap add android && node scripts/patch-android.mjs && npx cap sync android",
+    "android:sync": "npm run build:mobile && npx cap sync android",
+    "dist:mac": "npm run build:desktop && electron-builder --mac --universal --publish never"
+  },
+  "build": {
+    "appId": "com.caigengyu.gubian",
+    "productName": "GuBian",
+    "directories": {
+      "output": "release"
+    },
+    "files": [
+      "dist-desktop/**/*",
+      "electron/**/*"
+    ],
+    "win": {
+      "target": [
+        {
+          "target": "nsis"
+        },
+        {
+          "target": "portable"
+        }
+      ]
+    },
+    "nsis": {
+      "oneClick": false,
+      "allowToChangeInstallationDirectory": true,
+      "shortcutName": "蛊变：长江启示录"
+    },
+    "portable": {
+      "artifactName": "GuBian-Portable-${version}.exe"
+    },
+    "icon": "build/icon.png",
+    "mac": {
+      "target": [
+        {
+          "target": "dmg",
+          "arch": [
+            "universal"
+          ]
+        }
+      ],
+      "category": "public.app-category.games",
+      "identity": "-",
+      "hardenedRuntime": false,
+      "gatekeeperAssess": false,
+      "artifactName": "GuBian-Mac-${version}.${ext}"
+    },
+    "dmg": {
+      "title": "蛊变：长江启示录"
+    }
+  },
+  "dependencies": {
+    "@capacitor/android": "^8.5.3",
+    "@capacitor/core": "^8.5.3",
+    "@capacitor/status-bar": "^8.0.4",
+    "three": "^0.180.0"
+  },
+  "devDependencies": {
+    "@capacitor/cli": "^8.5.3",
+    "@types/three": "^0.180.0",
+    "electron": "^38.8.6",
+    "electron-builder": "^26.15.3",
+    "typescript": "5.8",
+    "vite": "^7.3.7"
+  }
+}

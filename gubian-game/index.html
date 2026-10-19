@@ -1,0 +1,121 @@
+<!doctype html>
+<html lang="zh-CN">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover" />
+    <meta name="theme-color" content="#000000" />
+    <link rel="manifest" href="./manifest.webmanifest" />
+    <link rel="icon" type="image/png" href="./icons/favicon-64.png" />
+    <link rel="apple-touch-icon" href="./icons/apple-touch-icon.png" />
+    <meta name="apple-mobile-web-app-capable" content="yes" />
+    <meta name="mobile-web-app-capable" content="yes" />
+    <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent" />
+    <meta name="apple-mobile-web-app-title" content="蛊变" />
+    <title>蛊变：长江启示录</title>
+  </head>
+  <body>
+    <canvas id="game"></canvas>
+    <div id="weapon"></div>
+    <div id="hud"></div>
+    <div id="grain"></div>
+    <div id="cine"></div>
+    <div id="mg"></div>
+    <div id="clicklock">点击画面继续</div>
+    <div id="rotate"><div class="rot-icon">⟳</div><p>请把手机横过来玩</p><small>iPhone 请关闭“竖排方向锁定”</small></div>
+
+    <div id="menu" class="screen">
+      <div class="menu-bg"></div>
+      <div class="title">
+        <h1>蛊变</h1>
+        <h2>长江启示录</h2>
+        <p class="sub" id="platform-label"></p>
+      </div>
+      <div class="buttons">
+        <button data-act="continue" id="btn-continue">继续游戏</button>
+        <button data-act="new">新的游戏</button>
+        <button data-act="chapters">章节选择</button>
+        <button data-act="side" class="side-btn">联动支线 · 丹字档案</button>
+        <button data-act="trailer">观看宣传片</button>
+        <button data-act="settings">设置</button>
+        <button data-act="controls">操作说明</button>
+      </div>
+      <p class="foot">恐怖游戏 · 含血腥与惊吓内容，建议 16 岁以上 · 佩戴耳机体验更佳</p>
+    </div>
+
+    <div id="chapters" class="screen">
+      <h3>章节选择</h3>
+      <div class="chapter-grid" id="chapter-grid"></div>
+      <div class="buttons row"><button data-act="back">返回</button></div>
+    </div>
+
+    <div id="side" class="screen">
+      <h3>联动支线 · 丹字档案</h3>
+      <p class="side-sub">《侠客行1971》 × 《蛊变：长江启示录》　·　1971 年，唐武男追查一口从丰都运出的铜皮箱</p>
+      <div class="chapter-grid side-grid" id="side-grid"></div>
+      <div class="buttons row"><button data-act="back">返回</button></div>
+    </div>
+
+    <div id="pause" class="screen">
+      <h3>暂停</h3>
+      <div class="buttons">
+        <button data-act="resume">继续</button>
+        <button data-act="settings">设置</button>
+        <button data-act="checkpoint">回到检查点</button>
+        <button data-act="restart">重新开始本章</button>
+        <button data-act="quit">返回主菜单</button>
+      </div>
+    </div>
+
+    <div id="dead" class="screen">
+      <h3 class="dead-title">你 死 了</h3>
+      <p class="dead-tip" id="dead-tip"></p>
+      <div class="buttons">
+        <button data-act="checkpoint">从检查点继续</button>
+        <button data-act="quit">返回主菜单</button>
+      </div>
+    </div>
+
+    <div id="inter" class="screen">
+      <div class="inter-bg" id="inter-bg"></div>
+      <div class="inter-box">
+        <p class="inter-ch" id="inter-ch"></p>
+        <h3 id="inter-title"></h3>
+        <div class="inter-rows" id="inter-rows"></div>
+        <div class="inter-grade" id="inter-grade"></div>
+        <div class="buttons row"><button data-act="next" id="btn-next">下一章</button><button data-act="quit">主菜单</button></div>
+      </div>
+    </div>
+
+    <div id="ending" class="screen">
+      <div class="credits" id="credits"></div>
+      <div class="buttons row"><button data-act="quit">返回主菜单</button></div>
+    </div>
+
+    <div id="settings" class="screen">
+      <h3>设置</h3>
+      <label>画质
+        <select id="s-quality">
+          <option value="low">低（中低端手机）</option>
+          <option value="mid">中</option>
+          <option value="high">高（实时阴影）</option>
+        </select>
+      </label>
+      <label>视角灵敏度 <input id="s-sens" type="range" min="0.3" max="2.5" step="0.1" /></label>
+      <label>音量 <input id="s-vol" type="range" min="0" max="1" step="0.05" /></label>
+      <label>字幕大小 <input id="s-sub" type="range" min="0.8" max="1.6" step="0.1" /></label>
+      <label class="row">辅助瞄准 <input id="s-assist" type="checkbox" /></label>
+      <label class="row">QTE 简化模式 <input id="s-easy" type="checkbox" /></label>
+      <p class="note">画质的阴影与光源数量在重新载入章节后生效。</p>
+      <div class="buttons"><button data-act="back">返回</button></div>
+    </div>
+
+    <div id="controls" class="screen">
+      <h3>操作说明</h3>
+      <div class="ctl" id="ctl"></div>
+      <div class="buttons"><button data-act="back">返回</button></div>
+    </div>
+
+    <div id="loading"><div class="ld-title">蛊变</div><div class="ld-bar"><i id="ld-fill"></i></div><div id="ld-text">载入美术资源……</div></div>
+    <script type="module" src="/src/main.ts"></script>
+  </body>
+</html>

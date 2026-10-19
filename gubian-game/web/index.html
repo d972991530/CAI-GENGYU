@@ -1,0 +1,55 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover" />
+<meta name="theme-color" content="#000000" />
+<link rel="icon" type="image/png" href="./pc/icons/favicon-64.png" />
+<link rel="apple-touch-icon" href="./m/icons/apple-touch-icon.png" />
+<title>蛊变：长江启示录</title>
+<style>
+  :root { color-scheme: dark; }
+  * { box-sizing: border-box; }
+  body { margin: 0; min-height: 100vh; background: #050404; color: #e8d8c0; font: 16px/1.7 system-ui, "PingFang SC", "Microsoft YaHei", sans-serif;
+    display: flex; align-items: center; justify-content: center; padding: 24px 16px; }
+  main { max-width: 640px; width: 100%; text-align: center; }
+  img { width: 112px; height: 112px; border-radius: 24px; box-shadow: 0 0 40px rgba(200, 40, 28, .35); }
+  h1 { font-size: 30px; letter-spacing: 6px; margin: 18px 0 4px; color: #e8382a; }
+  .sub { color: #9a8a76; margin: 0 0 22px; }
+  .go { display: flex; gap: 12px; justify-content: center; flex-wrap: wrap; margin-bottom: 20px; }
+  a.btn { display: block; min-width: 220px; padding: 14px 18px; border: 1px solid #a8321e; background: #1a0c0a; color: #ffd8c8; text-decoration: none; letter-spacing: 2px; }
+  a.btn:hover, a.btn:focus-visible { background: #3a120e; outline: none; }
+  a.btn small { display: block; color: #a08a78; letter-spacing: 0; }
+  .tips { text-align: left; background: #120d0b; border-left: 3px solid #a8321e; padding: 12px 16px; color: #c8b8a4; font-size: 14px; }
+  .tips b { color: #ffd8c8; }
+  .auto { color: #8a7a68; font-size: 13px; min-height: 1.7em; }
+</style>
+</head>
+<body>
+<main>
+  <img src="./m/icons/icon-512.png" alt="" />
+  <h1>蛊变</h1>
+  <p class="sub">长江启示录 · 网页版（Mac / iPhone / iPad / 任意电脑与手机）</p>
+  <div class="go">
+    <a class="btn" id="pc" href="./pc/">电脑版<small>键盘鼠标 · 手柄</small></a>
+    <a class="btn" id="m" href="./m/">手机 / 平板版<small>触屏操作 · 横屏</small></a>
+  </div>
+  <p class="auto" id="auto"></p>
+  <div class="tips">
+    <p><b>iPhone / iPad：</b>用 Safari 打开手机版，点底部「分享」→「添加到主屏幕」，之后从桌面图标进入就是全屏横屏，和 App 一样。</p>
+    <p><b>Mac：</b>用 Safari 或 Chrome 打开电脑版，点一下画面锁定鼠标即可。也可以下载 Mac 安装包（见发布页）。</p>
+    <p>存档保存在当前浏览器里；清除浏览器数据会丢失进度。</p>
+  </div>
+</main>
+<script>
+  // 触屏设备自动进入手机版，带 ?stay 时不跳转
+  var touch = matchMedia('(pointer: coarse)').matches && !matchMedia('(pointer: fine)').matches;
+  var ipad = /Macintosh/.test(navigator.userAgent) && navigator.maxTouchPoints > 1;
+  if (!/[?&]stay/.test(location.search)) {
+    var target = touch || ipad ? 'm' : 'pc';
+    document.getElementById('auto').textContent = '3 秒后自动进入' + (target === 'm' ? '手机版' : '电脑版') + '……';
+    setTimeout(function () { location.href = './' + target + '/'; }, 3000);
+  }
+</script>
+</body>
+</html>

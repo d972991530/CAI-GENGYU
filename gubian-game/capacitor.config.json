@@ -1,0 +1,6 @@
+{
+  "appId": "com.caigengyu.gubian",
+  "appName": "蛊变：长江启示录",
+  "webDir": "dist-mobile",
+  "android": { "backgroundColor": "#000000" }
+}
