@@ -17,7 +17,8 @@
     "electron": "npm run build:desktop && electron .",
     "dist:win": "npm run build:desktop && electron-builder --win --x64 --publish never",
     "android:init": "npm run build:mobile && npx cap add android && node scripts/patch-android.mjs && npx cap sync android",
-    "android:sync": "npm run build:mobile && npx cap sync android"
+    "android:sync": "npm run build:mobile && npx cap sync android",
+    "dist:mac": "npm run build:desktop && electron-builder --mac --universal --publish never"
   },
   "build": {
     "appId": "com.caigengyu.gubian",
@@ -46,6 +47,25 @@
     },
     "portable": {
       "artifactName": "GuBian-Portable-${version}.exe"
+    },
+    "icon": "build/icon.png",
+    "mac": {
+      "target": [
+        {
+          "target": "dmg",
+          "arch": [
+            "universal"
+          ]
+        }
+      ],
+      "category": "public.app-category.games",
+      "identity": "-",
+      "hardenedRuntime": false,
+      "gatekeeperAssess": false,
+      "artifactName": "GuBian-Mac-${version}.${ext}"
+    },
+    "dmg": {
+      "title": "蛊变：长江启示录"
     }
   },
   "dependencies": {

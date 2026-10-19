@@ -312,3 +312,10 @@ body.mobile .h-sub img { width: 42px; height: 42px; }
   .inter-rows b { font-size: 20px; }
   .inter-grade { font-size: 30px; min-height: 34px; margin: 4px 0; }
 }
+
+/* 手机竖屏提示（iOS 网页版无法锁定横屏） */
+#rotate { position: fixed; inset: 0; z-index: 50; display: none; flex-direction: column; align-items: center; justify-content: center; gap: 8px; background: #000; color: #e8d8c0; font-family: system-ui, sans-serif; letter-spacing: 3px; text-align: center; }
+#rotate .rot-icon { font-size: 64px; color: #c8281c; animation: rotHint 2s ease-in-out infinite; }
+#rotate small { color: #8a7a68; letter-spacing: 1px; }
+@keyframes rotHint { 0%, 30% { transform: rotate(0); } 60%, 100% { transform: rotate(90deg); } }
+@media (orientation: portrait) { body.mobile #rotate { display: flex; } }

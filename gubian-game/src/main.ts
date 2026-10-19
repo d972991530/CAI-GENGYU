@@ -5,7 +5,7 @@ import { audio } from './core/audio';
 import { loadAll, artUrl } from './core/assets';
 import { Game, Settings, ChapterStats } from './game/game';
 import { CHAPTERS, SIDE, Chapter } from './chapters';
-import { IS_MOBILE, PLATFORM, SAVE_KEY } from './platform';
+import { IS_MOBILE, SAVE_KEY } from './platform';
 
 document.body.classList.add(IS_MOBILE ? 'mobile' : 'desktop');
 
@@ -47,7 +47,14 @@ let back: Screen = 'menu';
 const show = (n: Screen | null) => SCREENS.forEach((s) => document.getElementById(s)!.classList.toggle('on', s === n));
 const $ = (id: string) => document.getElementById(id)!;
 
-$('platform-label').textContent = IS_MOBILE ? '安卓手机版' : 'Windows 电脑版';
+// 版本名称：安卓 App / Windows·Mac 安装版 / 网页版（Mac、iPhone、iPad 等）
+const ua = navigator.userAgent;
+const isMac = /Macintosh|Mac OS X/.test(ua);
+const isIOS = /iPhone|iPad|iPod/.test(ua) || (isMac && navigator.maxTouchPoints > 1);
+const PLATFORM_NAME = IS_MOBILE
+  ? (Capacitor.isNativePlatform() ? '安卓手机版' : isIOS ? 'iPhone / iPad 网页版' : '手机网页版')
+  : /Electron/.test(ua) ? (isMac ? 'Mac 电脑版' : 'Windows 电脑版') : (isMac ? 'Mac 网页版' : '电脑网页版');
+$('platform-label').textContent = PLATFORM_NAME;
 $('ctl').innerHTML = IS_MOBILE
   ? `<h4>手机版操作</h4>
      <p>左半屏任意位置按下：浮动摇杆移动（推到底小跑，消耗体力）</p>
@@ -220,7 +227,7 @@ function ending() {
   game.setState('menu');
   $('credits').innerHTML = `<h2>蛊变：长江启示录</h2><p>第一季　完</p>
     <p class="cr">原作剧本 · 美术设定：CAI-GENGYU</p><p class="cr">游戏开发：Claude Code</p>
-    <p class="cr">${PLATFORM === 'mobile' ? '安卓手机版' : 'Windows 电脑版'} · 通关总用时 ${fmt(game.totalTime)}</p>
+    <p class="cr">${PLATFORM_NAME} · 通关总用时 ${fmt(game.totalTime)}</p>
     <p class="tease">黑屏。一辆冷链卡车驶过夜色中的山路。<br>车厢内，一支标着「CG-7 · 备份」的样本管，在黑暗中微微发出红光。</p>`;
   show('ending');
 }

@@ -62,6 +62,17 @@
 
 CI 每次打包前都会先跑这项校验，校验不过就不出安装包。
 
+## 各平台版本
+
+| 平台 | 获取方式 | 操控 |
+| --- | --- | --- |
+| 安卓手机 | 发布页 `GuBian-Android.apk` | 触屏 |
+| Windows | 发布页 `GuBian Setup *.exe`（安装版）/ `GuBian-Portable-*.exe`（免安装） | 键鼠 / 手柄 |
+| Mac | 发布页 `GuBian-Mac-*.dmg`（Intel 与 Apple 芯片通用，未签名：首次右键 →「打开」，提示“已损坏”时执行 `xattr -cr /Applications/GuBian.app`） | 键鼠 / 手柄 |
+| 网页版（Mac / iPhone / iPad / 任意设备） | https://d972991530.github.io/CAI-GENGYU/ ，电脑进 `pc/`，触屏设备自动进 `m/` | 同上 |
+
+iPhone / iPad 用 Safari 打开网页版手机版后「分享 → 添加到主屏幕」，从桌面图标进入即为全屏横屏。网页版由 CI 的 `web` 任务构建并推送到 `gh-pages` 分支（仓库 Settings → Pages 的来源需设为 `gh-pages` 分支）。
+
 ## 本地开发
 
 需要 Node.js 22+。
