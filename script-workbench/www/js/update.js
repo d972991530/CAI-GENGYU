@@ -1,5 +1,5 @@
 // 版本号与更新检查。发布流程（GitHub Actions）会校验这里的版本号与 version.json 一致。
-export const VERSION = "1.2.0";
+export const VERSION = "1.2.1";
 
 // 先查 GitHub Pages，打不开再查仓库里的原文件
 const SOURCES = [

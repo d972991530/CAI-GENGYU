@@ -751,8 +751,9 @@ function showSettings() {
       <div class="field"><label for="s-model">${t("set.model")}</label><input id="s-model" list="s-models" value="${esc(cur.model)}" autocapitalize="off" spellcheck="false" dir="ltr"><datalist id="s-models">${PROVIDERS[settings.provider].models.map((m) => `<option value="${esc(m)}">`).join("")}</datalist></div>
       <div class="field"><label for="s-key">API Key</label><input id="s-key" type="password" value="${esc(cur.apiKey)}" autocomplete="off" autocapitalize="off" spellcheck="false" dir="ltr" placeholder="${esc(t("set.keyPh"))}"></div>
       <label class="hint"><input type="checkbox" id="s-show"> ${t("set.showKey")}</label>
-      <div class="btns"><button class="btn primary" id="s-save">${t("common.save")}</button><button class="btn" id="s-test">${t("set.test")}</button><button class="btn" id="s-list">${t("set.listModels")}</button></div>
+      <div class="btns"><button class="btn primary" id="s-save">${t("common.save")}</button><button class="btn" id="s-test">${t("set.test")}</button><button class="btn" id="s-list">${t("set.listModels")}</button><button class="btn danger" id="s-clear">${t("set.clearKey")}</button></div>
       <p class="hint" id="s-res" aria-live="polite"></p>
+      <p class="notice">${t("set.keyLocal")}</p>
       <p class="hint">${t("set.keyNote")}</p>
     </div>
     <div class="panel"><h2>${t("set.rates")}</h2>
@@ -799,6 +800,12 @@ function showSettings() {
     try { const s = await testConnection(current()); res.textContent = t("set.testOk", { reply: s.slice(0, 20) }); }
     catch (e) { res.textContent = e.message || String(e); }
   };
+  // 只清掉当前选中服务商的 Key，立即保存，避免手机借给别人时泄露
+  $("#s-clear").onclick = () => confirmSheet(t("set.confirmClear", { name: pname(shown) }), t("set.clearKey"), () => {
+    edits[shown].apiKey = "";
+    settings.keys[shown] = { ...settings.keys[shown], apiKey: "" };
+    saveSettings(); showSettings(); toast(t("set.keyCleared"));
+  });
   $("#s-list").onclick = async () => {
     const res = $("#s-res"); res.textContent = t("set.listing");
     try {

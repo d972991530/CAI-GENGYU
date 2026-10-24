@@ -1,17 +1,17 @@
 {
-  "version": "1.2.0",
+  "version": "1.2.1",
   "date": "2026-10-24",
   "apk": "https://d972991530.github.io/CAI-GENGYU/download/script-workbench.apk",
   "page": "https://d972991530.github.io/CAI-GENGYU/",
-  "release": "https://github.com/d972991530/CAI-GENGYU/releases/download/v1.2.0/script-workbench-1.2.0.apk",
+  "release": "https://github.com/d972991530/CAI-GENGYU/releases/download/v1.2.1/script-workbench-1.2.1.apk",
   "notes": {
-    "zh-CN": "新增底部导航、8 种界面语言（台词可指定语言）、自动检查更新和「支持作者」页面。",
-    "zh-TW": "新增底部導覽、8 種介面語言（台詞可指定語言）、自動檢查更新和「支持作者」頁面。",
-    "en": "Bottom navigation, 8 interface languages (dialogue can be written in any of them), automatic update check and a “Support the author” page.",
-    "ja": "下部ナビ、8 つの表示言語（セリフの言語も指定可）、自動アップデート確認、「作者を応援」ページを追加。",
-    "ko": "하단 내비게이션, 8개 언어(대사 언어 지정 가능), 자동 업데이트 확인, ‘개발자 후원’ 페이지 추가.",
-    "fr": "Navigation en bas, 8 langues d’interface (dialogues dans la langue choisie), vérification automatique des mises à jour et page « Soutenir l’auteur ».",
-    "es": "Navegación inferior, 8 idiomas de interfaz (diálogos en el idioma elegido), búsqueda automática de actualizaciones y página «Apoya al autor».",
-    "ar": "شريط تنقل سفلي، و8 لغات للواجهة (يمكن كتابة الحوار بأي منها)، وفحص تلقائي للتحديثات، وصفحة «ادعم المطوّر»."
+    "zh-CN": "安全加固：安装包不含任何 API Key；禁止通过调试和备份导出 App 数据；设置里新增「清除 Key」。",
+    "zh-TW": "安全強化：安裝包不含任何 API Key；禁止透過除錯和備份匯出 App 資料；設定新增「清除 Key」。",
+    "en": "Security: the installer contains no API keys; app data can no longer be extracted via debugging or backups; new “Clear key” button in Settings.",
+    "ja": "セキュリティ強化：インストールファイルに API キーは含まれません。デバッグやバックアップ経由でのデータ取り出しを禁止し、設定に「キーを消去」を追加。",
+    "ko": "보안 강화: 설치 파일에 API 키가 없으며, 디버깅·백업으로 앱 데이터를 꺼낼 수 없게 했습니다. 설정에 ‘키 삭제’ 추가.",
+    "fr": "Sécurité : le fichier d’installation ne contient aucune clé API ; les données de l’app ne peuvent plus être extraites par débogage ou sauvegarde ; nouveau bouton « Effacer la clé ».",
+    "es": "Seguridad: el instalador no contiene claves API; ya no se pueden extraer los datos de la app mediante depuración o copias de seguridad; nuevo botón «Borrar clave».",
+    "ar": "تعزيز الأمان: لا يحتوي ملف التثبيت على أي مفتاح API، ولم يعد ممكنًا استخراج بيانات التطبيق عبر التصحيح أو النسخ الاحتياطي، وزر جديد «مسح المفتاح» في الإعدادات."
   }
 }

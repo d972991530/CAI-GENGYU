@@ -47,6 +47,14 @@ jobs:
           fi
           echo "version=$V" >> "$GITHUB_OUTPUT"
 
+      # 发布前确认没有把任何 API Key 写进代码或页面
+      - name: Scan for API keys
+        run: |
+          if grep -rnE "sk-[A-Za-z0-9_-]{20,}|sk-ant-[A-Za-z0-9_-]{20,}|AIza[0-9A-Za-z_-]{30,}" script-workbench/www script-workbench/site; then
+            echo "::error::代码里发现疑似 API Key，已停止发布"
+            exit 1
+          fi
+
       - name: Build and sign APK
         env:
           KEYSTORE_BASE64: ${{ secrets.KEYSTORE_BASE64 }}
