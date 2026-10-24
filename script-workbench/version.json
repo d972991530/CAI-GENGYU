@@ -1,7 +1,7 @@
 {
   "version": "1.2.1",
   "date": "2026-10-24",
-  "apk": "https://d972991530.github.io/CAI-GENGYU/download/script-workbench.apk",
+  "apk": "https://cdn.jsdelivr.net/gh/d972991530/CAI-GENGYU@v1.2.1/script-workbench/download/script-workbench-1.2.1.apk",
   "page": "https://d972991530.github.io/CAI-GENGYU/",
   "release": "https://github.com/d972991530/CAI-GENGYU/releases/download/v1.2.1/script-workbench-1.2.1.apk",
   "notes": {
@@ -13,5 +13,10 @@
     "fr": "Sécurité : le fichier d’installation ne contient aucune clé API ; les données de l’app ne peuvent plus être extraites par débogage ou sauvegarde ; nouveau bouton « Effacer la clé ».",
     "es": "Seguridad: el instalador no contiene claves API; ya no se pueden extraer los datos de la app mediante depuración o copias de seguridad; nuevo botón «Borrar clave».",
     "ar": "تعزيز الأمان: لا يحتوي ملف التثبيت على أي مفتاح API، ولم يعد ممكنًا استخراج بيانات التطبيق عبر التصحيح أو النسخ الاحتياطي، وزر جديد «مسح المفتاح» في الإعدادات."
-  }
+  },
+  "apkMirrors": [
+    "https://gcore.jsdelivr.net/gh/d972991530/CAI-GENGYU@v1.2.1/script-workbench/download/script-workbench-1.2.1.apk",
+    "https://fastly.jsdelivr.net/gh/d972991530/CAI-GENGYU@v1.2.1/script-workbench/download/script-workbench-1.2.1.apk",
+    "https://github.com/d972991530/CAI-GENGYU/releases/download/v1.2.1/script-workbench-1.2.1.apk"
+  ]
 }
