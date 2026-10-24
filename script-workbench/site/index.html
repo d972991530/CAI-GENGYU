@@ -1,0 +1,220 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<meta name="color-scheme" content="light dark">
+<title>剧本结构台 · 台词工坊</title>
+<meta name="description" content="按人物卡和短剧赛道规则写台词、分析剧本结构的安卓应用。支持 Claude、GPT、Gemini、DeepSeek，8 种语言。">
+<style>
+:root{
+  --bg:#f3f5f4;--paper:#fbfcfb;--ink:#1d2427;--muted:#5d6970;--line:#d6dcdc;--rule:#2b3438;--accent:#2f5e9e;--accent-ink:#fff;
+  --l0:#d9622b;--l1:#2f5e9e;--l2:#2f8a5f;--l3:#7b5aa6;
+  --display:"Noto Serif CJK SC","Source Han Serif SC","Songti SC","STSong",Georgia,serif;
+  --body:"Noto Sans CJK SC","Source Han Sans SC","PingFang SC","Microsoft YaHei",system-ui,sans-serif;
+}
+@media (prefers-color-scheme:dark){:root:not([data-theme="light"]){
+  --bg:#14191b;--paper:#1b2225;--ink:#e6ecec;--muted:#98a5ab;--line:#2d373b;--rule:#c9d3d6;--accent:#7aa6e3;--accent-ink:#0e1418;
+  --l0:#f08a55;--l1:#7aa6e3;--l2:#5fc492;--l3:#b496dc}}
+:root[data-theme="dark"]{--bg:#14191b;--paper:#1b2225;--ink:#e6ecec;--muted:#98a5ab;--line:#2d373b;--rule:#c9d3d6;--accent:#7aa6e3;--accent-ink:#0e1418;--l0:#f08a55;--l1:#7aa6e3;--l2:#5fc492;--l3:#b496dc}
+*{box-sizing:border-box}
+html{scroll-behavior:smooth}
+body{margin:0;background:var(--bg);color:var(--ink);font-family:var(--body);font-size:16px;line-height:1.7}
+a{color:var(--accent)}
+img{max-width:100%;display:block}
+main{overflow-x:clip}
+.wrap{max-width:1080px;margin:0 auto;padding:0 max(16px,env(safe-area-inset-left))}
+header{position:sticky;top:0;z-index:10;background:color-mix(in srgb,var(--bg) 88%,transparent);backdrop-filter:blur(8px);border-bottom:1px solid var(--line)}
+header .wrap{display:flex;align-items:center;gap:12px;height:56px}
+.mark{width:28px;height:28px;border-radius:7px;background:var(--rule);display:grid;place-items:center;color:var(--bg);font-family:var(--display);font-weight:900;font-size:16px}
+.brand{font-family:var(--display);font-weight:700;font-size:17px;flex:1;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.lang{border:1px solid var(--line);background:var(--paper);color:var(--ink);border-radius:6px;padding:4px 8px;font:inherit;font-size:14px}
+.hero{padding:56px 0 40px;display:grid;grid-template-columns:1.1fr .9fr;gap:40px;align-items:center}
+.eyebrow{display:inline-block;font-size:13px;color:var(--accent);border:1px solid var(--accent);border-radius:999px;padding:2px 12px;margin-bottom:16px}
+h1{font-family:var(--display);font-size:clamp(34px,5.4vw,56px);line-height:1.15;margin:0 0 16px;letter-spacing:.01em;text-wrap:balance}
+.lead{font-size:18px;color:var(--muted);margin:0 0 28px;max-width:34em}
+.cta{display:flex;flex-wrap:wrap;gap:12px;align-items:center}
+.btn{display:inline-flex;align-items:center;gap:8px;min-height:48px;padding:10px 22px;border-radius:10px;font-weight:600;text-decoration:none;border:1px solid var(--rule);color:var(--ink);background:var(--paper)}
+.btn.primary{background:var(--rule);color:var(--bg)}
+.btn svg{width:20px;height:20px}
+.meta{font-size:13px;color:var(--muted);margin-top:14px;font-variant-numeric:tabular-nums}
+.qrbox{display:flex;gap:14px;align-items:center;margin-top:22px;font-size:13px;color:var(--muted)}
+.qrbox img{width:96px;height:96px;border-radius:8px;border:1px solid var(--line);background:#fff;padding:4px;image-rendering:pixelated}
+.phones{position:relative;height:560px}
+.phone{position:absolute;width:260px;border-radius:28px;border:8px solid var(--rule);overflow:hidden;background:var(--paper);box-shadow:0 18px 48px rgba(0,0,0,.18)}
+.phone img{width:100%}
+.phone.a{right:150px;top:30px;transform:rotate(-4deg)}
+.phone.b{right:0;top:0;transform:rotate(3deg)}
+section{padding:56px 0}
+h2{font-family:var(--display);font-size:clamp(26px,3.4vw,36px);margin:0 0 10px}
+.sub{color:var(--muted);margin:0 0 32px;max-width:40em}
+.grid{display:grid;grid-template-columns:repeat(3,1fr);gap:16px}
+.card{background:var(--paper);border:1px solid var(--line);border-radius:14px;padding:22px}
+.card h3{margin:10px 0 6px;font-size:17px}
+.card p{margin:0;color:var(--muted);font-size:14.5px}
+.dot{width:34px;height:34px;border-radius:9px;display:grid;place-items:center;color:#fff;font-weight:700}
+.shots{display:flex;gap:18px;overflow-x:auto;scroll-snap-type:x mandatory;padding:4px 2px 18px}
+.shots figure{margin:0;flex:0 0 240px;scroll-snap-align:start}
+.shots img{border-radius:18px;border:1px solid var(--line)}
+.shots figcaption{font-size:13px;color:var(--muted);margin-top:8px;text-align:center}
+.steps{counter-reset:s;display:grid;grid-template-columns:repeat(3,1fr);gap:16px}
+.steps li{list-style:none;background:var(--paper);border:1px solid var(--line);border-radius:14px;padding:22px}
+.steps li::before{counter-increment:s;content:counter(s);display:inline-grid;place-items:center;width:30px;height:30px;border-radius:50%;background:var(--rule);color:var(--bg);font-weight:700;margin-bottom:10px}
+.steps b{display:block;margin-bottom:4px}
+.steps span{color:var(--muted);font-size:14.5px}
+details{background:var(--paper);border:1px solid var(--line);border-radius:12px;padding:14px 18px;margin-bottom:10px}
+summary{cursor:pointer;font-weight:600}
+details p{margin:10px 0 0;color:var(--muted);font-size:15px}
+.support{display:grid;grid-template-columns:1fr 260px;gap:32px;align-items:center;background:var(--paper);border:1px solid var(--line);border-radius:18px;padding:28px}
+.support img{border-radius:12px;border:1px solid var(--line)}
+footer{border-top:1px solid var(--line);padding:28px 0 calc(28px + env(safe-area-inset-bottom));color:var(--muted);font-size:13px}
+footer .wrap{display:flex;flex-wrap:wrap;gap:8px 20px;justify-content:space-between}
+@media (max-width:860px){
+  .hero{grid-template-columns:1fr;padding-top:36px}
+  .phones{height:420px;max-width:420px;width:100%;margin:0 auto}
+  .phone{width:200px;border-width:6px;border-radius:22px}
+  .phone.a{right:auto;left:0}
+  .grid,.steps{grid-template-columns:1fr}
+  .support{grid-template-columns:1fr}
+  .support img{max-width:260px;margin:0 auto}
+  .qrbox{display:none}
+}
+</style>
+</head>
+<body>
+<header><div class="wrap">
+  <div class="mark" aria-hidden="true">剧</div>
+  <div class="brand" data-t="brand">剧本结构台 · 台词工坊</div>
+  <select class="lang" id="lang" aria-label="Language"><option value="zh">中文</option><option value="en">English</option></select>
+</div></header>
+
+<main>
+<div class="wrap hero">
+  <div>
+    <span class="eyebrow" data-t="eyebrow">安卓应用 · 免费</span>
+    <h1 data-t="h1">让每个角色说出<br>自己的台词</h1>
+    <p class="lead" data-t="lead">按人物卡和男频、女频短剧赛道规则写台词，统一排成剧本或网文格式。逐句换写、按反面清单审校，还能把整部剧本拆成结构时间线。</p>
+    <div class="cta">
+      <a class="btn primary" id="dl" href="download/script-workbench.apk"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M12 3v12M7 10l5 5 5-5M5 21h14"/></svg><span data-t="download">下载安卓版</span></a>
+      <a class="btn" href="https://github.com/d972991530/CAI-GENGYU/releases" data-t="releases">全部版本</a>
+    </div>
+    <div class="meta" id="meta"></div>
+    <div class="qrbox"><img src="img/download-qr.png" alt="" width="96" height="96"><span data-t="scan">用手机扫码直接下载安装包</span></div>
+  </div>
+  <div class="phones" aria-hidden="true">
+    <div class="phone a"><img src="img/home.png" alt=""></div>
+    <div class="phone b"><img src="img/book.png" alt=""></div>
+  </div>
+</div>
+
+<section><div class="wrap">
+  <h2 data-t="fTitle">写台词不再乱</h2>
+  <p class="sub" data-t="fSub">AI 按固定结构返回每一句（谁说、什么神态、说什么），排版由应用完成，格式始终整齐。</p>
+  <div class="grid">
+    <div class="card"><div class="dot" style="background:var(--l1)">1</div><h3 data-t="f1t">人物卡驱动</h3><p data-t="f1d">写清身份、性格和说话方式，不同角色语气拉开，换掉名字也听得出是谁。</p></div>
+    <div class="card"><div class="dot" style="background:var(--l0)">2</div><h3 data-t="f2t">17 条短剧赛道</h3><p data-t="f2d">内置男频、女频编剧规则：赘婿、战神、真千金、虐恋……按赛道铁律和爽点节奏写。</p></div>
+    <div class="card"><div class="dot" style="background:var(--l2)">3</div><h3 data-t="f3t">逐句换写与审校</h3><p data-t="f3d">点任意一句让 AI 给出 3 个备选；按审稿口诀和反面清单打分，问题一键修改。</p></div>
+    <div class="card"><div class="dot" style="background:var(--l3)">4</div><h3 data-t="f4t">剧本结构时间线</h3><p data-t="f4d">上传 Word / PDF 剧本，自动分场、估算时长、分线索、找伏笔，导出整张结构图。</p></div>
+    <div class="card"><div class="dot" style="background:var(--l1)">5</div><h3 data-t="f5t">四家 AI 任选</h3><p data-t="f5d">Claude、GPT、Gemini、DeepSeek，各存一份 Key，随时切换；Key 只保存在你的手机上。</p></div>
+    <div class="card"><div class="dot" style="background:var(--l0)">6</div><h3 data-t="f6t">8 种语言</h3><p data-t="f6d">简体、繁体、英语、日语、韩语、法语、西班牙语、阿拉伯语；台词也可以用这些语言写。</p></div>
+  </div>
+</div></section>
+
+<section><div class="wrap">
+  <h2 data-t="sTitle">界面一览</h2>
+  <div class="shots">
+    <figure><img src="img/home.png" alt="" loading="lazy"><figcaption data-t="s1">台词工坊首页</figcaption></figure>
+    <figure><img src="img/book.png" alt="" loading="lazy"><figcaption data-t="s2">剧本格式的台词</figcaption></figure>
+    <figure><img src="img/review.png" alt="" loading="lazy"><figcaption data-t="s3">按赛道清单审校</figcaption></figure>
+    <figure><img src="img/home-en.png" alt="" loading="lazy"><figcaption data-t="s4">英文界面</figcaption></figure>
+  </div>
+</div></section>
+
+<section><div class="wrap">
+  <h2 data-t="hTitle">三步开始</h2>
+  <ol class="steps">
+    <li><b data-t="h1t">下载安装</b><span data-t="h1d">用手机浏览器下载安装包。安卓会提示“未知来源”，在提示里允许本次安装即可。</span></li>
+    <li><b data-t="h2t">填写 AI Key</b><span data-t="h2d">在「设置」里选一家 AI 服务，粘贴你自己的 API Key，点「测试连接」。</span></li>
+    <li><b data-t="h3t">建台词本开写</b><span data-t="h3d">选体裁和赛道，添加人物卡，描述这场戏要发生什么，生成台词。</span></li>
+  </ol>
+</div></section>
+
+<section><div class="wrap">
+  <h2 data-t="qTitle">常见问题</h2>
+  <details><summary data-t="q1">需要付费吗？</summary><p data-t="a1">应用免费。AI 调用使用你自己的 API Key，费用由对应的 AI 服务商按用量收取。</p></details>
+  <details><summary data-t="q2">在中国大陆能用吗？</summary><p data-t="a2">DeepSeek 可以直接使用。Claude、GPT、Gemini 的官方接口在中国大陆无法直接访问，需要能访问境外网络的环境，或在设置里换成你信任的兼容中转地址。</p></details>
+  <details><summary data-t="q3">我的剧本和 Key 存在哪里？</summary><p data-t="a3">都只保存在你的手机上。写台词或分析时，相关内容会直接发给你选择的 AI 服务商，不经过任何其他服务器。</p></details>
+  <details><summary data-t="q4">怎么更新？</summary><p data-t="a4">应用打开时会自动检查新版本，有更新会提示下载。也可以在「设置 → 关于 → 检查更新」手动检查，或回到本页下载最新版覆盖安装，数据不会丢。</p></details>
+  <details><summary data-t="q5">之前装过 1.0 原版，装不上新版？</summary><p data-t="a5">最早的 1.0 原版签名不同，需要先导出需要保留的数据、卸载旧版，再安装本页的版本。之后的更新都可以直接覆盖安装。</p></details>
+</div></section>
+
+<section id="support"><div class="wrap">
+  <div class="support">
+    <div>
+      <h2 data-t="supTitle">支持作者</h2>
+      <p class="sub" style="margin:0" data-t="supText">如果这个工具帮到了你，欢迎用支付宝扫码请作者喝杯咖啡。打赏完全自愿，不兑换 AI 额度或任何服务。</p>
+    </div>
+    <img src="img/support-qr.png" alt="支付宝收款码" loading="lazy" data-alt="supAlt">
+  </div>
+</div></section>
+</main>
+
+<footer><div class="wrap">
+  <span data-t="foot">剧本结构台 · 台词工坊</span>
+  <a href="https://github.com/d972991530/CAI-GENGYU">GitHub</a>
+</div></footer>
+
+<script>
+const EN = {
+  brand: "Script Workbench · Dialogue Studio", eyebrow: "Android app · free",
+  h1: "Give every character<br>a voice of their own",
+  lead: "Write dialogue from character cards and short-drama genre rules, laid out cleanly as a screenplay or novel prose. Rewrite any line, review against checklists, and turn a whole script into a structure timeline.",
+  download: "Download for Android", releases: "All releases", scan: "Scan with your phone to download",
+  fTitle: "Dialogue that stays tidy", fSub: "The AI returns every line in a fixed structure (who, manner, words) and the app does the layout, so formatting is always consistent.",
+  f1t: "Character-driven", f1d: "Describe role, personality and speech habits; each character sounds different enough to recognise without names.",
+  f2t: "17 short-drama tracks", f2d: "Built-in rulebooks for male- and female-oriented genres: live-in son-in-law, war god, real heiress, angst romance and more.",
+  f3t: "Rewrite and review", f3d: "Tap any line for three AI alternatives; get a score and fixes from genre checklists.",
+  f4t: "Structure timeline", f4d: "Upload a Word/PDF script to split scenes, estimate timing, separate storylines, find foreshadowing and export a full chart.",
+  f5t: "Four AI providers", f5d: "Claude, GPT, Gemini and DeepSeek, each with its own key; keys stay on your phone.",
+  f6t: "8 languages", f6d: "Simplified and Traditional Chinese, English, Japanese, Korean, French, Spanish and Arabic — for the interface and for the dialogue itself.",
+  sTitle: "Screens", s1: "Dialogue Studio home", s2: "Dialogue in screenplay format", s3: "Genre checklist review", s4: "English interface",
+  hTitle: "Get started in three steps",
+  h1t: "Install", h1d: "Download the APK in your phone’s browser. Android warns about unknown sources; allow this install.",
+  h2t: "Add an AI key", h2d: "In Settings, pick a provider, paste your own API key and tap Test connection.",
+  h3t: "Write", h3d: "Create a dialogue book, choose format and genre, add characters, describe the scene and generate.",
+  qTitle: "FAQ",
+  q1: "Does it cost anything?", a1: "The app is free. AI calls use your own API key and are billed by that provider.",
+  q2: "Does it work in mainland China?", a2: "DeepSeek works directly. Claude, GPT and Gemini are not reachable directly from mainland China; use a network that can reach them or a trusted compatible relay address.",
+  q3: "Where are my scripts and keys stored?", a3: "Only on your phone. Text you write or analyse is sent straight to the AI provider you chose, not to any other server.",
+  q4: "How do updates work?", a4: "The app checks for new versions on launch and offers the download. You can also check in Settings → About, or download the latest version here and install over the old one; your data stays.",
+  q5: "Installed the original 1.0 and the new version won’t install?", a5: "The original 1.0 was signed with a different key. Export what you need, uninstall it, then install from this page. Later updates install over the top.",
+  supTitle: "Support the author", supText: "If this tool helps you, you can buy the author a coffee with this Alipay code. Tips are voluntary and are not converted into AI credit or any service.", supAlt: "Alipay payment code",
+  foot: "Script Workbench · Dialogue Studio",
+};
+const ZH = {};
+document.querySelectorAll("[data-t]").forEach((el) => (ZH[el.dataset.t] = el.innerHTML));
+let info = null;
+function apply(lang) {
+  const d = lang === "en" ? EN : ZH;
+  document.documentElement.lang = lang === "en" ? "en" : "zh-CN";
+  document.querySelectorAll("[data-t]").forEach((el) => { if (d[el.dataset.t]) el.innerHTML = d[el.dataset.t]; });
+  document.querySelectorAll("[data-alt]").forEach((el) => (el.alt = lang === "en" ? EN[el.dataset.alt] : "支付宝收款码"));
+  document.title = lang === "en" ? "Script Workbench · Dialogue Studio" : "剧本结构台 · 台词工坊";
+  renderMeta(lang);
+}
+function renderMeta(lang) {
+  if (!info) return;
+  const en = lang === "en";
+  const note = info.notes && (info.notes[en ? "en" : "zh-CN"] || "");
+  document.getElementById("meta").textContent = (en ? `Latest v${info.version} · ${info.date}` : `最新版本 v${info.version} · ${info.date}`) + (note ? " — " + note : "");
+}
+const sel = document.getElementById("lang");
+let saved = null;
+try { saved = localStorage.getItem("site.lang"); } catch {}
+sel.value = saved || ((navigator.language || "").toLowerCase().startsWith("zh") ? "zh" : "en");
+sel.onchange = () => { try { localStorage.setItem("site.lang", sel.value); } catch {} apply(sel.value); };
+apply(sel.value);
+fetch("version.json", { cache: "no-store" }).then((r) => (r.ok ? r.json() : null)).then((j) => { if (j) { info = j; renderMeta(sel.value); } }).catch(() => {});
+</script>
+</body>
+</html>

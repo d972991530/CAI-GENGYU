@@ -1,0 +1,17 @@
+{
+  "version": "1.2.0",
+  "date": "2026-10-24",
+  "apk": "https://d972991530.github.io/CAI-GENGYU/download/script-workbench.apk",
+  "page": "https://d972991530.github.io/CAI-GENGYU/",
+  "release": "https://github.com/d972991530/CAI-GENGYU/releases/download/v1.2.0/script-workbench-1.2.0.apk",
+  "notes": {
+    "zh-CN": "新增底部导航、8 种界面语言（台词可指定语言）、自动检查更新和「支持作者」页面。",
+    "zh-TW": "新增底部導覽、8 種介面語言（台詞可指定語言）、自動檢查更新和「支持作者」頁面。",
+    "en": "Bottom navigation, 8 interface languages (dialogue can be written in any of them), automatic update check and a “Support the author” page.",
+    "ja": "下部ナビ、8 つの表示言語（セリフの言語も指定可）、自動アップデート確認、「作者を応援」ページを追加。",
+    "ko": "하단 내비게이션, 8개 언어(대사 언어 지정 가능), 자동 업데이트 확인, ‘개발자 후원’ 페이지 추가.",
+    "fr": "Navigation en bas, 8 langues d’interface (dialogues dans la langue choisie), vérification automatique des mises à jour et page « Soutenir l’auteur ».",
+    "es": "Navegación inferior, 8 idiomas de interfaz (diálogos en el idioma elegido), búsqueda automática de actualizaciones y página «Apoya al autor».",
+    "ar": "شريط تنقل سفلي، و8 لغات للواجهة (يمكن كتابة الحوار بأي منها)، وفحص تلقائي للتحديثات، وصفحة «ادعم المطوّر»."
+  }
+}
