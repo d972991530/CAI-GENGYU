@@ -1,18 +1,18 @@
 {
-  "version": "1.2.1",
-  "date": "2026-10-24",
+  "version": "1.3.0",
+  "date": "2026-10-25",
   "apk": "https://cdn.jsdelivr.net/gh/d972991530/CAI-GENGYU@fbcdd25394b847957c8f669564bbfdf19ee5710f/script-workbench/download/script-workbench-1.2.1.apk",
   "page": "https://d972991530.github.io/CAI-GENGYU/",
-  "release": "https://github.com/d972991530/CAI-GENGYU/releases/download/v1.2.1/script-workbench-1.2.1.apk",
+  "release": "https://github.com/d972991530/CAI-GENGYU/releases/download/v1.3.0/script-workbench-1.3.0.apk",
   "notes": {
-    "zh-CN": "安全加固：安装包不含任何 API Key；禁止通过调试和备份导出 App 数据；设置里新增「清除 Key」。",
-    "zh-TW": "安全強化：安裝包不含任何 API Key；禁止透過除錯和備份匯出 App 資料；設定新增「清除 Key」。",
-    "en": "Security: the installer contains no API keys; app data can no longer be extracted via debugging or backups; new “Clear key” button in Settings.",
-    "ja": "セキュリティ強化：インストールファイルに API キーは含まれません。デバッグやバックアップ経由でのデータ取り出しを禁止し、設定に「キーを消去」を追加。",
-    "ko": "보안 강화: 설치 파일에 API 키가 없으며, 디버깅·백업으로 앱 데이터를 꺼낼 수 없게 했습니다. 설정에 ‘키 삭제’ 추가.",
-    "fr": "Sécurité : le fichier d’installation ne contient aucune clé API ; les données de l’app ne peuvent plus être extraites par débogage ou sauvegarde ; nouveau bouton « Effacer la clé ».",
-    "es": "Seguridad: el instalador no contiene claves API; ya no se pueden extraer los datos de la app mediante depuración o copias de seguridad; nuevo botón «Borrar clave».",
-    "ar": "تعزيز الأمان: لا يحتوي ملف التثبيت على أي مفتاح API، ولم يعد ممكنًا استخراج بيانات التطبيق عبر التصحيح أو النسخ الاحتياطي، وزر جديد «مسح المفتاح» في الإعدادات."
+    "zh-CN": "新增豆包（火山方舟）和「自建中转」服务商；推出网页版；设置里新增备份导出与导入。",
+    "zh-TW": "新增豆包（火山方舟）和「自建中轉」服務商；推出網頁版；設定新增備份匯出與匯入。",
+    "en": "Added Doubao (Volcano Ark) and self-hosted relay providers, a web version, and backup export/import in Settings.",
+    "ja": "豆包（火山方舟）と自前の中継サーバーに対応、Web 版を公開、設定にバックアップの書き出し・読み込みを追加。",
+    "ko": "Doubao(화산 방주)와 자체 중계 서버 지원, 웹 버전 출시, 설정에 백업 내보내기·가져오기 추가.",
+    "fr": "Ajout de Doubao (Volcano Ark) et d’un relais auto-hébergé, d’une version web, et de l’export/import de sauvegarde dans les réglages.",
+    "es": "Se añaden Doubao (Volcano Ark) y un relé propio, una versión web y la exportación/importación de copias en Ajustes.",
+    "ar": "إضافة Doubao ‏(Volcano Ark) والوسيط ذاتي الاستضافة، وإطلاق نسخة الويب، وتصدير النسخ الاحتياطية واستيرادها من الإعدادات."
   },
   "apkMirrors": [
     "https://gcore.jsdelivr.net/gh/d972991530/CAI-GENGYU@fbcdd25394b847957c8f669564bbfdf19ee5710f/script-workbench/download/script-workbench-1.2.1.apk",

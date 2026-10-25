@@ -1,0 +1,9 @@
+{
+  "name": "script-workbench-relay",
+  "version": "1.0.0",
+  "private": true,
+  "description": "剧本结构台 AI 中转服务（阿里云函数计算 Web 函数）",
+  "main": "server.js",
+  "scripts": { "start": "node server.js" },
+  "engines": { "node": ">=18" }
+}

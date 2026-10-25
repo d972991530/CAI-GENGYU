@@ -3,7 +3,9 @@
 按人物卡和男频/女频短剧赛道规则写台词、分析剧本结构的安卓应用（Capacitor 外壳 + 网页代码）。
 
 - 下载页：https://d972991530.github.io/CAI-GENGYU/
+- 网页版：https://d972991530.github.io/CAI-GENGYU/app/
 - 所有版本：https://github.com/d972991530/CAI-GENGYU/releases
+- 国内可用的 AI：DeepSeek、豆包（火山方舟），或部署 `relay/` 里的自建中转（阿里云函数计算，见 `relay/README.md`）
 
 ## 目录
 
@@ -15,6 +17,8 @@
 | `android/base.apk` | 安卓外壳（原生部分），打包时把 `www/` 替换进去 |
 | `tools/repack.py` | 把 `www/` 打进外壳 APK 的脚本 |
 | `site/` | 产品介绍与下载页（GitHub Pages） |
+| `relay/` | AI 中转服务（部署到阿里云函数计算），网页版和 App 都可以用它 |
+| `download/` | 已签名的安装包（未配置签名 Secrets 时，下载页用这里最新的一个） |
 | `version.json` | 当前版本号、更新说明、下载地址；App 启动时读取它判断是否有新版 |
 
 ## 自动发布是怎么工作的
@@ -29,6 +33,8 @@
 App 每次打开（最多每 12 小时一次）会读取下载页上的 `version.json`，发现新版本就在顶部提示「下载安装」。
 
 ## 第一次使用前的设置（只需一次）
+
+网页版和下载页只需要第 2、3 步；第 1 步用于自动打包签名新的安装包。
 
 1. **添加签名密钥 Secrets**：仓库 Settings → Secrets and variables → Actions → New repository secret，添加 4 个：
 

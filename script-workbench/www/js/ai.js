@@ -25,6 +25,19 @@ export const PROVIDERS = {
     keyHint: "在 Google AI Studio（aistudio.google.com）创建 API Key。模型名以账户可用的为准，可点「获取可用模型」。",
     kind: "gemini",
   },
+  doubao: {
+    name: "豆包（火山方舟）",
+    baseUrl: "https://ark.cn-beijing.volces.com/api/v3",
+    models: ["doubao-seed-2-1-pro-260915", "doubao-seed-2-1-turbo-260628"],
+    kind: "doubao",
+  },
+  // 自己部署的中转服务（见 relay/），兼容 OpenAI 格式；Key 处填中转的访问口令
+  relay: {
+    name: "自建中转",
+    baseUrl: "",
+    models: ["auto"],
+    kind: "relay",
+  },
   deepseek: {
     name: "DeepSeek",
     baseUrl: "https://api.deepseek.com",
@@ -33,7 +46,7 @@ export const PROVIDERS = {
     kind: "deepseek",
   },
 };
-export const PROVIDER_ORDER = ["claude", "openai", "gemini", "deepseek"];
+export const PROVIDER_ORDER = ["deepseek", "doubao", "claude", "openai", "gemini", "relay"];
 
 const ANTHROPIC_VERSION = "2026-10-21";
 
@@ -45,7 +58,8 @@ function base(cfg) {
   if (/^https?:\/\/[^/]+$/.test(b)) {
     const kind = PROVIDERS[cfg.provider]?.kind;
     if (kind === "gemini") b += "/v1beta/openai";
-    else if (kind === "openai" || kind === "anthropic") b += "/v1";
+    else if (kind === "doubao") b += "/api/v3";
+    else if (kind === "openai" || kind === "anthropic" || kind === "relay") b += "/v1";
   }
   return b;
 }
@@ -69,7 +83,11 @@ async function request(url, opts) {
   let res;
   try { res = await fetch(url, opts); }
   // 原生网络层断网时抛的不是 TypeError，凡是没拿到 HTTP 响应的都按网络问题提示
-  catch (e) { throw new Error(t("err.network") + (e?.message ? " (" + String(e.message).slice(0, 120) + ")" : "")); }
+  catch (e) {
+    // 网页版里浏览器会拦下服务商不允许的跨域请求，表现和断网一样
+    const web = !window.Capacitor?.isNativePlatform?.();
+    throw new Error(t("err.network") + (web ? " " + t("err.cors") : "") + (e?.message ? " (" + String(e.message).slice(0, 120) + ")" : ""));
+  }
   const text = await res.text();
   if (!res.ok) {
     let msg = text;
@@ -177,7 +195,7 @@ export async function chatJson(cfg, messages, opts) {
 }
 
 export async function testConnection(cfg) {
-  const r = await chat(cfg, [{ role: "user", content: "只回复两个字：连通" }], { maxTokens: 20, effort: "low" });
+  const r = await chat(cfg, [{ role: "user", content: "只回复两个字：连通" }], { maxTokens: 1024, effort: "low" });
   return r.trim();
 }
 

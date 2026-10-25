@@ -129,6 +129,7 @@ function showWriteHome() {
       ${books.length ? `<div class="list">${books.map((b) => `<div class="item"><div class="grow" data-book="${b.id}" role="button" tabindex="0"><b>${esc(b.title || t("book.untitled"))}</b><small>${esc(t("genre." + b.genre + ".short"))} · ${esc(trackLabel(b))} · ${t("home.nPassages", { n: b.n })} · ${date(b.updatedAt)}</small></div><button data-bdel="${b.id}">${t("common.delete")}</button></div>`).join("")}</div>`
         : `<p class="hint">${t("home.emptyBooks")}</p>`}
     </div>
+    ${isNative() ? "" : `<p class="notice">${t("web.storageNote")}</p>`}
     <p class="hint center-t"><a href="#/support">${t("sup.link")}</a></p>
   </div>`;
   $("#newbook").onclick = () => editBookMeta(null);
@@ -710,6 +711,7 @@ function showSupport() {
 let updateInfo = store.get("stl.update", null);
 function renderUpdateBanner() {
   const el = $("#update");
+  if (!isNative()) { el.hidden = true; return; } // 网页版打开就是最新，不需要更新提示
   const u = updateInfo && newerThan(updateInfo.version, VERSION) && store.get("stl.updateSkip", "") !== updateInfo.version ? updateInfo : null;
   el.hidden = !u;
   if (!u) return;
@@ -732,6 +734,51 @@ async function runUpdateCheck(manual) {
       else toast(t("upd.latest", { v: VERSION }));
     } else renderUpdateBanner();
   } catch (e) { if (manual) toast(t("upd.failed")); }
+}
+
+// ---------- 备份 ----------
+// 导出全部台词本、剧本和设置；API Key 一律不导出
+async function exportBackup() {
+  const data = {};
+  for (let i = 0; i < localStorage.length; i++) {
+    const k = localStorage.key(i);
+    if (k && k.startsWith("stl.") && !k.startsWith("stl.update")) data[k] = localStorage.getItem(k);
+  }
+  if (data["stl.settings"]) {
+    const s = JSON.parse(data["stl.settings"]);
+    for (const k of Object.keys(s.keys || {})) s.keys[k].apiKey = "";
+    data["stl.settings"] = JSON.stringify(s);
+  }
+  const out = JSON.stringify({ app: "script-workbench", v: 1, at: new Date().toISOString(), data }, null, 1);
+  const b64 = btoa(unescape(encodeURIComponent(out)));
+  try { await saveOrShare(`script-workbench-backup-${new Date().toISOString().slice(0, 10)}.json`, b64, "application/json"); } catch (e) { exportFailed(e); }
+}
+
+async function importBackup(file) {
+  let j;
+  try { j = JSON.parse(await file.text()); } catch { j = null; }
+  if (!j || j.app !== "script-workbench" || typeof j.data !== "object") return toast(t("set.importBad"));
+  const n = Object.keys(j.data).filter((k) => k.startsWith("stl.b.") || k.startsWith("stl.p.")).length;
+  confirmSheet(t("set.confirmImport", { n }), t("set.import"), () => {
+    for (const [k, v] of Object.entries(j.data)) {
+      if (!k.startsWith("stl.") || typeof v !== "string") continue;
+      if (k === "stl.settings") {
+        // 保留本机已填的 Key，只导入其他设置
+        const inc = JSON.parse(v);
+        for (const p of Object.keys(inc.keys || {})) if (settings.keys[p]) inc.keys[p].apiKey = settings.keys[p].apiKey;
+        try { localStorage.setItem(k, JSON.stringify(inc)); } catch {}
+      } else if (k === "stl.bindex" || k === "stl.index") {
+        // 目录合并：本机已有、备份里没有的条目也保留
+        const inc = JSON.parse(v), ids = new Set(inc.map((x) => x.id));
+        store.set(k, [...inc, ...store.get(k, []).filter((x) => !ids.has(x.id))]);
+      } else {
+        try { localStorage.setItem(k, v); } catch { return toast(t("err.storageFull")); }
+      }
+    }
+    settings = loadSettings(); saveSettings();
+    toast(t("set.importOk", { n }));
+    go("#/");
+  });
 }
 
 // ---------- 设置 ----------
@@ -766,9 +813,14 @@ function showSettings() {
       </div>
       <div class="btns"><button class="btn" id="r-save">${t("common.save")}</button><button class="btn" id="r-reset">${t("set.reset")}</button></div>
     </div>
+    <div class="panel"><h2>${t("set.backup")}</h2>
+      <p class="hint">${t("set.backupHint")}</p>
+      <div class="btns"><button class="btn" id="s-export">${t("set.export")}</button><button class="btn" id="s-import">${t("set.import")}</button></div>
+      <input type="file" id="s-importfile" accept=".json,application/json" hidden>
+    </div>
     <div class="panel"><h2>${t("set.about")}</h2>
-      <p class="hint">${t("set.aboutText", { v: VERSION })}</p>
-      <div class="btns"><button class="btn" id="s-upd">${t("set.checkUpdate")}</button><a class="btn" href="#/support">${t("sup.title")}</a></div>
+      <p class="hint">${t("set.aboutText", { v: VERSION })}${isNative() ? "" : "<br>" + t("set.webNote")}</p>
+      <div class="btns">${isNative() ? `<button class="btn" id="s-upd">${t("set.checkUpdate")}</button>` : ""}<a class="btn" href="#/support">${t("sup.title")}</a></div>
     </div>
   </div>`;
   $("#s-lang").onchange = (e) => { setLang(e.target.value); route(); toast(t("common.saved")); };
@@ -820,9 +872,12 @@ function showSettings() {
     saveSettings(); toast(t("common.saved"));
   };
   $("#r-reset").onclick = () => { $("#r-base").value = DEFAULT_RATES.base; $("#r-act").value = DEFAULT_RATES.action; $("#r-dia").value = DEFAULT_RATES.dialogue; $("#r-line").value = DEFAULT_RATES.perLine; };
-  $("#s-upd").onclick = () => runUpdateCheck(true);
+  if ($("#s-upd")) $("#s-upd").onclick = () => runUpdateCheck(true);
+  $("#s-export").onclick = exportBackup;
+  $("#s-import").onclick = () => $("#s-importfile").click();
+  $("#s-importfile").onchange = (e) => { const f = e.target.files[0]; e.target.value = ""; if (f) importBackup(f); };
 }
 
 route();
 // 启动后静默检查更新，最多每 12 小时一次
-if (Date.now() - store.get("stl.updateAt", 0) > 12 * 3600e3) setTimeout(() => runUpdateCheck(false), 1500);
+if (isNative() && Date.now() - store.get("stl.updateAt", 0) > 12 * 3600e3) setTimeout(() => runUpdateCheck(false), 1500);

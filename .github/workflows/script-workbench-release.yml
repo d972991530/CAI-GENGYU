@@ -1,5 +1,6 @@
-# 剧本结构台：改动推到 main 后自动打包签名、发布 GitHub Release，并更新下载页（GitHub Pages）。
-# 首次使用前需要在仓库 Settings 里配置签名密钥 Secrets，并把 Pages 来源设为 GitHub Actions，见 script-workbench/README.md。
+# 剧本结构台：改动推到 main 后自动发布网页版和下载页（GitHub Pages）；
+# 配好签名密钥 Secrets 时还会打包签名 APK 并发布 GitHub Release。
+# 首次使用前需要把 Pages 来源设为 GitHub Actions，见 script-workbench/README.md。
 name: script-workbench release
 
 on:
@@ -26,6 +27,8 @@ env:
 jobs:
   build:
     runs-on: ubuntu-latest
+    env:
+      HAS_KEYSTORE: ${{ secrets.KEYSTORE_BASE64 != '' }}
     outputs:
       version: ${{ steps.v.outputs.version }}
     steps:
@@ -56,6 +59,7 @@ jobs:
           fi
 
       - name: Build and sign APK
+        if: env.HAS_KEYSTORE == 'true'
         env:
           KEYSTORE_BASE64: ${{ secrets.KEYSTORE_BASE64 }}
           KEYSTORE_PASSWORD: ${{ secrets.KEYSTORE_PASSWORD }}
@@ -63,10 +67,6 @@ jobs:
           KEY_PASSWORD: ${{ secrets.KEY_PASSWORD }}
           V: ${{ steps.v.outputs.version }}
         run: |
-          if [ -z "$KEYSTORE_BASE64" ]; then
-            echo "::error::缺少签名密钥：请在仓库 Settings → Secrets and variables → Actions 添加 KEYSTORE_BASE64 等 4 个 Secret"
-            exit 1
-          fi
           mkdir -p out
           python3 script-workbench/tools/repack.py script-workbench/android/base.apk script-workbench/www out/unsigned.apk
           curl -sSfL -o "$RUNNER_TEMP/signer.jar" "$SIGNER_URL"
@@ -78,6 +78,7 @@ jobs:
           mv out/signed/*-aligned-signed.apk "out/script-workbench-$V.apk"
 
       - name: Publish GitHub Release
+        if: env.HAS_KEYSTORE == 'true'
         env:
           GH_TOKEN: ${{ github.token }}
           V: ${{ steps.v.outputs.version }}
@@ -100,9 +101,14 @@ jobs:
           V: ${{ steps.v.outputs.version }}
         run: |
           cp -r script-workbench/site _site
+          cp -r script-workbench/www _site/app
           cp script-workbench/version.json _site/version.json
           mkdir -p _site/download
-          cp "out/script-workbench-$V.apk" _site/download/script-workbench.apk
+          # 有签名密钥就用刚打的包，否则用仓库 download/ 里最新的已签名安装包
+          APK="out/script-workbench-$V.apk"
+          [ -f "$APK" ] || APK=$(ls script-workbench/download/*.apk | sort -V | tail -1)
+          echo "下载页使用的安装包：$APK"
+          cp "$APK" _site/download/script-workbench.apk
 
       - uses: actions/upload-pages-artifact@v3
         with:
